@@ -1,0 +1,77 @@
+﻿@page "/capelas"
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@rendermode InteractiveServer
+
+<MudText Typo="Typo.h4" Class="mb-4">Gestão de Capelas</MudText>
+
+<MudTable Items="@capelas" Hover="true" Elevation="2" Loading="@isLoading">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Capelas Cadastradas</MudText>
+        <MudSpacer />
+        @* Mudança: Garantindo que o OnClick aponte para a Task correta *@
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add" 
+                   OnClick="@((e) => AbrirModalNovaCapela())">
+            Nova Capela
+        </MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Nome</MudTh>
+        <MudTh>Localização</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Nome">@context.Nome</MudTd>
+        <MudTd DataLabel="Localização">@context.Localizacao</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" ToolTip="Excluir" OnClick="@(() => ExcluirCapela(context))" />
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private List<Capela> capelas = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync() => await CarregarCapelas();
+
+    private async Task CarregarCapelas()
+    {
+        isLoading = true;
+        capelas = await DbContext.Capelas.OrderBy(c => c.Nome).ToListAsync();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task AbrirModalNovaCapela()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        
+        // Chamada explícita do componente que criamos antes
+        var dialog = await DialogService.ShowAsync<CapelaDialog>("Cadastrar Nova Capela", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarCapelas();
+        }
+    }
+
+    private async Task ExcluirCapela(Capela capela)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("Confirmação", $"Excluir {capela.Nome}?", yesText: "Excluir", cancelText: "Cancelar");
+        if (confirm == true)
+        {
+            DbContext.Capelas.Remove(capela);
+            await DbContext.SaveChangesAsync();
+            await CarregarCapelas();
+        }
+    }
+}

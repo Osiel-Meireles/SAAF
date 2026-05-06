@@ -1,0 +1,89 @@
+﻿@page "/obitos"
+@using Microsoft.EntityFrameworkCore
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+
+<PageTitle>Gerenciar Atendimentos - Sakrus</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Gerenciar Atendimentos (Óbitos)</MudText>
+    <MudButton Href="/novo-atendimento" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Novo Registro</MudButton>
+</div>
+
+<MudTable Items="@listaAtendimentos" Hover="true" Striped="true" Elevation="2" T="Atendimento" Loading="@isLoading">
+    <HeaderContent>
+        <MudTh>ID</MudTh>
+        <MudTh>Responsável</MudTh>
+        <MudTh>Causa da Morte</MudTh>
+        <MudTh>Nº OS / Auxílio</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Responsável">@context.Responsavel.Nome</MudTd>
+        <MudTd DataLabel="Causa da Morte">@context.Falecido.CausaDaMorte.ToString()</MudTd>
+        <MudTd DataLabel="Nº OS / Auxílio">
+            @if (string.IsNullOrEmpty(context.NumeroOsAuxilio))
+            {
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Pendente</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Success" Size="Size.Small">@context.NumeroOsAuxilio</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Ações">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small" />
+            
+            @* Botão que abre o nosso novo Modal *@
+            <MudIconButton Icon="@Icons.Material.Filled.Receipt" Color="Color.Info" Size="Size.Small" OnClick="@(() => AbrirModalFaturamento(context.Id))" />
+            
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" RowsPerPageString="Linhas por página:" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<Atendimento> listaAtendimentos = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDadosAsync();
+    }
+
+    private async Task CarregarDadosAsync()
+    {
+        isLoading = true;
+        listaAtendimentos = await DbContext.Atendimentos
+            .Include(a => a.Responsavel)
+            .Include(a => a.Falecido)
+            .OrderByDescending(a => a.Id)
+            .ToListAsync();
+            
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task AbrirModalFaturamento(int id)
+    {
+        // Prepara os parâmetros para enviar ao Modal (Qual ID de atendimento abrir)
+        var parameters = new DialogParameters { ["AtendimentoId"] = id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        
+        // Abre o modal
+        var dialog = await DialogService.ShowAsync<FaturamentoDialog>("Faturamento do Atendimento", parameters, options);
+        var result = await dialog.Result;
+
+        // Se o usuário finalizou a OS (não cancelou), recarrega a tabela para atualizar a coluna "Nº OS / Auxílio"
+        if (!result.Canceled)
+        {
+            await CarregarDadosAsync();
+        }
+    }
+}

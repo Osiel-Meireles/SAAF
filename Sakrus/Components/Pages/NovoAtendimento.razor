@@ -1,0 +1,145 @@
+﻿@page "/novo-atendimento"
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Novo Atendimento - Sakrus</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Registro de Novo Atendimento</MudText>
+
+<MudPaper Class="pa-4" Elevation="2">
+    <MudForm @ref="form" @bind-IsValid="@sucesso">
+        <MudGrid>
+            @* --- 1. DADOS DO RESPONSÁVEL --- *@
+            <MudItem xs="12">
+                <MudText Typo="Typo.h6" Color="Color.Primary">Dados do Responsável</MudText>
+                <MudDivider Class="mb-3" />
+            </MudItem>
+            
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="novoAtendimento.Responsavel.Nome" Label="Nome Completo" Required="true" RequiredError="O nome é obrigatório" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="novoAtendimento.Responsavel.CPF" Label="CPF" Required="true" RequiredError="CPF obrigatório" Mask="@(new PatternMask("000.000.000-00"))" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="novoAtendimento.Responsavel.RG" Label="RG" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="novoAtendimento.Responsavel.OrgaoEmissor" Label="Órgão Emissor" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="novoAtendimento.Responsavel.Profissao" Label="Profissão" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="novoAtendimento.Responsavel.Telefone" Label="Telefone" Required="true" Mask="@(new PatternMask("(00) 00000-0000"))" />
+            </MudItem>
+            <MudItem xs="12" sm="9">
+                <MudTextField @bind-Value="novoAtendimento.Responsavel.Endereco" Label="Endereço Completo" Required="true" />
+            </MudItem>
+
+            @* --- 2. DADOS DO FALECIDO (Restritos) --- *@
+            <MudItem xs="12" Class="mt-4">
+                <MudText Typo="Typo.h6" Color="Color.Primary">Dados do Falecido</MudText>
+                <MudAlert Severity="Severity.Warning" Class="mb-2">Campos de identificação civil ocultados por regra de negócio.</MudAlert>
+                <MudDivider Class="mb-3" />
+            </MudItem>
+            
+            <MudItem xs="12" sm="4">
+                <MudSelect T="CausaMorte" Label="Causa da Morte" @bind-Value="novoAtendimento.Falecido.CausaDaMorte" Required="true">
+                    @foreach (CausaMorte causa in Enum.GetValues(typeof(CausaMorte)))
+                    {
+                        <MudSelectItem Value="@causa">@causa.ToString()</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="novoAtendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" Required="true" />
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="novoAtendimento.LocalFalecimento" Label="Local do Falecimento" Required="true" />
+            </MudItem>
+
+            @* --- 3. INFORMAÇÕES DO ATENDIMENTO --- *@
+            <MudItem xs="12" Class="mt-4">
+                <MudText Typo="Typo.h6" Color="Color.Primary">Classificação do Atendimento</MudText>
+                <MudDivider Class="mb-3" />
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudSelect T="PerfilAtendimento" Label="Perfil" @bind-Value="novoAtendimento.Perfil" Required="true">
+                    @foreach (PerfilAtendimento perfil in Enum.GetValues(typeof(PerfilAtendimento)))
+                    {
+                        <MudSelectItem Value="@perfil">@perfil.ToString()</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudSelect T="OrigemAtendimento" Label="Origem" @bind-Value="novoAtendimento.Origem" Required="true">
+                    @foreach (OrigemAtendimento origem in Enum.GetValues(typeof(OrigemAtendimento)))
+                    {
+                        <MudSelectItem Value="@origem">@origem.ToString()</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudSelect T="TipoProcedimento" Label="Procedimento" @bind-Value="novoAtendimento.Procedimento" Required="true">
+                    @foreach (TipoProcedimento procedimento in Enum.GetValues(typeof(TipoProcedimento)))
+                    {
+                        <MudSelectItem Value="@procedimento">@procedimento.ToString()</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            @* --- BOTÃO DE AÇÃO --- *@
+            <MudItem xs="12" Class="d-flex justify-end mt-4">
+                <MudButton Variant="Variant.Text" Color="Color.Default" Class="mr-2" OnClick="@Cancelar">Cancelar</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!sucesso)" OnClick="@SalvarAtendimento">Salvar Atendimento</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm form = null!;
+    private bool sucesso;
+    
+    // Instancia o objeto já com as entidades filhas para evitar NullReferenceException no Bind do form
+    private Atendimento novoAtendimento = new Atendimento
+    {
+        Responsavel = new Responsavel(),
+        Falecido = new Falecido()
+    };
+
+    private async Task SalvarAtendimento()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            try
+            {
+                // Salva os dados diretamente no banco usando o Entity Framework
+                DbContext.Atendimentos.Add(novoAtendimento);
+                await DbContext.SaveChangesAsync();
+                
+                Snackbar.Add("Atendimento registrado com sucesso!", Severity.Success);
+                Navigation.NavigateTo("/obitos");
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private void Cancelar()
+    {
+        Navigation.NavigateTo("/obitos");
+    }
+}

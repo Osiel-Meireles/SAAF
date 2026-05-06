@@ -1,0 +1,111 @@
+﻿@page "/"
+@using Sakrus.Core.Entities
+
+<PageTitle>Dashboard - Sakrus</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Dashboard Geral</MudText>
+
+<MudGrid>
+    @* --- Kpis (Resumo Rápido) --- *@
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center justify-center h-100">
+            <MudIcon Icon="@Icons.Material.Filled.Church" Color="Color.Primary" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.h5">@CapelasOcupadas / @TotalCapelas</MudText>
+            <MudText Typo="Typo.body2">Capelas Ocupadas</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center justify-center h-100">
+            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Info" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.h5">@TotalObitosMes</MudText>
+            <MudText Typo="Typo.body2">Óbitos este Mês</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center justify-center h-100">
+            <MudIcon Icon="@Icons.Material.Filled.SyncProblem" Color="Color.Warning" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.h5">@ExumacoesPendentes</MudText>
+            <MudText Typo="Typo.body2">Exumações Pendentes</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center justify-center h-100">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.h5">@ExumacoesAtrasadas</MudText>
+            <MudText Typo="Typo.body2">Exumações Atrasadas (> 3 anos)</MudText>
+        </MudPaper>
+    </MudItem>
+
+    @* --- Ocupação das Capelas (Lista) --- *@
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Status das Capelas</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudList T="Capela" ReadOnly="true">
+                    @foreach (var capela in Capelas)
+                    {
+                        <MudListItem>
+                            <div class="d-flex align-center">
+                                <MudIcon Icon="@Icons.Material.Filled.Church" Class="mr-3" 
+                                         Color="@(capela.Status == "Disponível" ? Color.Success : (capela.Status == "Ocupada" ? Color.Error : Color.Warning))" />
+                                <MudText><strong>@capela.Nome</strong> - @capela.Status</MudText>
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* --- Gráfico Simulado --- *@
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Óbitos Registrados (Últimos 6 meses)</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @* A propriedade T="double" é obrigatória no MudBlazor v9 para gráficos *@
+                <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@Series" XAxisLabels="@XAxisLabels" Width="100%" Height="300px" />
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    // --- Dados Simulados para os KPIs ---
+    private int TotalCapelas = 5;
+    private int CapelasOcupadas = 3;
+    private int TotalObitosMes = 12;
+    private int ExumacoesPendentes = 4;
+    private int ExumacoesAtrasadas = 2;
+
+    // --- Dados Simulados para as Capelas ---
+    private List<Capela> Capelas = new()
+    {
+        new Capela { Id = 1, Nome = "Capela Master 1", Status = "Ocupada" },
+        new Capela { Id = 2, Nome = "Capela Master 2", Status = "Disponível" },
+        new Capela { Id = 3, Nome = "Capela Padrão A", Status = "Ocupada" },
+        new Capela { Id = 4, Nome = "Capela Padrão B", Status = "Ocupada" },
+        new Capela { Id = 5, Nome = "Capela Social", Status = "Manutenção" }
+    };
+
+    // --- Dados Simulados para o Gráfico ---
+    public List<ChartSeries<double>> Series = new List<ChartSeries<double>>()
+    {
+        new ChartSeries<double>() 
+        { 
+            Name = "Óbitos", 
+            Data = new double[] { 15, 12, 18, 10, 22, 12 } 
+        }
+    };
+    public string[] XAxisLabels = { "Dez", "Jan", "Fev", "Mar", "Abr", "Mai" };
+}

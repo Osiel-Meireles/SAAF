@@ -1,0 +1,166 @@
+﻿@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Sakrus.Services
+@using Microsoft.EntityFrameworkCore
+@inject AtendimentoFaturamentoService FaturamentoService
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject RelatorioService RelatorioService
+
+<MudDialog>
+    <DialogContent>
+        @if (atendimento == null)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        }
+        else
+        {
+            <MudText Typo="Typo.subtitle1" Class="mb-4">
+                <strong>Responsável:</strong> @atendimento.Responsavel?.Nome <br />
+                <strong>Status da OS:</strong> 
+                @if (string.IsNullOrEmpty(atendimento.NumeroOsAuxilio))
+                {
+                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Pendente</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">@atendimento.NumeroOsAuxilio</MudChip>
+                }
+            </MudText>
+
+            @if (string.IsNullOrEmpty(atendimento.NumeroOsAuxilio))
+            {
+                <MudGrid Class="mb-4 align-end">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" Label="Categoria do Item" @bind-Value="novoCategoria">
+                            <MudSelectItem Value="@("urna padrão")">Urna Padrão</MudSelectItem>
+                            <MudSelectItem Value="@("urna especial")">Urna Especial</MudSelectItem>
+                            <MudSelectItem Value="@("translado (km)")">Translado (KM)</MudSelectItem>
+                            <MudSelectItem Value="@("pompa")">Pompa</MudSelectItem>
+                            <MudSelectItem Value="@("preparo")">Preparo</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudNumericField @bind-Value="novaQuantidade" Label="Qtd / KM" Min="1" />
+                    </MudItem>
+                    <MudItem xs="12" sm="2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AdicionarItem">Add</MudButton>
+                    </MudItem>
+                </MudGrid>
+            }
+
+            <MudTable Items="atendimento.ItensFaturados" Dense="true" Hover="true" Elevation="1">
+                <HeaderContent>
+                    <MudTh>Categoria</MudTh>
+                    <MudTh>Qtd/KM</MudTh>
+                    <MudTh>Valor Total</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Categoria">@context.CategoriaItem</MudTd>
+                    <MudTd DataLabel="Qtd/KM">@context.QuantidadeOuKm</MudTd>
+                    <MudTd DataLabel="Valor Total">R$ @context.ValorTotalCalculado.ToString("N2")</MudTd>
+                </RowTemplate>
+                <FooterContent>
+                    <MudTd colspan="2" class="text-right"><strong>Total Geral:</strong></MudTd>
+                    <MudTd><strong>R$ @atendimento.ItensFaturados.Sum(i => i.ValorTotalCalculado).ToString("N2")</strong></MudTd>
+                </FooterContent>
+            </MudTable>
+
+            @if (string.IsNullOrEmpty(atendimento.NumeroOsAuxilio))
+            {
+                <MudGrid Class="mt-4">
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="numeroGuia" Label="Nº da Guia do Auxílio (CAAF)" Required="true" HelperText="Deixe em branco para o sistema gerar um automático, ou digite a guia física." />
+                    </MudItem>
+                </MudGrid>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Fechar">Cancelar</MudButton>
+        @if (atendimento != null && string.IsNullOrEmpty(atendimento.NumeroOsAuxilio))
+        {
+            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="GerarOS" Disabled="@(atendimento.ItensFaturados.Count == 0)">
+                Gerar OS e Finalizar
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int AtendimentoId { get; set; }
+
+    private Atendimento? atendimento;
+    private string novoCategoria = "urna padrão";
+    private decimal novaQuantidade = 1;
+    private string numeroGuia = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await DbContext.ConfiguracoesFinanceiras.AnyAsync())
+        {
+            DbContext.ConfiguracoesFinanceiras.Add(new ConfiguracaoFinanceira { DataUltimaAtualizacao = DateTime.UtcNow });
+            await DbContext.SaveChangesAsync();
+        }
+
+        await CarregarAtendimento();
+    }
+
+    private async Task CarregarAtendimento()
+    {
+        atendimento = await DbContext.Atendimentos
+            .Include(a => a.Responsavel)
+            .Include(a => a.Falecido)
+            .Include(a => a.ItensFaturados)
+            .FirstOrDefaultAsync(a => a.Id == AtendimentoId);
+    }
+
+    private async Task AdicionarItem()
+    {
+        try
+        {
+            await FaturamentoService.AdicionarItemFaturadoAsync(AtendimentoId, novoCategoria, novaQuantidade);
+            Snackbar.Add("Item adicionado!", Severity.Success);
+            await CarregarAtendimento(); 
+            novaQuantidade = 1; 
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task GerarOS()
+    {
+        try
+        {
+            var guiaFinal = string.IsNullOrWhiteSpace(numeroGuia) ? $"AUTO-{DateTime.Now.Millisecond}" : numeroGuia;
+            
+            await FaturamentoService.GerarOrdemServicoUnificadaAsync(AtendimentoId, guiaFinal);
+            
+            // Recarrega para pegar os dados atualizados da OS
+            await CarregarAtendimento();
+
+            if (atendimento != null)
+            {
+                var pdfBytes = RelatorioService.GerarPdfOrdemServico(atendimento);
+                var fileName = $"OS_{atendimento.NumeroOsAuxilio}.pdf";
+                
+                // Dispara o download via JS
+                await JS.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(pdfBytes));
+            }
+
+            Snackbar.Add("Ordem de Serviço gerada e enviada para impressão!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private void Fechar() => MudDialog.Cancel();
+}

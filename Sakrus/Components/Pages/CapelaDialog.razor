@@ -1,0 +1,44 @@
+﻿@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+@rendermode InteractiveServer
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Nova Capela / Sala de Velório</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="novaCapela.Nome" Label="Nome da Capela" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="novaCapela.Localizacao" Label="Localização (Ex: Setor A)" Class="mt-4" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar">Salvar Capela</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    // Assumindo que sua entidade Capela tenha Nome e Localizacao
+    private Capela novaCapela = new();
+
+    private async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(novaCapela.Nome))
+        {
+            Snackbar.Add("O nome da capela é obrigatório.", Severity.Error);
+            return;
+        }
+
+        DbContext.Capelas.Add(novaCapela);
+        await DbContext.SaveChangesAsync();
+        
+        Snackbar.Add("Capela cadastrada com sucesso!", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

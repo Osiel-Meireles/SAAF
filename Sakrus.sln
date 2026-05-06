@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sakrus", "Sakrus\Sakrus.csproj", "{9C702EDA-59A8-4765-A22F-210FF8A14BF0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sakrus.Core", "Sakrus.Core\Sakrus.Core.csproj", "{AEE40591-01A9-4D9F-8122-6DE043F9B34D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sakrus.Infrastructure", "Sakrus.Infrastructure\Sakrus.Infrastructure.csproj", "{5D7EF9EE-29E7-43D5-9B70-E7E30366CAEB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9C702EDA-59A8-4765-A22F-210FF8A14BF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C702EDA-59A8-4765-A22F-210FF8A14BF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C702EDA-59A8-4765-A22F-210FF8A14BF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C702EDA-59A8-4765-A22F-210FF8A14BF0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AEE40591-01A9-4D9F-8122-6DE043F9B34D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AEE40591-01A9-4D9F-8122-6DE043F9B34D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AEE40591-01A9-4D9F-8122-6DE043F9B34D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AEE40591-01A9-4D9F-8122-6DE043F9B34D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D7EF9EE-29E7-43D5-9B70-E7E30366CAEB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D7EF9EE-29E7-43D5-9B70-E7E30366CAEB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D7EF9EE-29E7-43D5-9B70-E7E30366CAEB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D7EF9EE-29E7-43D5-9B70-E7E30366CAEB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+	EndGlobalSection
+EndGlobal

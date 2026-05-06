@@ -1,0 +1,114 @@
+﻿@page "/jazigos"
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h4" Class="mb-4">Gestão de Jazigos</MudText>
+
+<MudTable Items="@listaJazigos" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="2" Loading="@isLoading">
+    <HeaderContent>
+        <MudTh>Identificador</MudTh>
+        <MudTh>Modelo</MudTh>
+        <MudTh>Tipo</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Identificador">@context.CodigoIdentificador</MudTd>
+        <MudTd DataLabel="Modelo">@context.ModeloJazigo?.Nome</MudTd>
+        <MudTd DataLabel="Tipo">@(context.IsInfantil ? "Infantil" : "Adulto")</MudTd>
+        <MudTd DataLabel="Status">
+            @if (context.JazigoPaiId != null)
+            {
+                <MudChip T="string" Color="Color.Info" Size="Size.Small">Sub-lote</MudChip>
+            }
+            @if (context.Ocupado)
+            {
+                <MudChip T="string" Color="Color.Error" Size="Size.Small">Ocupado / Divisivo</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Success" Size="Size.Small">Livre</MudChip>
+            }
+        </MudTd>
+        <MudTd>
+            @if (context.JazigoPaiId == null && !context.Ocupado)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.AccountTree" 
+                               Color="Color.Secondary" 
+                               ToolTip="Desmembrar Lote"
+                               OnClick="@(() => AbrirDialogDesmembramento(context))" />
+            }
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private List<Jazigo> listaJazigos = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await popularDadosIniciais();
+        await CarregarDados();
+    }
+
+    private async Task popularDadosIniciais()
+    {
+        var modelo = await DbContext.ModelosJazigos.FirstOrDefaultAsync();
+        if (modelo == null)
+        {
+            // Removida a propriedade 'Descricao' que causava o erro CS0117
+            modelo = new ModeloJazigo { Nome = "Padrão Municipal" };
+            DbContext.ModelosJazigos.Add(modelo);
+            await DbContext.SaveChangesAsync();
+        }
+
+        if (!await DbContext.Jazigos.AnyAsync())
+        {
+            for (int i = 1; i <= 5; i++)
+            {
+                DbContext.Jazigos.Add(new Jazigo
+                {
+                    CodigoIdentificador = $"Lote {i.ToString("D2")}",
+                    ModeloJazigoId = modelo.Id,
+                    IsInfantil = false,
+                    Ocupado = false
+                });
+            }
+            await DbContext.SaveChangesAsync();
+        }
+    }
+
+    private async Task CarregarDados()
+    {
+        isLoading = true;
+        listaJazigos = await DbContext.Jazigos
+            .Include(j => j.ModeloJazigo)
+            .OrderBy(j => j.CodigoIdentificador)
+            .ToListAsync();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task AbrirDialogDesmembramento(Jazigo jazigo)
+    {
+        var parameters = new DialogParameters { 
+            ["JazigoId"] = jazigo.Id, 
+            ["CodigoIdentificadorPai"] = jazigo.CodigoIdentificador 
+        };
+        
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DesmembramentoDialog>("Desmembrar Lote", parameters, options);
+        var result = await dialog.Result;
+
+        // Corrigido erro CS0023: Removido o operador '!' aplicado incorretamente ao DialogResult
+        if (result != null && !result.Canceled) 
+        {
+            await CarregarDados();
+        }
+    }
+}

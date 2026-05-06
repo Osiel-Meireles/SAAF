@@ -1,0 +1,81 @@
+﻿@page "/exumacoes"
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4" Class="mb-4">Controle de Exumações</MudText>
+
+<MudAlert Severity="Severity.Warning" Class="mb-4">
+    Listagem de gavetas ocupadas. Verifique as datas de previsão para organizar as retiradas de restos mortais.
+</MudAlert>
+
+<MudTable Items="@gavetasOcupadas" Hover="true" Elevation="2" Loading="@isLoading">
+    <HeaderContent>
+        <MudTh>Gaveta</MudTh>
+        <MudTh>Data Ocupação</MudTh>
+        <MudTh>Previsão Exumação</MudTh>
+        <MudTh>Status Prazo</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Gaveta">@context.NumeroGaveta</MudTd>
+        <MudTd DataLabel="Data Ocupação">@context.DataOcupacao?.ToString("dd/MM/yyyy")</MudTd>
+        <MudTd DataLabel="Previsão Exumação">@context.DataPrevisaoExumacao?.ToString("dd/MM/yyyy")</MudTd>
+        <MudTd DataLabel="Status Prazo">
+            @if (context.DataPrevisaoExumacao < DateTime.Today)
+            {
+                <MudChip T="string" Color="Color.Error" Size="Size.Small">Vencido</MudChip>
+            }
+            else if (context.DataPrevisaoExumacao <= DateTime.Today.AddDays(30))
+            {
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Próximo</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Success" Size="Size.Small">Em Prazo</MudChip>
+            }
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Event" 
+                           Color="Color.Warning" 
+                           ToolTip="Reagendar Exumação" 
+                           OnClick="@(() => AbrirAgendamento(context))" />
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private List<GavetaPublica> gavetasOcupadas = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync() => await CarregarDados();
+
+    private async Task CarregarDados()
+    {
+        isLoading = true;
+        // Filtra apenas as que estão ocupadas para gerenciar a exumação
+        gavetasOcupadas = await DbContext.GavetasPublicas
+            .Where(g => g.Ocupada)
+            .OrderBy(g => g.DataPrevisaoExumacao)
+            .ToListAsync();
+        isLoading = false;
+    }
+
+    private async Task AbrirAgendamento(GavetaPublica gaveta)
+    {
+        var parameters = new DialogParameters { ["GavetaId"] = gaveta.Id, ["GavetaNumero"] = gaveta.NumeroGaveta };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<AgendarExumacaoDialog>("Programar Retirada", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarDados();
+        }
+    }
+}
