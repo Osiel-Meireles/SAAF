@@ -2,24 +2,27 @@ services:
   db:
     image: postgres:latest
     container_name: sakrus-db
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD:-1234}
       POSTGRES_DB: SakrusDb
     ports:
-      - "5432:5432"
+      - "5032:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   web:
     build: .
     container_name: sakrus-app
+    restart: always
     depends_on:
       - db
     environment:
+      - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=SakrusDb;Username=postgres;Password=${DB_PASSWORD:-1234}
     ports:
-      - "8080:8080"
+      - "8085:8080" # Acesse via porta 8085 no navegador
 
 volumes:
   postgres_data:
