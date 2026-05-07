@@ -10,7 +10,7 @@ services:
     ports:
       - "5439:5432"
     volumes:
-      - /mnt/data/postgresql/saaf_data:/var/lib/postgresql/data
+      - /mnt/data/postgresql/saaf_data:/var/lib/postgresql
 
   web:
     build: .
@@ -22,4 +22,4 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=SakrusDb;Username=postgres;Password=${DB_PASSWORD:-1234}
     ports:
-      - "8085:8080" # Acesse via porta 8085 no navegador
+      - "8085:8080"
