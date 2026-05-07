@@ -1,0 +1,7 @@
+services:
+  web:
+    restart: always
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+  db:
+    restart: always

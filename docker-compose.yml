@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: sakrus-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-1234}
+      POSTGRES_DB: SakrusDb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  web:
+    build: .
+    container_name: sakrus-app
+    depends_on:
+      - db
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=SakrusDb;Username=postgres;Password=${DB_PASSWORD:-1234}
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
