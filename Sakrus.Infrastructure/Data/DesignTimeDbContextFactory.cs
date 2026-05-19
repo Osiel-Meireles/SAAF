@@ -9,8 +9,9 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<Applicatio
     {
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
         
-        // Insira a mesma connection string que você colocou no appsettings.json do projeto Web
-        var connectionString = "Host=localhost;Port=5432;Database=sakrus_db;Username=postgres;Password=sua_senha_aqui";
+        // Usa variável de ambiente para segurança (ou padrão para desenvolvimento)
+        var connectionString = Environment.GetEnvironmentVariable("SAKRUS_DB_CONNECTION") 
+            ?? "Host=localhost;Port=5432;Database=sakrus_db;Username=postgres;Password=1234";
         
         optionsBuilder.UseNpgsql(connectionString);
 

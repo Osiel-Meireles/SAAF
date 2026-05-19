@@ -1,0 +1,168 @@
+@page "/estoque"
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+<PageTitle>Almoxarifado e Estoque - Sakrus</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Controle de Estoque e Almoxarifado</MudText>
+
+<MudTable Items="@produtos" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@isLoading" LoadingProgressColor="Color.Info" Dense="true" Elevation="2">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Produtos Disponíveis</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddForm">Novo Produto</MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>ID</MudTh>
+        <MudTh>Nome / Categoria</MudTh>
+        <MudTh>Qtd. Disponível</MudTh>
+        <MudTh>Estoque Mínimo</MudTh>
+        <MudTh>Custo (R$)</MudTh>
+        <MudTh>Venda (R$)</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Nome">@context.Nome</MudTd>
+        <MudTd DataLabel="Disponível">@context.QuantidadeDisponivel</MudTd>
+        <MudTd DataLabel="Mínimo">@context.EstoqueMinimo</MudTd>
+        <MudTd DataLabel="Custo">@context.Custo.ToString("N2")</MudTd>
+        <MudTd DataLabel="Venda">@context.ValorVenda.ToString("N2")</MudTd>
+        <MudTd DataLabel="Status">
+            @if (context.QuantidadeDisponivel <= context.EstoqueMinimo)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Warning">Abaixo do Mínimo</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success">OK</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Ações">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenEditForm(context))" />
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@if (showForm)
+{
+    <MudPaper Class="pa-4 mt-4" Elevation="3">
+        <MudText Typo="Typo.h6" Class="mb-3">@(isEditing ? "Editar Produto" : "Novo Produto")</MudText>
+        <MudForm @ref="form" @bind-IsValid="sucesso">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentProduto.Nome" Label="Nome do Produto/Categoria" Required="true" RequiredError="Nome é obrigatório" HelperText="Ex: Urna Básica, Placa de Bronze" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField @bind-Value="currentProduto.QuantidadeDisponivel" Label="Quantidade" Required="true" Min="0" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField @bind-Value="currentProduto.EstoqueMinimo" Label="Estoque Mínimo (Alerta)" Required="true" Min="1" />
+                </MudItem>
+                
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="currentProduto.Custo" Label="Custo Unitário (R$)" Format="N2" HideSpinButtons="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="currentProduto.ValorVenda" Label="Valor de Venda Base (R$)" Format="N2" HideSpinButtons="true" />
+                </MudItem>
+
+                <MudItem xs="12" Class="d-flex justify-end mt-4">
+                    <MudButton Variant="Variant.Text" OnClick="CloseForm" Class="mr-2">Cancelar</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!sucesso)" OnClick="Save">Salvar</MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </MudPaper>
+}
+
+@code {
+    private List<ProdutoEstoque> produtos = new();
+    private bool isLoading = true;
+    private bool showForm = false;
+    private bool isEditing = false;
+    private bool sucesso;
+    private MudForm form = null!;
+    
+    private ProdutoEstoque currentProduto = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        produtos = await DbContext.ProdutosEstoque.OrderBy(p => p.Nome).ToListAsync();
+        isLoading = false;
+    }
+
+    private void OpenAddForm()
+    {
+        currentProduto = new ProdutoEstoque { QuantidadeDisponivel = 0, EstoqueMinimo = 5 };
+        isEditing = false;
+        showForm = true;
+    }
+
+    private void OpenEditForm(ProdutoEstoque produto)
+    {
+        currentProduto = new ProdutoEstoque
+        {
+            Id = produto.Id,
+            Nome = produto.Nome,
+            QuantidadeDisponivel = produto.QuantidadeDisponivel,
+            EstoqueMinimo = produto.EstoqueMinimo,
+            Custo = produto.Custo,
+            ValorVenda = produto.ValorVenda
+        };
+        isEditing = true;
+        showForm = true;
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+        currentProduto = new ProdutoEstoque();
+    }
+
+    private async Task Save()
+    {
+        await form.Validate();
+        if (!form.IsValid) return;
+
+        try
+        {
+            if (isEditing)
+            {
+                var p = await DbContext.ProdutosEstoque.FindAsync(currentProduto.Id);
+                if (p != null)
+                {
+                    p.Nome = currentProduto.Nome;
+                    p.QuantidadeDisponivel = currentProduto.QuantidadeDisponivel;
+                    p.EstoqueMinimo = currentProduto.EstoqueMinimo;
+                    p.Custo = currentProduto.Custo;
+                    p.ValorVenda = currentProduto.ValorVenda;
+                    DbContext.ProdutosEstoque.Update(p);
+                }
+            }
+            else
+            {
+                DbContext.ProdutosEstoque.Add(currentProduto);
+            }
+
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add("Produto salvo com sucesso!", Severity.Success);
+            CloseForm();
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+        }
+    }
+}

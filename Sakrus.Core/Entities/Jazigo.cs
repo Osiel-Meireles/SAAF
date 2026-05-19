@@ -1,11 +1,15 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using Sakrus.Core.Enums;
 
 namespace Sakrus.Core.Entities;
 
 public class Jazigo
 {
-    [Key]
     public int Id { get; set; }
+    
+    [Required]
+    [MaxLength(50)]
     public string CodigoIdentificador { get; set; } = string.Empty;
     
     public int ModeloJazigoId { get; set; }
@@ -19,5 +23,9 @@ public class Jazigo
     public Jazigo? JazigoPai { get; set; }
     
     // Coordenadas SVG ou GPS para integração com o Mapa Gráfico
-    public string CoordenadasMapa { get; set; } = string.Empty; 
+    [MaxLength(250)]
+    public string CoordenadasMapa { get; set; } = string.Empty;
+    
+    // Relacionamento 1:N com Falecidos sepultados neste Jazigo
+    public List<Falecido> Falecidos { get; set; } = new();
 }

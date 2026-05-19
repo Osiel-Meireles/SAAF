@@ -1,0 +1,170 @@
+@page "/funerarias"
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+<PageTitle>Funerárias Parceiras - Sakrus</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Gerenciamento de Funerárias</MudText>
+
+<MudTable Items="@funerarias" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@isLoading" LoadingProgressColor="Color.Info" Dense="true" Elevation="2">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Funerárias Credenciadas</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddForm">Nova Funerária</MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>ID</MudTh>
+        <MudTh>Nome</MudTh>
+        <MudTh>CNPJ</MudTh>
+        <MudTh>Telefone</MudTh>
+        <MudTh>Endereço</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Nome">@context.Nome</MudTd>
+        <MudTd DataLabel="CNPJ">@context.CNPJ</MudTd>
+        <MudTd DataLabel="Telefone">@context.Telefone</MudTd>
+        <MudTd DataLabel="Endereço">@context.Endereco</MudTd>
+        <MudTd DataLabel="Ações">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenEditForm(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => Delete(context))" />
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@if (showForm)
+{
+    <MudPaper Class="pa-4 mt-4" Elevation="3">
+        <MudText Typo="Typo.h6" Class="mb-3">@(isEditing ? "Editar Funerária" : "Nova Funerária")</MudText>
+        <MudForm @ref="form" @bind-IsValid="sucesso">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentFuneraria.Nome" Label="Nome da Funerária" Required="true" RequiredError="Nome é obrigatório" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentFuneraria.CNPJ" Label="CNPJ" Required="false" Mask="@(new PatternMask("00.000.000/0001-00"))" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentFuneraria.Telefone" Label="Telefone" Required="false" Mask="@(new PatternMask("(00) 00000-0000"))" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentFuneraria.Endereco" Label="Endereço Completo" Required="false" />
+                </MudItem>
+                <MudItem xs="12" Class="d-flex justify-end mt-4">
+                    <MudButton Variant="Variant.Text" OnClick="CloseForm" Class="mr-2">Cancelar</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!sucesso)" OnClick="Save">Salvar</MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </MudPaper>
+}
+
+@code {
+    private List<Funeraria> funerarias = new();
+    private bool isLoading = true;
+    private bool showForm = false;
+    private bool isEditing = false;
+    private bool sucesso;
+    private MudForm form = null!;
+    
+    private Funeraria currentFuneraria = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        funerarias = await DbContext.Funerarias.OrderBy(f => f.Nome).ToListAsync();
+        isLoading = false;
+    }
+
+    private void OpenAddForm()
+    {
+        currentFuneraria = new Funeraria();
+        isEditing = false;
+        showForm = true;
+    }
+
+    private void OpenEditForm(Funeraria funeraria)
+    {
+        // Cria uma cópia simples para edição
+        currentFuneraria = new Funeraria
+        {
+            Id = funeraria.Id,
+            Nome = funeraria.Nome,
+            CNPJ = funeraria.CNPJ,
+            Telefone = funeraria.Telefone,
+            Endereco = funeraria.Endereco
+        };
+        isEditing = true;
+        showForm = true;
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+        currentFuneraria = new Funeraria();
+    }
+
+    private async Task Save()
+    {
+        await form.Validate();
+        if (!form.IsValid) return;
+
+        try
+        {
+            if (isEditing)
+            {
+                var f = await DbContext.Funerarias.FindAsync(currentFuneraria.Id);
+                if (f != null)
+                {
+                    f.Nome = currentFuneraria.Nome;
+                    f.CNPJ = currentFuneraria.CNPJ;
+                    f.Telefone = currentFuneraria.Telefone;
+                    f.Endereco = currentFuneraria.Endereco;
+                    DbContext.Funerarias.Update(f);
+                }
+            }
+            else
+            {
+                DbContext.Funerarias.Add(currentFuneraria);
+            }
+
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add("Funerária salva com sucesso!", Severity.Success);
+            CloseForm();
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Delete(Funeraria funeraria)
+    {
+        // Idealmente usar um dialog de confirmação, mas simplificando para o MVP
+        try
+        {
+            var f = await DbContext.Funerarias.FindAsync(funeraria.Id);
+            if (f != null)
+            {
+                DbContext.Funerarias.Remove(f);
+                await DbContext.SaveChangesAsync();
+                Snackbar.Add("Funerária removida.", Severity.Success);
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Não é possível remover funerária em uso ({ex.Message})", Severity.Error);
+        }
+    }
+}

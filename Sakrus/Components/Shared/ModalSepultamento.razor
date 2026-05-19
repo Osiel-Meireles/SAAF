@@ -1,0 +1,73 @@
+﻿@using Sakrus.Core.Entities
+@using Sakrus.Core.Enums
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            <strong>Jazigo Selecionado:</strong> @JazigoSelecionado.CodigoIdentificador
+            @if (JazigoSelecionado.IsInfantil)
+            {
+                <MudChip T="string" Color="Color.Primary" Size="Size.Small" Class="ml-2">Infantil</MudChip>
+            }
+        </MudAlert>
+
+        <MudForm Model="@NovoFalecido" @ref="_form">
+            <MudTextField @bind-Value="NovoFalecido.Nome" 
+                          Label="Nome do Falecido" 
+                          Required="true" 
+                          RequiredError="O nome é obrigatório" 
+                          Class="mb-3" />
+
+            <MudTextField @bind-Value="NovoFalecido.Cpf" 
+                          Label="CPF (Opcional)" 
+                          Mask="@(new PatternMask("000.000.000-00"))" 
+                          Class="mb-3" />
+
+            <MudDatePicker @bind-Date="_dataFalecimento" 
+                           Label="Data do Falecimento" 
+                           Required="true" 
+                           Class="mb-3" />
+            
+            <MudSelect T="CausaMorte" @bind-Value="NovoFalecido.CausaMorte" Label="Causa da Morte" Required="true" Class="mb-3">
+                @foreach (CausaMorte item in Enum.GetValues(typeof(CausaMorte)))
+                {
+                    <MudSelectItem Value="@item">@item.ToString()</MudSelectItem>
+                }
+            </MudSelect>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="Confirmar">Confirmar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    IMudDialogInstance MudDialog { get; set; }
+    
+    [Parameter] 
+    public Jazigo JazigoSelecionado { get; set; }
+    
+    private Falecido NovoFalecido = new Falecido();
+    private DateTime? _dataFalecimento = DateTime.Today;
+    private MudForm _form;
+
+    private async Task Confirmar()
+    {
+        await _form.Validate();
+        if (_form.IsValid)
+        {
+            NovoFalecido.DataFalecimento = _dataFalecimento ?? DateTime.Today;
+            NovoFalecido.JazigoId = JazigoSelecionado.Id;
+            
+            MudDialog.Close(DialogResult.Ok(NovoFalecido));
+        }
+    }
+
+    private void Cancelar()
+    {
+        MudDialog.Cancel();
+    }
+}

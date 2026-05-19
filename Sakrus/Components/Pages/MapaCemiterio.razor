@@ -1,0 +1,72 @@
+@page "/mapa-cemiterio"
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+
+<PageTitle>Mapa Espacial do Cemitério - Sakrus</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Visão Espacial - Mapa de Jazigos</MudText>
+
+@if (jazigos == null)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <div class="d-flex gap-4">
+            <MudChip T="string" Size="Size.Small" Color="Color.Success">Livre (@livres)</MudChip>
+            <MudChip T="string" Size="Size.Small" Color="Color.Error">Ocupado (@ocupados)</MudChip>
+        </div>
+    </MudPaper>
+
+    <MudGrid>
+        @foreach (var jazigo in jazigos)
+        {
+            <MudItem xs="6" sm="4" md="3" lg="2">
+                <MudCard Elevation="2" Style="@($"border-left: 6px solid {(jazigo.Ocupado ? "red" : "green")}; cursor: pointer;")" @onclick="() => AbrirDetalhes(jazigo)">
+                    <MudCardContent Class="py-3 px-3">
+                        <MudText Typo="Typo.subtitle1" Align="Align.Center"><b>Jazigo @jazigo.CodigoIdentificador</b></MudText>
+                        <MudText Typo="Typo.caption" Align="Align.Center" Style="display:block;">
+                            @(jazigo.Ocupado ? "OCUPADO" : "LIVRE")
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<Jazigo> jazigos;
+    private int livres = 0;
+    private int ocupados = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        jazigos = await DbContext.Jazigos
+            .Include(j => j.ModeloJazigo)
+            .OrderBy(j => j.CodigoIdentificador)
+            .ToListAsync();
+            
+        ocupados = jazigos.Count(j => j.Ocupado);
+        livres = jazigos.Count - ocupados;
+    }
+
+    private async Task AbrirDetalhes(Jazigo jazigo)
+    {
+        var parameters = new DialogParameters { ["JazigoId"] = jazigo.Id };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<DetalhesJazigoDialog>("Detalhes do Jazigo", parameters, options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            // Recarrega se houve transferência
+            await OnInitializedAsync();
+        }
+    }
+}

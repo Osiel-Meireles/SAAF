@@ -1,111 +1,385 @@
-﻿@page "/"
+@page "/"
 @using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject ApplicationDbContext DbContext
 
-<PageTitle>Dashboard - Sakrus</PageTitle>
+<PageTitle>Dashboard — Sakrus</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Dashboard Geral</MudText>
+@if (_carregando)
+{
+    <div class="d-flex align-center justify-center" style="min-height: 60vh;">
+        <div class="text-center">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            <MudText Typo="Typo.body1" Class="mt-4" Style="color: var(--mud-palette-text-secondary);">
+                Carregando dados do sistema...
+            </MudText>
+        </div>
+    </div>
+}
+else
+{
+    @* ── Cabeçalho ── *@
+    <div class="d-flex justify-space-between align-center mb-6 flex-wrap gap-2">
+        <div>
+            <MudText Typo="Typo.h4" Style="font-weight:700;">Dashboard Geral</MudText>
+            <MudText Typo="Typo.caption" Style="color:var(--mud-palette-text-secondary);">
+                Atualizado em @_ultimaAtualizacao.ToString("dd/MM/yyyy 'às' HH:mm")
+            </MudText>
+        </div>
+        <MudButton StartIcon="@Icons.Material.Filled.Refresh"
+                   Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   OnClick="@CarregarDados"
+                   Size="Size.Small">
+            Atualizar
+        </MudButton>
+    </div>
 
-<MudGrid>
-    @* --- Kpis (Resumo Rápido) --- *@
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center justify-center h-100">
-            <MudIcon Icon="@Icons.Material.Filled.Church" Color="Color.Primary" Size="Size.Large" Class="mb-2" />
-            <MudText Typo="Typo.h5">@CapelasOcupadas / @TotalCapelas</MudText>
-            <MudText Typo="Typo.body2">Capelas Ocupadas</MudText>
-        </MudPaper>
-    </MudItem>
+    @* ── ROW 1: KPIs principais ── *@
+    <MudGrid Class="mb-2">
 
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center justify-center h-100">
-            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Info" Size="Size.Large" Class="mb-2" />
-            <MudText Typo="Typo.h5">@TotalObitosMes</MudText>
-            <MudText Typo="Typo.body2">Óbitos este Mês</MudText>
-        </MudPaper>
-    </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="3" Class="pa-4 h-100 dashboard-kpi-card">
+                <div class="d-flex align-center justify-space-between mb-2">
+                    <MudText Typo="Typo.overline" Style="color:var(--mud-palette-text-secondary); letter-spacing:1px;">
+                        CAPELAS
+                    </MudText>
+                    <div class="kpi-icon-bg kpi-primary">
+                        <MudIcon Icon="@Icons.Material.Filled.Church" Color="Color.Primary" />
+                    </div>
+                </div>
+                <MudText Typo="Typo.h4" Style="font-weight:700;">@_capelasOcupadas<span style="font-size:1rem; font-weight:400; opacity:.6;"> / @_totalCapelas</span></MudText>
+                <MudText Typo="Typo.body2" Style="color:var(--mud-palette-text-secondary);">Ocupadas de @_totalCapelas disponíveis</MudText>
+                @if (_totalCapelas > 0)
+                {
+                    <MudProgressLinear Color="Color.Primary" Value="@((double)_capelasOcupadas / _totalCapelas * 100)" Class="mt-2" Rounded="true" />
+                }
+            </MudPaper>
+        </MudItem>
 
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center justify-center h-100">
-            <MudIcon Icon="@Icons.Material.Filled.SyncProblem" Color="Color.Warning" Size="Size.Large" Class="mb-2" />
-            <MudText Typo="Typo.h5">@ExumacoesPendentes</MudText>
-            <MudText Typo="Typo.body2">Exumações Pendentes</MudText>
-        </MudPaper>
-    </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="3" Class="pa-4 h-100 dashboard-kpi-card">
+                <div class="d-flex align-center justify-space-between mb-2">
+                    <MudText Typo="Typo.overline" Style="color:var(--mud-palette-text-secondary); letter-spacing:1px;">
+                        ÓBITOS — @_mesAtual
+                    </MudText>
+                    <div class="kpi-icon-bg kpi-info">
+                        <MudIcon Icon="@Icons.Material.Filled.PersonOff" Color="Color.Info" />
+                    </div>
+                </div>
+                <MudText Typo="Typo.h4" Style="font-weight:700;">@_totalObitosMes</MudText>
+                <MudText Typo="Typo.body2" Style="color:var(--mud-palette-text-secondary);">Sepultamentos este mês</MudText>
+            </MudPaper>
+        </MudItem>
 
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center justify-center h-100">
-            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" Class="mb-2" />
-            <MudText Typo="Typo.h5">@ExumacoesAtrasadas</MudText>
-            <MudText Typo="Typo.body2">Exumações Atrasadas (> 3 anos)</MudText>
-        </MudPaper>
-    </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="3" Class="pa-4 h-100 dashboard-kpi-card">
+                <div class="d-flex align-center justify-space-between mb-2">
+                    <MudText Typo="Typo.overline" Style="color:var(--mud-palette-text-secondary); letter-spacing:1px;">
+                        EXUMAÇÕES PENDENTES
+                    </MudText>
+                    <div class="kpi-icon-bg kpi-warning">
+                        <MudIcon Icon="@Icons.Material.Filled.SyncProblem" Color="Color.Warning" />
+                    </div>
+                </div>
+                <MudText Typo="Typo.h4" Style="font-weight:700;">@_exumacoesPendentes</MudText>
+                <MudText Typo="Typo.body2" Style="color:var(--mud-palette-text-secondary);">Gavetas com prazo futuro</MudText>
+            </MudPaper>
+        </MudItem>
 
-    @* --- Ocupação das Capelas (Lista) --- *@
-    <MudItem xs="12" md="6">
-        <MudCard Elevation="2" Class="h-100">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Status das Capelas</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudList T="Capela" ReadOnly="true">
-                    @foreach (var capela in Capelas)
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="3" Class="@ClassKpiAtrasadas">
+                <div class="d-flex align-center justify-space-between mb-2">
+                    <MudText Typo="Typo.overline" Style="color:var(--mud-palette-text-secondary); letter-spacing:1px;">
+                        EXUMAÇÕES ATRASADAS
+                    </MudText>
+                    <div class="kpi-icon-bg kpi-error">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+                    </div>
+                </div>
+                <MudText Typo="Typo.h4" Style="@StyleKpiAtrasadas">
+                    @_exumacoesAtrasadas
+                </MudText>
+                <MudText Typo="Typo.body2" Style="color:var(--mud-palette-text-secondary);">Prazo vencido (ação necessária)</MudText>
+            </MudPaper>
+        </MudItem>
+
+    </MudGrid>
+
+    @* ── ROW 2: Métricas secundárias ── *@
+    <MudGrid Class="mb-4">
+
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="2" Class="pa-4 d-flex align-center gap-4">
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Style="width:52px;height:52px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Landscape" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h5" Style="font-weight:700;">@_jazigosLivres</MudText>
+                    <MudText Typo="Typo.body2" Style="color:var(--mud-palette-text-secondary);">Jazigos disponíveis</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="2" Class="pa-4 d-flex align-center gap-4">
+                <MudAvatar Color="Color.Tertiary" Variant="Variant.Filled" Style="width:52px;height:52px;">
+                    <MudIcon Icon="@Icons.Material.Filled.AttachMoney" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h5" Style="font-weight:700;">R$ @_receitaMes.ToString("N2")</MudText>
+                    <MudText Typo="Typo.body2" Style="color:var(--mud-palette-text-secondary);">Receita faturada no mês</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="2" Class="pa-4 d-flex align-center gap-4">
+                <MudAvatar Color="@(_atendimentosSemOs > 0 ? Color.Warning : Color.Success)" Variant="Variant.Filled" Style="width:52px;height:52px;">
+                    <MudIcon Icon="@Icons.Material.Filled.PendingActions" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h5" Style="font-weight:700;">@_atendimentosSemOs</MudText>
+                    <MudText Typo="Typo.body2" Style="color:var(--mud-palette-text-secondary);">Atendimentos sem OS gerada</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+    </MudGrid>
+
+    @* ── ROW 3: Capelas + Gráfico ── *@
+    <MudGrid>
+
+        <MudItem xs="12" md="5">
+            <MudCard Elevation="2" Class="h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Status das Capelas</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                            @_totalCapelas no total
+                        </MudChip>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (!_capelas.Any())
                     {
-                        <MudListItem>
-                            <div class="d-flex align-center">
-                                <MudIcon Icon="@Icons.Material.Filled.Church" Class="mr-3" 
-                                         Color="@(capela.Status == "Disponível" ? Color.Success : (capela.Status == "Ocupada" ? Color.Error : Color.Warning))" />
-                                <MudText><strong>@capela.Nome</strong> - @capela.Status</MudText>
-                            </div>
-                        </MudListItem>
+                        <div class="d-flex flex-column align-center pa-6" style="color:var(--mud-palette-text-secondary);">
+                            <MudIcon Icon="@Icons.Material.Filled.Church" Size="Size.Large" Class="mb-3" Style="opacity:.4;" />
+                            <MudText Typo="Typo.body1">Nenhuma capela cadastrada</MudText>
+                            <MudText Typo="Typo.body2">Acesse o menu Capelas para iniciar o cadastro.</MudText>
+                        </div>
                     }
-                </MudList>
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
+                    else
+                    {
+                        <MudList T="Capela" ReadOnly="true" Dense="true">
+                            @foreach (var capela in _capelas)
+                            {
+                                <MudListItem>
+                                    <div class="d-flex align-center justify-space-between w-100 py-1">
+                                        <div class="d-flex align-center gap-3">
+                                            <MudIcon Icon="@Icons.Material.Filled.Church"
+                                                     Color="@GetCorCapela(capela.Status)" />
+                                            <div>
+                                                <MudText Typo="Typo.body1" Style="font-weight:600;">@capela.Nome</MudText>
+                                                @if (!string.IsNullOrWhiteSpace(capela.Localizacao))
+                                                {
+                                                    <MudText Typo="Typo.caption" Style="color:var(--mud-palette-text-secondary);">
+                                                        @capela.Localizacao
+                                                    </MudText>
+                                                }
+                                            </div>
+                                        </div>
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="@GetCorCapela(capela.Status)"
+                                                 Variant="Variant.Filled"
+                                                 Style="min-width:90px; justify-content:center;">
+                                            @(string.IsNullOrWhiteSpace(capela.Status) ? "Indefinido" : capela.Status)
+                                        </MudChip>
+                                    </div>
+                                </MudListItem>
+                                <MudDivider />
+                            }
+                        </MudList>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
 
-    @* --- Gráfico Simulado --- *@
-    <MudItem xs="12" md="6">
-        <MudCard Elevation="2" Class="h-100">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Óbitos Registrados (Últimos 6 meses)</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                @* A propriedade T="double" é obrigatória no MudBlazor v9 para gráficos *@
-                <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@Series" XAxisLabels="@XAxisLabels" Width="100%" Height="300px" />
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
-</MudGrid>
+        <MudItem xs="12" md="7">
+            <MudCard Elevation="2" Class="h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Sepultamentos por Mês (Últimos 6 meses)</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_series.Count == 0 || _series[0].Data.All(d => d == 0))
+                    {
+                        <div class="d-flex flex-column align-center pa-8" style="color:var(--mud-palette-text-secondary);">
+                            <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Class="mb-3" Style="opacity:.4;" />
+                            <MudText Typo="Typo.body1">Sem dados de sepultamentos</MudText>
+                            <MudText Typo="Typo.body2">Registre atendimentos para visualizar o gráfico.</MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <MudChart T="double" ChartType="ChartType.Bar"
+                                  ChartSeries="@_series"
+                                  XAxisLabels="@_xAxisLabels"
+                                  Width="100%" Height="300px" />
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+    </MudGrid>
+}
+
+<style>
+    .dashboard-kpi-card {
+        border-left: 4px solid transparent;
+        transition: box-shadow 0.2s ease;
+    }
+    .dashboard-kpi-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.12) !important; }
+    .dashboard-kpi-card.kpi-alert { border-left-color: var(--mud-palette-error); }
+
+    .kpi-icon-bg {
+        width: 40px; height: 40px;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .kpi-primary { background: rgba(var(--mud-palette-primary-rgb), 0.12); }
+    .kpi-info    { background: rgba(var(--mud-palette-info-rgb), 0.12); }
+    .kpi-warning { background: rgba(var(--mud-palette-warning-rgb), 0.12); }
+    .kpi-error   { background: rgba(var(--mud-palette-error-rgb), 0.12); }
+</style>
 
 @code {
-    // --- Dados Simulados para os KPIs ---
-    private int TotalCapelas = 5;
-    private int CapelasOcupadas = 3;
-    private int TotalObitosMes = 12;
-    private int ExumacoesPendentes = 4;
-    private int ExumacoesAtrasadas = 2;
+    // ─── Estado ───────────────────────────────────────────────
+    private bool _carregando = true;
+    private DateTime _ultimaAtualizacao;
+    private string _mesAtual = string.Empty;
 
-    // --- Dados Simulados para as Capelas ---
-    private List<Capela> Capelas = new()
-    {
-        new Capela { Id = 1, Nome = "Capela Master 1", Status = "Ocupada" },
-        new Capela { Id = 2, Nome = "Capela Master 2", Status = "Disponível" },
-        new Capela { Id = 3, Nome = "Capela Padrão A", Status = "Ocupada" },
-        new Capela { Id = 4, Nome = "Capela Padrão B", Status = "Ocupada" },
-        new Capela { Id = 5, Nome = "Capela Social", Status = "Manutenção" }
-    };
+    // ─── KPIs Principais ──────────────────────────────────────
+    private int _totalCapelas;
+    private int _capelasOcupadas;
+    private int _totalObitosMes;
+    private int _exumacoesPendentes;
+    private int _exumacoesAtrasadas;
 
-    // --- Dados Simulados para o Gráfico ---
-    public List<ChartSeries<double>> Series = new List<ChartSeries<double>>()
+    // ─── Métricas Secundárias ─────────────────────────────────
+    private int _jazigosLivres;
+    private decimal _receitaMes;
+    private int _atendimentosSemOs;
+
+    // ─── Capelas e Gráfico ────────────────────────────────────
+    private List<Capela> _capelas = new();
+    private List<ChartSeries<double>> _series = new();
+    private string[] _xAxisLabels = Array.Empty<string>();
+
+    // ─── Propriedades computadas (evita RZ9986) ───────────────
+    private string ClassKpiAtrasadas =>
+        _exumacoesAtrasadas > 0
+            ? "pa-4 h-100 dashboard-kpi-card kpi-alert"
+            : "pa-4 h-100 dashboard-kpi-card";
+
+    private string StyleKpiAtrasadas =>
+        _exumacoesAtrasadas > 0
+            ? "font-weight:700; color:var(--mud-palette-error);"
+            : "font-weight:700;";
+
+    protected override async Task OnInitializedAsync() => await CarregarDados();
+
+    private async Task CarregarDados()
     {
-        new ChartSeries<double>() 
-        { 
-            Name = "Óbitos", 
-            Data = new double[] { 15, 12, 18, 10, 22, 12 } 
+        _carregando = true;
+        StateHasChanged();
+
+        var agora = DateTime.UtcNow;
+        _mesAtual = agora.ToString("MMMM/yyyy", new CultureInfo("pt-BR")).ToUpper();
+
+        var inicioMes = new DateTime(agora.Year, agora.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var fimMes    = inicioMes.AddMonths(1);
+
+        // ── Capelas ───────────────────────────────────────────
+        _capelas       = await DbContext.Capelas.OrderBy(c => c.Nome).ToListAsync();
+        _totalCapelas  = _capelas.Count;
+        _capelasOcupadas = _capelas.Count(c => c.Status == "Ocupada");
+
+        // ── Óbitos do mês (Atendimentos com DataSepultamento no mês) ──
+        _totalObitosMes = await DbContext.Atendimentos
+            .CountAsync(a => a.DataSepultamento >= inicioMes && a.DataSepultamento < fimMes);
+
+        // ── Exumações de Gavetas Públicas ─────────────────────
+        _exumacoesPendentes = await DbContext.GavetasPublicas
+            .CountAsync(g => g.Ocupada
+                          && g.DataPrevisaoExumacao.HasValue
+                          && g.DataPrevisaoExumacao.Value >= agora);
+
+        _exumacoesAtrasadas = await DbContext.GavetasPublicas
+            .CountAsync(g => g.Ocupada
+                          && g.DataPrevisaoExumacao.HasValue
+                          && g.DataPrevisaoExumacao.Value < agora);
+
+        // ── Jazigos livres ────────────────────────────────────
+        _jazigosLivres = await DbContext.Jazigos.CountAsync(j => !j.Ocupado);
+
+        // ── Receita do mês: soma itens de atendimentos do mês ─
+        var idsAtendimentosMes = DbContext.Atendimentos
+            .Where(a => a.DataSepultamento >= inicioMes && a.DataSepultamento < fimMes)
+            .Select(a => a.Id);
+
+        _receitaMes = await DbContext.ItensFaturados
+            .Where(i => idsAtendimentosMes.Contains(i.AtendimentoId))
+            .SumAsync(i => (decimal?)i.ValorTotalCalculado) ?? 0m;
+
+        // ── Atendimentos sem OS gerada ────────────────────────
+        _atendimentosSemOs = await DbContext.Atendimentos
+            .CountAsync(a => string.IsNullOrEmpty(a.NumeroOsAuxilio));
+
+        // ── Gráfico: sepultamentos por mês nos últimos 6 meses ─
+        await CarregarGraficoAsync(agora);
+
+        _ultimaAtualizacao = DateTime.Now;
+        _carregando = false;
+    }
+
+    private async Task CarregarGraficoAsync(DateTime agora)
+    {
+        var dados  = new double[6];
+        var labels = new string[6];
+        var culturaPtBr = new CultureInfo("pt-BR");
+
+        for (int i = 5; i >= 0; i--)
+        {
+            var mes = agora.AddMonths(-i);
+            var idx = 5 - i;
+
+            labels[idx] = mes.ToString("MMM/yy", culturaPtBr);
+
+            var ini = new DateTime(mes.Year, mes.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var fim = ini.AddMonths(1);
+
+            dados[idx] = await DbContext.Atendimentos
+                .CountAsync(a => a.DataSepultamento >= ini && a.DataSepultamento < fim);
         }
+
+        _series = new List<ChartSeries<double>>
+        {
+            new ChartSeries<double> { Name = "Sepultamentos", Data = dados }
+        };
+        _xAxisLabels = labels;
+    }
+
+    private static Color GetCorCapela(string? status) => status switch
+    {
+        "Disponível" => Color.Success,
+        "Ocupada"    => Color.Error,
+        "Manutenção" => Color.Warning,
+        _            => Color.Default
     };
-    public string[] XAxisLabels = { "Dez", "Jan", "Fev", "Mar", "Abr", "Mai" };
 }

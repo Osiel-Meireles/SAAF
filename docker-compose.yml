@@ -1,6 +1,7 @@
 services:
   db:
-    image: postgres:latest
+    image: postgres:16-alpine
+    platform: linux/amd64
     container_name: sakrus-db
     restart: always
     environment:
@@ -10,16 +11,29 @@ services:
     ports:
       - "5439:5432"
     volumes:
-      - /mnt/data/postgresql/saaf_data:/var/lib/postgresql
+      - sakrus_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d SakrusDb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   web:
     build: .
     container_name: sakrus-app
     restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=SakrusDb;Username=postgres;Password=${DB_PASSWORD:-1234}
     ports:
       - "8085:8080"
+    volumes:
+      - sakrus_dataprotection:/app/dataprotection-keys
+
+volumes:
+  sakrus_pgdata:
+  sakrus_dataprotection:

@@ -1,0 +1,199 @@
+@page "/relatorios"
+@using Sakrus.Core.Entities
+@using Sakrus.Services
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject RelatorioService RelatorioService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Relatórios - SAAF</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-6">Relatórios e Extratos</MudText>
+
+<MudGrid>
+    @* Card 1: Relatório de Atendimentos *@
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
+                <MudText Typo="Typo.h6">Atendimentos</MudText>
+                <MudText Typo="Typo.body2">Listagem de óbitos e atendimentos registrados</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="() => GerarRelatorioAtendimentos()">
+                    Gerar
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    @* Card 2: Relatório de Jazigos *@
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.GridOn" Size="Size.Large" Color="Color.Warning" Class="mb-3" />
+                <MudText Typo="Typo.h6">Lotação de Jazigos</MudText>
+                <MudText Typo="Typo.body2">Status de ocupação do cemitério</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="() => GerarRelatorioJazigos()">
+                    Gerar
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    @* Card 3: Relatório Financeiro *@
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Success" Class="mb-3" />
+                <MudText Typo="Typo.h6">Faturamento Mensal</MudText>
+                <MudText Typo="Typo.body2">Ordens de Serviço geradas</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Success" OnClick="() => GerarRelatorioFinanceiro()">
+                    Gerar
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    @* Card 4: Relatório de Exumações *@
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.Sync" Size="Size.Large" Color="Color.Error" Class="mb-3" />
+                <MudText Typo="Typo.h6">Exumações</MudText>
+                <MudText Typo="Typo.body2">Histórico de libração de jazigos</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="() => GerarRelatorioExumacoes()">
+                    Gerar
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    @* Card 5: Estatísticas de Óbitos *@
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Color="Color.Info" Class="mb-3" />
+                <MudText Typo="Typo.h6">Estatísticas</MudText>
+                <MudText Typo="Typo.body2">Causas de morte e ocupação</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="() => GerarEstatisticas()">
+                    Visualizar
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private async Task GerarRelatorioAtendimentos()
+    {
+        try
+        {
+            var atendimentos = await DbContext.Atendimentos
+                .Include(a => a.Responsavel)
+                .Include(a => a.Falecido)
+                .OrderByDescending(a => a.Id)
+                .ToListAsync();
+
+            Snackbar.Add($"Relatório com {atendimentos.Count} atendimentos gerado!", Severity.Success);
+            // Aqui você poderia gerar um PDF ou CSV
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task GerarRelatorioJazigos()
+    {
+        try
+        {
+            var jazigos = await DbContext.Jazigos
+                .Include(j => j.ModeloJazigo)
+                .ToListAsync();
+
+            var total = jazigos.Count;
+            var ocupados = jazigos.Count(j => j.Ocupado);
+            var disponiveis = total - ocupados;
+            var infantis = jazigos.Count(j => j.IsInfantil);
+
+            var msg = $"Total: {total} | Ocupados: {ocupados} | Disponíveis: {disponiveis} | Infantis: {infantis}";
+            Snackbar.Add(msg, Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task GerarRelatorioFinanceiro()
+    {
+        try
+        {
+            var atendimentos = await DbContext.Atendimentos
+                .Include(a => a.ItensFaturados)
+                .Where(a => !string.IsNullOrEmpty(a.NumeroOsAuxilio))
+                .ToListAsync();
+
+            var totalFaturado = atendimentos
+                .SelectMany(a => a.ItensFaturados)
+                .Sum(i => i.ValorTotalCalculado);
+
+            Snackbar.Add($"Total Faturado: R$ {totalFaturado:N2} em {atendimentos.Count} OS geradas", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task GerarRelatorioExumacoes()
+    {
+        try
+        {
+            var exumacoes = await DbContext.ExumacoesRegistros
+                .Include(e => e.Falecido)
+                .OrderByDescending(e => e.DataExecucao)
+                .ToListAsync();
+
+            Snackbar.Add($"Total de exumações registradas: {exumacoes.Count}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task GerarEstatisticas()
+    {
+        try
+        {
+            var falecidos = await DbContext.Falecidos.ToListAsync();
+            var causas = falecidos
+                .GroupBy(f => f.CausaMorte)
+                .Select(g => new { Causa = g.Key, Quantidade = g.Count() })
+                .ToList();
+
+            var msg = "Causas de Morte: ";
+            foreach (var c in causas)
+            {
+                msg += $"{c.Causa} ({c.Quantidade}), ";
+            }
+            Snackbar.Add(msg, Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -1,6 +1,11 @@
-﻿namespace Sakrus.Services;
+﻿using System.Threading.Tasks;
+using Sakrus.Core.Entities;
 
-public class IFalecidoService
+namespace Sakrus.Services
 {
-    
+    public interface IFalecidoService
+    {
+        Task<Falecido> RegistrarSepultamentoAsync(Falecido falecido);
+        Task ExumarAsync(int falecidoId, ExecutorExumacao executor, string observacoes = "");
+    }
 }

@@ -1,0 +1,423 @@
+@page "/configuracoes/financeiro"
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Configuração Financeira — Sakrus</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-6">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:700;">Configuração Financeira</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--mud-palette-text-secondary);">
+            Defina as taxas e preços de serviços utilizados no faturamento de atendimentos
+        </MudText>
+    </div>
+    @if (_config is not null)
+    {
+        <div class="text-right">
+            <MudText Typo="Typo.caption" Style="color:var(--mud-palette-text-secondary);">
+                Última atualização: @_config.DataUltimaAtualizacao.ToLocalTime().ToString("dd/MM/yyyy 'às' HH:mm")
+            </MudText>
+            @if (!string.IsNullOrWhiteSpace(_config.AtualizadoPor))
+            {
+                <MudText Typo="Typo.caption" Style="color:var(--mud-palette-text-secondary);">
+                    por @_config.AtualizadoPor
+                </MudText>
+            }
+        </div>
+    }
+</div>
+
+@if (_carregando)
+{
+    <div class="d-flex justify-center pa-8">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    </div>
+}
+else if (_config is null)
+{
+    <MudAlert Severity="Severity.Error" Icon="@Icons.Material.Filled.ErrorOutline">
+        Não foi possível carregar a configuração financeira.
+    </MudAlert>
+}
+else
+{
+    <MudForm @ref="_form" @bind-IsValid="_formValido">
+        <MudGrid>
+
+            @* ── SEÇÃO 1: Taxas de Jazigo ── *@
+            <MudItem xs="12">
+                <div class="section-header">
+                    <MudIcon Icon="@Icons.Material.Filled.Landscape" Class="mr-2" Color="Color.Primary" />
+                    <MudText Typo="Typo.h6">Taxas de Jazigo</MudText>
+                </div>
+                <MudText Typo="Typo.body2" Class="mb-4" Style="color:var(--mud-palette-text-secondary);">
+                    Valores base utilizados no cálculo de concessão e manutenção de jazigos.
+                </MudText>
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudNumericField @bind-Value="_config.ValorMetroQuadrado"
+                                 Label="Valor por m² (R$)"
+                                 Variant="Variant.Outlined"
+                                 Format="N2"
+                                 Min="0m"
+                                 Adornment="Adornment.Start"
+                                 AdornmentText="R$"
+                                 Required="true"
+                                 HideSpinButtons="true"
+                                 HelperText="Usado no cálculo do valor de concessão" />
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudNumericField @bind-Value="_config.TaxaManutencaoBase"
+                                 Label="Taxa de Manutenção Base (R$)"
+                                 Variant="Variant.Outlined"
+                                 Format="N2"
+                                 Min="0m"
+                                 Adornment="Adornment.Start"
+                                 AdornmentText="R$"
+                                 Required="true"
+                                 HideSpinButtons="true"
+                                 HelperText="Cobrada anualmente por jazigo" />
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudNumericField @bind-Value="_config.TaxaConcessaoBase"
+                                 Label="Taxa de Concessão Base (R$)"
+                                 Variant="Variant.Outlined"
+                                 Format="N2"
+                                 Min="0m"
+                                 Adornment="Adornment.Start"
+                                 AdornmentText="R$"
+                                 Required="true"
+                                 HideSpinButtons="true"
+                                 HelperText="Valor fixo cobrado na concessão" />
+            </MudItem>
+
+            @* ── DIVIDER ── *@
+            <MudItem xs="12">
+                <MudDivider Class="my-2" />
+                <div class="section-header mt-4">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h6">Tabela de Preços — Serviços Funerários</MudText>
+                </div>
+                <MudText Typo="Typo.body2" Class="mb-4" Style="color:var(--mud-palette-text-secondary);">
+                    Preços utilizados automaticamente no faturamento de atendimentos.
+                    Alterações aqui não afetam itens já faturados.
+                </MudText>
+            </MudItem>
+
+            @* Urnas *@
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4 price-card" Elevation="1">
+                    <div class="d-flex align-center mb-3">
+                        <MudAvatar Color="Color.Default" Variant="Variant.Filled" Size="Size.Small" Class="mr-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" />
+                        </MudAvatar>
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Urna Padrão</MudText>
+                    </div>
+                    <MudNumericField @bind-Value="_config.PrecoUrnaBasica"
+                                     Label="Preço unitário (R$)"
+                                     Variant="Variant.Outlined"
+                                     Format="N2"
+                                     Min="0m"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="R$"
+                                     HideSpinButtons="true"
+                                     Required="true" />
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4 price-card" Elevation="1">
+                    <div class="d-flex align-center mb-3">
+                        <MudAvatar Color="Color.Secondary" Variant="Variant.Filled" Size="Size.Small" Class="mr-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" />
+                        </MudAvatar>
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Urna Especial</MudText>
+                    </div>
+                    <MudNumericField @bind-Value="_config.PrecoUrnaEspecial"
+                                     Label="Preço unitário (R$)"
+                                     Variant="Variant.Outlined"
+                                     Format="N2"
+                                     Min="0m"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="R$"
+                                     HideSpinButtons="true"
+                                     Required="true" />
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4 price-card" Elevation="1">
+                    <div class="d-flex align-center mb-3">
+                        <MudAvatar Color="Color.Info" Variant="Variant.Filled" Size="Size.Small" Class="mr-2">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Size="Size.Small" />
+                        </MudAvatar>
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Translado</MudText>
+                    </div>
+                    <MudNumericField @bind-Value="_config.PrecoTransladoPorKm"
+                                     Label="Preço por km (R$)"
+                                     Variant="Variant.Outlined"
+                                     Format="N4"
+                                     Min="0m"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="R$"
+                                     HideSpinButtons="true"
+                                     Required="true"
+                                     HelperText="Valor cobrado por quilômetro rodado" />
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4 price-card" Elevation="1">
+                    <div class="d-flex align-center mb-3">
+                        <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Small" Class="mr-2">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalFlorist" Size="Size.Small" />
+                        </MudAvatar>
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Pompa Fúnebre</MudText>
+                    </div>
+                    <MudNumericField @bind-Value="_config.PrecoPompa"
+                                     Label="Preço unitário (R$)"
+                                     Variant="Variant.Outlined"
+                                     Format="N2"
+                                     Min="0m"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="R$"
+                                     HideSpinButtons="true"
+                                     Required="true" />
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4 price-card" Elevation="1">
+                    <div class="d-flex align-center mb-3">
+                        <MudAvatar Color="Color.Tertiary" Variant="Variant.Filled" Size="Size.Small" Class="mr-2">
+                            <MudIcon Icon="@Icons.Material.Filled.MedicalServices" Size="Size.Small" />
+                        </MudAvatar>
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Preparo do Corpo</MudText>
+                    </div>
+                    <MudNumericField @bind-Value="_config.PrecoPreparoCorpo"
+                                     Label="Preço unitário (R$)"
+                                     Variant="Variant.Outlined"
+                                     Format="N2"
+                                     Min="0m"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="R$"
+                                     HideSpinButtons="true"
+                                     Required="true" />
+                </MudPaper>
+            </MudItem>
+
+            @* ── Preview de resumo ── *@
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4 h-100 d-flex flex-column justify-center" Elevation="0"
+                          Style="border: 2px dashed var(--mud-palette-lines-default); border-radius: 12px;">
+                    <MudText Typo="Typo.subtitle2" Class="mb-3" Style="color:var(--mud-palette-text-secondary); font-weight:600;">
+                        RESUMO ATUAL
+                    </MudText>
+                    <div class="d-flex justify-space-between mb-1">
+                        <MudText Typo="Typo.body2">Urna Padrão</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">R$ @_config.PrecoUrnaBasica.ToString("N2")</MudText>
+                    </div>
+                    <div class="d-flex justify-space-between mb-1">
+                        <MudText Typo="Typo.body2">Urna Especial</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">R$ @_config.PrecoUrnaEspecial.ToString("N2")</MudText>
+                    </div>
+                    <div class="d-flex justify-space-between mb-1">
+                        <MudText Typo="Typo.body2">Translado/km</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">R$ @_config.PrecoTransladoPorKm.ToString("N4")</MudText>
+                    </div>
+                    <div class="d-flex justify-space-between mb-1">
+                        <MudText Typo="Typo.body2">Pompa Fúnebre</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">R$ @_config.PrecoPompa.ToString("N2")</MudText>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                        <MudText Typo="Typo.body2">Preparo do Corpo</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">R$ @_config.PrecoPreparoCorpo.ToString("N2")</MudText>
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            @* ── Ações ── *@
+            <MudItem xs="12">
+                <MudDivider Class="my-4" />
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+                    <strong>Atenção:</strong> Alterações nos preços serão aplicadas apenas a
+                    <strong>novos itens faturados</strong>. Itens já registrados não serão afetados.
+                </MudAlert>
+                <div class="d-flex justify-end gap-3">
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Default"
+                               OnClick="@Cancelar"
+                               Disabled="@_salvando">
+                        Descartar alterações
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               OnClick="@Salvar"
+                               Disabled="@(!_formValido || _salvando)">
+                        @if (_salvando)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Salvando...</span>
+                        }
+                        else
+                        {
+                            <span>Salvar Configurações</span>
+                        }
+                    </MudButton>
+                </div>
+            </MudItem>
+
+        </MudGrid>
+    </MudForm>
+}
+
+<style>
+    .section-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .price-card {
+        border-radius: 12px !important;
+        border: 1px solid var(--mud-palette-lines-default);
+        transition: box-shadow 0.2s ease;
+    }
+
+    .price-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1) !important;
+    }
+</style>
+
+@code {
+    private MudForm _form = null!;
+    private bool _formValido;
+    private bool _carregando = true;
+    private bool _salvando;
+    private ConfiguracaoFinanceira? _config;
+    private ConfiguracaoFinanceira? _configOriginal; // para o botão Descartar
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+
+        // Usa a config mais recente, ou cria uma nova em memória se não existir
+        _config = await DbContext.ConfiguracoesFinanceiras
+            .OrderByDescending(c => c.DataUltimaAtualizacao)
+            .FirstOrDefaultAsync();
+
+        if (_config is null)
+        {
+            _config = new ConfiguracaoFinanceira
+            {
+                DataUltimaAtualizacao = DateTime.UtcNow
+            };
+        }
+
+        // Snapshot para permitir Descartar
+        _configOriginal = new ConfiguracaoFinanceira
+        {
+            Id                    = _config.Id,
+            ValorMetroQuadrado    = _config.ValorMetroQuadrado,
+            TaxaManutencaoBase    = _config.TaxaManutencaoBase,
+            TaxaConcessaoBase     = _config.TaxaConcessaoBase,
+            PrecoUrnaBasica       = _config.PrecoUrnaBasica,
+            PrecoUrnaEspecial     = _config.PrecoUrnaEspecial,
+            PrecoTransladoPorKm   = _config.PrecoTransladoPorKm,
+            PrecoPompa            = _config.PrecoPompa,
+            PrecoPreparoCorpo     = _config.PrecoPreparoCorpo,
+            DataUltimaAtualizacao = _config.DataUltimaAtualizacao,
+            AtualizadoPor         = _config.AtualizadoPor
+        };
+
+        _carregando = false;
+    }
+
+    private async Task Salvar()
+    {
+        await _form.Validate();
+        if (!_form.IsValid || _config is null) return;
+
+        _salvando = true;
+
+        try
+        {
+            // Obtém o nome do usuário logado para o campo AtualizadoPor
+            var authState = await AuthState.GetAuthenticationStateAsync();
+            var nomeUsuario = authState.User.Identity?.Name ?? "Sistema";
+
+            _config.DataUltimaAtualizacao = DateTime.UtcNow;
+            _config.AtualizadoPor = nomeUsuario;
+
+            if (_config.Id == 0)
+            {
+                // Primeira vez — insere
+                DbContext.ConfiguracoesFinanceiras.Add(_config);
+            }
+            else
+            {
+                // Já existe — atualiza
+                DbContext.ConfiguracoesFinanceiras.Update(_config);
+            }
+
+            await DbContext.SaveChangesAsync();
+
+            // Atualiza o snapshot para o novo estado salvo
+            _configOriginal = new ConfiguracaoFinanceira
+            {
+                Id                    = _config.Id,
+                ValorMetroQuadrado    = _config.ValorMetroQuadrado,
+                TaxaManutencaoBase    = _config.TaxaManutencaoBase,
+                TaxaConcessaoBase     = _config.TaxaConcessaoBase,
+                PrecoUrnaBasica       = _config.PrecoUrnaBasica,
+                PrecoUrnaEspecial     = _config.PrecoUrnaEspecial,
+                PrecoTransladoPorKm   = _config.PrecoTransladoPorKm,
+                PrecoPompa            = _config.PrecoPompa,
+                PrecoPreparoCorpo     = _config.PrecoPreparoCorpo,
+                DataUltimaAtualizacao = _config.DataUltimaAtualizacao,
+                AtualizadoPor         = _config.AtualizadoPor
+            };
+
+            Snackbar.Add("Configuração financeira salva com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar()
+    {
+        if (_configOriginal is null || _config is null) return;
+
+        // Restaura o snapshot
+        _config.ValorMetroQuadrado  = _configOriginal.ValorMetroQuadrado;
+        _config.TaxaManutencaoBase  = _configOriginal.TaxaManutencaoBase;
+        _config.TaxaConcessaoBase   = _configOriginal.TaxaConcessaoBase;
+        _config.PrecoUrnaBasica     = _configOriginal.PrecoUrnaBasica;
+        _config.PrecoUrnaEspecial   = _configOriginal.PrecoUrnaEspecial;
+        _config.PrecoTransladoPorKm = _configOriginal.PrecoTransladoPorKm;
+        _config.PrecoPompa          = _configOriginal.PrecoPompa;
+        _config.PrecoPreparoCorpo   = _configOriginal.PrecoPreparoCorpo;
+
+        Snackbar.Add("Alterações descartadas.", Severity.Info);
+    }
+}

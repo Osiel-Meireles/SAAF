@@ -1,0 +1,166 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_loginTheme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+<div class="login-split-layout">
+    <div class="login-left-panel">
+        <div class="login-left-content">
+            <img src="/images/logo1.svg" class="login-brand-logo" alt="SAAF Logo" />
+            <h1 class="login-brand-title">SAAF</h1>
+            <p class="login-brand-subtitle">Sistema de Acolhimento e Assistência Funerária</p>
+        </div>
+        <div class="login-image-overlay"></div>
+    </div>
+    
+    <div class="login-right-panel">
+        <div class="login-form-container">
+            @Body
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Google Fonts */
+    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: 'Inter', sans-serif;
+        background-color: #F5F3EF; /* Greige extra claro */
+    }
+
+    .login-split-layout {
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+    }
+
+    /* Lado Esquerdo - Imagem e Marca */
+    .login-left-panel {
+        flex: 1;
+        display: none;
+        position: relative;
+        background-image: url('/images/login_bg.png');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+
+    @@media (min-width: 960px) {
+        .login-left-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 4rem;
+        }
+    }
+
+    .login-image-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, rgba(44, 53, 49, 0.4) 0%, rgba(143, 168, 140, 0.2) 100%);
+        z-index: 1;
+    }
+
+    .login-left-content {
+        position: relative;
+        z-index: 2;
+        text-align: center;
+        color: #ffffff;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        padding: 3rem;
+        border-radius: 24px;
+        border: 1px solid rgba(255,255,255,0.2);
+        max-width: 500px;
+    }
+
+    .login-brand-logo {
+        width: 120px;
+        height: auto;
+        margin-bottom: 1.5rem;
+        filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.1));
+    }
+
+    .login-brand-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 3.5rem;
+        font-weight: 700;
+        margin: 0 0 1rem 0;
+        letter-spacing: 2px;
+    }
+
+    .login-brand-subtitle {
+        font-family: 'Inter', sans-serif;
+        font-size: 1.1rem;
+        font-weight: 300;
+        line-height: 1.6;
+        opacity: 0.9;
+        margin: 0;
+    }
+
+    /* Lado Direito - Formulário */
+    .login-right-panel {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        background-color: #FDFCFB; /* Quase branco com toque de greige */
+    }
+
+    @@media (min-width: 960px) {
+        .login-right-panel {
+            flex: 0 0 500px;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.03);
+            z-index: 10;
+        }
+    }
+    
+    @@media (min-width: 1200px) {
+        .login-right-panel {
+            flex: 0 0 600px;
+        }
+    }
+
+    .login-form-container {
+        width: 100%;
+        max-width: 420px;
+        animation: fadeIn 0.8s ease-out forwards;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+@code {
+    // Nova paleta Premium: Greige e Verde Pastel
+    private MudTheme _loginTheme = new MudTheme()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#8FA88C", // Verde Pastel
+            Secondary = "#B4ACA1", // Greige médio
+            Tertiary = "#2C3531", // Texto escuro / verde bem escuro
+            Background = "#FDFCFB",
+            AppbarBackground = "#F5F3EF",
+            DrawerBackground = "#FDFCFB",
+            Surface = "#ffffff",
+            TextPrimary = "#3A3A3A",
+            TextSecondary = "#707070",
+            ActionDefault = "#B4ACA1",
+            ActionDisabled = "rgba(180, 172, 161, 0.5)",
+            TextDisabled = "rgba(58, 58, 58, 0.4)"
+        }
+    };
+}

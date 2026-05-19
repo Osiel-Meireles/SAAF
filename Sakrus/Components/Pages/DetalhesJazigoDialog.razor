@@ -1,0 +1,150 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Sakrus.Services
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject PdfGeneratorService PdfGeneratorService
+@inject IJSRuntime JS
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Map" Class="mr-2" />
+            Detalhes do Jazigo @jazigo?.CodigoIdentificador
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (jazigo == null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body1"><b>Status:</b> @(jazigo.Ocupado ? "Ocupado" : "Livre")</MudText>
+                    <MudText Typo="Typo.body1"><b>Modelo:</b> @(jazigo.ModeloJazigo?.Nome ?? "N/A")</MudText>
+                </MudItem>
+                
+                @if (responsavelAtual != null)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.body1"><b>Responsável:</b> @responsavelAtual.Nome</MudText>
+                        <MudText Typo="Typo.body1"><b>Contato:</b> @responsavelAtual.Telefone</MudText>
+                    </MudItem>
+                }
+
+                @if (jazigo.Ocupado && falecidos.Any())
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1" Class="mt-2" Color="Color.Primary"><b>Sepultados neste local:</b></MudText>
+                        <MudList T="object">
+                            @foreach(var falecido in falecidos)
+                            {
+                                <MudListItem T="object" Icon="@Icons.Material.Filled.PersonOutline">
+                                    @falecido.Nome (Óbito: @falecido.DataFalecimento.ToString("dd/MM/yyyy"))
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Fechar</MudButton>
+        @if (responsavelAtual != null)
+        {
+            <MudButton Color="Color.Info" Variant="Variant.Text" OnClick="GerarTermo" StartIcon="@Icons.Material.Filled.PictureAsPdf">Termo de Concessão</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AbrirTransferencia">Transferir Titularidade</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int JazigoId { get; set; }
+
+    private Jazigo? jazigo;
+    private Responsavel? responsavelAtual;
+    private List<Falecido> falecidos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        jazigo = await DbContext.Jazigos
+            .Include(j => j.ModeloJazigo)
+            .FirstOrDefaultAsync(j => j.Id == JazigoId);
+
+        if (jazigo != null)
+        {
+            // Busca falecidos vinculados
+            falecidos = await DbContext.Falecidos
+                .Where(f => f.JazigoId == JazigoId)
+                .ToListAsync();
+
+            // Busca responsável atual através de um atendimento (simplificação para o MVP, assumindo o primeiro responsável que faturou ou atendeu o jazigo)
+            var atendimento = await DbContext.Atendimentos
+                .Include(a => a.Responsavel)
+                .Where(a => a.Falecido.JazigoId == JazigoId)
+                .OrderByDescending(a => a.Id)
+                .FirstOrDefaultAsync();
+
+            if (atendimento != null)
+            {
+                responsavelAtual = atendimento.Responsavel;
+            }
+            else
+            {
+                // Se não tem atendimento de sepultamento, mas a titularidade foi transferida?
+                // Buscar último histórico de titularidade
+                var hist = await DbContext.HistoricoTitularidadeJazigos
+                    .Include(h => h.ResponsavelNovo)
+                    .Where(h => h.JazigoId == JazigoId)
+                    .OrderByDescending(h => h.DataTransferencia)
+                    .FirstOrDefaultAsync();
+
+                if (hist != null) responsavelAtual = hist.ResponsavelNovo;
+            }
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task GerarTermo()
+    {
+        if (jazigo == null || responsavelAtual == null) return;
+        
+        var hist = await DbContext.HistoricoTitularidadeJazigos
+            .Where(h => h.JazigoId == JazigoId)
+            .OrderByDescending(h => h.DataTransferencia)
+            .FirstOrDefaultAsync();
+
+        var pdfBytes = PdfGeneratorService.GerarTermoConcessaoPdf(jazigo, responsavelAtual, hist);
+        var base64 = Convert.ToBase64String(pdfBytes);
+        await JS.InvokeVoidAsync("downloadFileFromBase64", $"TermoConcessao_Jazigo_{jazigo.CodigoIdentificador}.pdf", base64);
+    }
+
+    private async Task AbrirTransferencia()
+    {
+        if (responsavelAtual == null)
+        {
+            Snackbar.Add("Não há responsável atual definido para transferência.", Severity.Warning);
+            return;
+        }
+
+        var parameters = new DialogParameters 
+        { 
+            ["JazigoId"] = JazigoId,
+            ["ResponsavelAntigoId"] = responsavelAtual.Id
+        };
+        var dialog = await DialogService.ShowAsync<TransferirTitularidadeDialog>("Transferir Titularidade", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            MudDialog.Close(DialogResult.Ok(true)); // Repassa o OK para o grid atualizar
+        }
+    }
+}

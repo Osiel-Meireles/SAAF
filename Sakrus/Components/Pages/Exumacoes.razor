@@ -1,4 +1,4 @@
-﻿@page "/exumacoes"
+@page "/exumacoes"
 @using MudBlazor
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
@@ -44,6 +44,10 @@
                            Color="Color.Warning" 
                            ToolTip="Reagendar Exumação" 
                            OnClick="@(() => AbrirAgendamento(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" 
+                           Color="Color.Success" 
+                           ToolTip="Executar Exumação" 
+                           OnClick="@(() => AbrirExecucao(context))" />
         </MudTd>
     </RowTemplate>
 </MudTable>
@@ -71,6 +75,20 @@
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
         
         var dialog = await DialogService.ShowAsync<AgendarExumacaoDialog>("Programar Retirada", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarDados();
+        }
+    }
+
+    private async Task AbrirExecucao(GavetaPublica gaveta)
+    {
+        var parameters = new DialogParameters { ["GavetaId"] = gaveta.Id, ["GavetaNumero"] = gaveta.NumeroGaveta };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<ExecutarExumacaoDialog>("Executar Exumação", parameters, options);
         var result = await dialog.Result;
 
         if (result != null && !result.Canceled)

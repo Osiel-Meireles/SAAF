@@ -1,0 +1,108 @@
+@page "/dashboards"
+@using Sakrus.Services
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject RelatorioService RelatorioService
+
+<PageTitle>Dashboards Gerenciais - Sakrus</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Dashboards Gerenciais</MudText>
+
+@if (ocupacaoGeral == null)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        @* DASHBOARD 1: OCUPAÇÃO GERAL (PIE CHART) *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="3" Style="height: 100%;">
+                <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="mb-4">Ocupação do Cemitério</MudText>
+                <div class="d-flex justify-center">
+                    <MudChart T="double" ChartType="ChartType.Pie" InputData="@ocupacaoData" InputLabels="@ocupacaoLabels" Width="300px" Height="300px" />
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        @* DASHBOARD 2: CAUSAS DE ÓBITO (DONUT CHART) *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="3" Style="height: 100%;">
+                <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Secondary" Class="mb-4">Causas de Óbito (Últimos 12 meses)</MudText>
+                <div class="d-flex justify-center">
+                    <MudChart T="double" ChartType="ChartType.Donut" InputData="@causasData" InputLabels="@causasLabels" Width="300px" Height="300px" />
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        @* DASHBOARD 3: FUNERÁRIAS (BAR CHART) *@
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="3">
+                <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Tertiary" Class="mb-4">Atendimentos por Funerária (Últimos 12 meses)</MudText>
+                <div class="d-flex justify-center">
+                    @if (funerariasSeries.Count > 0)
+                    {
+                        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@funerariasSeries" XAxisLabels="@funerariasLabels" Width="100%" Height="350px" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body1" Align="Align.Center">Sem dados de funerárias para o período.</MudText>
+                    }
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private Dictionary<string, int> ocupacaoGeral;
+    private double[] ocupacaoData;
+    private string[] ocupacaoLabels;
+
+    private Dictionary<string, int> causasObito;
+    private double[] causasData;
+    private string[] causasLabels;
+
+    private List<ChartSeries<double>> funerariasSeries = new();
+    private string[] funerariasLabels;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 1. Ocupação Geral
+        ocupacaoGeral = await RelatorioService.GetOcupacaoGeralAsync(DbContext);
+        ocupacaoLabels = ocupacaoGeral.Keys.ToArray();
+        ocupacaoData = ocupacaoGeral.Values.Select(v => (double)v).ToArray();
+
+        // 2. Causas Óbito (12 meses)
+        var start = DateTime.Today.AddMonths(-12);
+        var end = DateTime.Today;
+        
+        causasObito = await RelatorioService.GetCausasObitoPorPeriodoAsync(DbContext, start, end);
+        if (causasObito.Any())
+        {
+            causasLabels = causasObito.Keys.ToArray();
+            causasData = causasObito.Values.Select(v => (double)v).ToArray();
+        }
+        else
+        {
+            causasLabels = new[] { "Nenhum" };
+            causasData = new[] { 100.0 };
+        }
+
+        // 3. Funerárias (12 meses)
+        var funerariasData = await RelatorioService.GetSepultamentosPorFunerariaAsync(DbContext, start, end);
+        if (funerariasData.Any())
+        {
+            funerariasLabels = funerariasData.Keys.ToArray();
+            funerariasSeries.Add(new ChartSeries<double>() { 
+                Name = "Atendimentos", 
+                Data = funerariasData.Values.Select(v => (double)v).ToArray() 
+            });
+        }
+        else
+        {
+            funerariasLabels = new string[0];
+        }
+    }
+}

@@ -1,0 +1,152 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (atendimento == null)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        }
+        else
+        {
+            <MudForm @ref="form" @bind-IsValid="sucesso">
+                <MudGrid>
+                    @* --- DADOS DO RESPONSÁVEL --- *@
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.h6" Color="Color.Primary">Dados do Responsável</MudText>
+                        <MudDivider Class="mb-3" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="atendimento.Responsavel.Nome" Label="Nome Completo" Required="true" RequiredError="O nome é obrigatório" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudTextField @bind-Value="atendimento.Responsavel.CPF" Label="CPF" Required="true" Mask="@(new PatternMask("000.000.000-00"))" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudTextField @bind-Value="atendimento.Responsavel.Telefone" Label="Telefone" Mask="@(new PatternMask("(00) 00000-0000"))" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="atendimento.Responsavel.Endereco" Label="Endereço Completo" />
+                    </MudItem>
+
+                    @* --- DADOS DO FALECIDO --- *@
+                    <MudItem xs="12" Class="mt-4">
+                        <MudText Typo="Typo.h6" Color="Color.Primary">Dados do Falecido</MudText>
+                        <MudDivider Class="mb-3" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="CausaMorte" Label="Causa da Morte" @bind-Value="atendimento.Falecido.CausaMorte" Required="true">
+                            @foreach (CausaMorte causa in Enum.GetValues(typeof(CausaMorte)))
+                            {
+                                <MudSelectItem Value="@causa">@causa.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="dataFalecimento" Label="Data do Falecimento" />
+                    </MudItem>
+
+                    @* --- INFORMAÇÕES DO ATENDIMENTO --- *@
+                    <MudItem xs="12" Class="mt-4">
+                        <MudText Typo="Typo.h6" Color="Color.Primary">Informações do Atendimento</MudText>
+                        <MudDivider Class="mb-3" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="PerfilAtendimento" Label="Perfil" @bind-Value="atendimento.Perfil" Required="true">
+                            @foreach (PerfilAtendimento perfil in Enum.GetValues(typeof(PerfilAtendimento)))
+                            {
+                                <MudSelectItem Value="@perfil">@perfil.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="OrigemAtendimento" Label="Origem" @bind-Value="atendimento.Origem" Required="true">
+                            @foreach (OrigemAtendimento origem in Enum.GetValues(typeof(OrigemAtendimento)))
+                            {
+                                <MudSelectItem Value="@origem">@origem.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="TipoProcedimento" Label="Procedimento" @bind-Value="atendimento.Procedimento" Required="true">
+                            @foreach (TipoProcedimento procedimento in Enum.GetValues(typeof(TipoProcedimento)))
+                            {
+                                <MudSelectItem Value="@procedimento">@procedimento.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="atendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" />
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(!sucesso)">Salvar Alterações</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int AtendimentoId { get; set; }
+
+    private Atendimento? atendimento;
+    private DateTime? dataFalecimento;
+    private MudForm form = null!;
+    private bool sucesso;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAtendimento();
+    }
+
+    private async Task CarregarAtendimento()
+    {
+        atendimento = await DbContext.Atendimentos
+            .Include(a => a.Responsavel)
+            .Include(a => a.Falecido)
+            .FirstOrDefaultAsync(a => a.Id == AtendimentoId);
+
+        if (atendimento?.Falecido != null)
+        {
+            dataFalecimento = atendimento.Falecido.DataFalecimento;
+        }
+    }
+
+    private async Task Salvar()
+    {
+        await form.Validate();
+        if (!form.IsValid || atendimento == null) return;
+
+        try
+        {
+            if (dataFalecimento.HasValue)
+            {
+                atendimento.Falecido.DataFalecimento = dataFalecimento.Value;
+            }
+
+            DbContext.Atendimentos.Update(atendimento);
+            await DbContext.SaveChangesAsync();
+
+            Snackbar.Add("Atendimento atualizado com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

@@ -6,7 +6,7 @@ using Sakrus.Infrastructure.Data;
 
 namespace Sakrus.Services;
 
-public class GavetaPublicaService
+public class GavetaPublicaService : IGavetaPublicaService
 {
     private readonly ApplicationDbContext _context;
 
@@ -32,36 +32,47 @@ public class GavetaPublicaService
     // 2. Regra de Negócio: Ciclo de Vida, Exumação e Desvinculação
     public async Task EfetivarExumacaoAsync(int gavetaId, ExecutorExumacao executor, string observacoes)
     {
-        var gaveta = await _context.GavetasPublicas
-            .FirstOrDefaultAsync(g => g.Id == gavetaId);
-
-        if (gaveta == null || !gaveta.Ocupada || gaveta.FalecidoId == null)
+        // Utiliza transação para garantir consistência dos dados
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            throw new InvalidOperationException("Gaveta não encontrada, já está livre ou não possui falecido vinculado.");
+            var gaveta = await _context.GavetasPublicas
+                .FirstOrDefaultAsync(g => g.Id == gavetaId);
+
+            if (gaveta == null || !gaveta.Ocupada || gaveta.FalecidoId == null)
+            {
+                throw new InvalidOperationException("Gaveta não encontrada, já está livre ou não possui falecido vinculado.");
+            }
+
+            // Cria o registro histórico da exumação (Rastreabilidade)
+            var exumacao = new ExumacaoRegistro
+            {
+                FalecidoId = gaveta.FalecidoId.Value,
+                GavetaPublicaId = gaveta.Id,
+                DataAutorizacao = DateTime.UtcNow, // A data de autorização idealmente vem de um fluxo anterior do CAAF
+                SetorAutorizador = "CAAF",
+                DataExecucao = DateTime.UtcNow, // Momento da efetivação real
+                Executor = executor,
+                Observacoes = observacoes
+            };
+
+            _context.ExumacoesRegistros.Add(exumacao);
+
+            // Limpa a gaveta para permitir um novo cadastro do zero
+            gaveta.Ocupada = false;
+            gaveta.FalecidoId = null;
+            gaveta.DataOcupacao = null;
+            gaveta.DataPrevisaoExumacao = null;
+
+            _context.GavetasPublicas.Update(gaveta);
+            
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
-
-        // Cria o registro histórico da exumação (Rastreabilidade)
-        var exumacao = new ExumacaoRegistro
+        catch
         {
-            FalecidoId = gaveta.FalecidoId.Value,
-            GavetaPublicaId = gaveta.Id,
-            DataAutorizacao = DateTime.UtcNow, // A data de autorização idealmente vem de um fluxo anterior do CAAF
-            SetorAutorizador = "CAAF",
-            DataExecucao = DateTime.UtcNow, // Momento da efetivação real
-            Executor = executor,
-            Observacoes = observacoes
-        };
-
-        _context.ExumacoesRegistros.Add(exumacao);
-
-        // Limpa a gaveta para permitir um novo cadastro do zero
-        gaveta.Ocupada = false;
-        gaveta.FalecidoId = null;
-        gaveta.DataOcupacao = null;
-        gaveta.DataPrevisaoExumacao = null;
-
-        _context.GavetasPublicas.Update(gaveta);
-        
-        await _context.SaveChangesAsync();
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }

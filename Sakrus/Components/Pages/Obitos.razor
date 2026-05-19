@@ -1,9 +1,13 @@
-﻿@page "/obitos"
+@page "/obitos"
 @using Microsoft.EntityFrameworkCore
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
+@using Sakrus.Services
 @inject ApplicationDbContext DbContext
 @inject IDialogService DialogService
+@inject RelatorioService RelatorioService
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
 
 <PageTitle>Gerenciar Atendimentos - Sakrus</PageTitle>
 
@@ -23,7 +27,7 @@
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
         <MudTd DataLabel="Responsável">@context.Responsavel.Nome</MudTd>
-        <MudTd DataLabel="Causa da Morte">@context.Falecido.CausaDaMorte.ToString()</MudTd>
+        <MudTd DataLabel="Causa da Morte">@context.Falecido.CausaMorte.ToString()</MudTd>
         <MudTd DataLabel="Nº OS / Auxílio">
             @if (string.IsNullOrEmpty(context.NumeroOsAuxilio))
             {
@@ -35,12 +39,14 @@
             }
         </MudTd>
         <MudTd DataLabel="Ações">
-            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small" OnClick="@(() => EditarAtendimento(context))" Title="Editar" />
             
             @* Botão que abre o nosso novo Modal *@
-            <MudIconButton Icon="@Icons.Material.Filled.Receipt" Color="Color.Info" Size="Size.Small" OnClick="@(() => AbrirModalFaturamento(context.Id))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Receipt" Color="Color.Info" Size="Size.Small" OnClick="@(() => AbrirModalFaturamento(context.Id))" Title="Faturamento/OS" />
             
-            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Primary" Size="Size.Small" OnClick="@(() => BaixarGuiaSepultamento(context))" Title="Guia de Sepultamento" />
+            
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeletarAtendimento(context))" Title="Deletar" />
         </MudTd>
     </RowTemplate>
     <PagerContent>
@@ -86,4 +92,76 @@
             await CarregarDadosAsync();
         }
     }
+
+    private async Task BaixarGuiaSepultamento(Atendimento atendimento)
+    {
+        try
+        {
+            var pdfBytes = RelatorioService.GerarPdfGuiaSepultamento(atendimento.Falecido, atendimento);
+            var base64 = Convert.ToBase64String(pdfBytes);
+            var fileName = $"Guia_Sepultamento_{atendimento.Falecido.Nome.Replace(" ", "_")}.pdf";
+
+            // Chama função JS no lado do cliente para baixar o arquivo
+            await JSRuntime.InvokeVoidAsync("downloadFileFromBase64", fileName, base64);
+            Snackbar.Add("Guia de Sepultamento gerada com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao gerar PDF: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task EditarAtendimento(Atendimento atendimento)
+    {
+        var parameters = new DialogParameters 
+        { 
+            ["AtendimentoId"] = atendimento.Id,
+            ["Responsavel"] = atendimento.Responsavel,
+            ["Falecido"] = atendimento.Falecido
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<EditarAtendimentoDialog>("Editar Atendimento", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await CarregarDadosAsync();
+            Snackbar.Add("Atendimento atualizado com sucesso!", Severity.Success);
+        }
+    }
+
+    private async Task DeletarAtendimento(Atendimento atendimento)
+    {
+        bool? result = await DialogService.ShowMessageBoxAsync(
+            "Confirmação",
+            $"Tem certeza que deseja deletar o atendimento de {atendimento.Responsavel?.Nome}? Esta ação é irreversível!",
+            yesText: "Deletar", cancelText: "Cancelar");
+
+        if (result == true)
+        {
+            try
+            {
+                DbContext.Atendimentos.Remove(atendimento);
+                await DbContext.SaveChangesAsync();
+                await CarregarDadosAsync();
+                Snackbar.Add("Atendimento deletado com sucesso!", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao deletar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
 }
+
+<script>
+    window.downloadFileFromBase64 = function (fileName, base64) {
+        var link = document.createElement('a');
+        link.download = fileName;
+        link.href = 'data:application/pdf;base64,' + base64;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>

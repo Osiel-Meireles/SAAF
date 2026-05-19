@@ -1,6 +1,7 @@
-﻿@page "/novo-atendimento"
+@page "/novo-atendimento"
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext DbContext
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -47,16 +48,37 @@
                 <MudDivider Class="mb-3" />
             </MudItem>
             
-            <MudItem xs="12" sm="4">
-                <MudSelect T="CausaMorte" Label="Causa da Morte" @bind-Value="novoAtendimento.Falecido.CausaDaMorte" Required="true">
-                    @foreach (CausaMorte causa in Enum.GetValues(typeof(CausaMorte)))
+            @if (novoAtendimento.Falecido.TipoRestosMortais != TipoRestosMortais.PecaAnatomica)
+            {
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="CausaMorte" Label="Causa da Morte" @bind-Value="novoAtendimento.Falecido.CausaMorte" Required="true">
+                        @foreach (CausaMorte causa in Enum.GetValues(typeof(CausaMorte)))
+                        {
+                            <MudSelectItem Value="@causa">@causa.ToString()</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            }
+            else
+            {
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="novoAtendimento.PecaAnatomicaHospital" Label="Hospital de Origem / CRM Médico" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="novoAtendimento.PecaAnatomicaIdentificacao" Label="Identificação da Peça" Required="true" />
+                </MudItem>
+            }
+            
+            <MudItem xs="12" sm="3" Class="d-flex align-center">
+                <MudSelect T="TipoRestosMortais" Label="Tipo Restos Mortais" @bind-Value="novoAtendimento.Falecido.TipoRestosMortais" Required="true">
+                    @foreach (TipoRestosMortais tipo in Enum.GetValues(typeof(TipoRestosMortais)))
                     {
-                        <MudSelectItem Value="@causa">@causa.ToString()</MudSelectItem>
+                        <MudSelectItem Value="@tipo">@tipo.ToString()</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
             
-            <MudItem xs="12" sm="4">
+            <MudItem xs="12" sm="3">
                 <MudTextField @bind-Value="novoAtendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" Required="true" />
             </MudItem>
 
@@ -97,6 +119,16 @@
                 </MudSelect>
             </MudItem>
 
+            <MudItem xs="12" sm="4">
+                <MudSelect T="int?" Label="Funerária Credenciada (Opcional)" @bind-Value="novoAtendimento.FunerariaId">
+                    <MudSelectItem T="int?" Value="null">Nenhuma / Próprio Município</MudSelectItem>
+                    @foreach (var f in funerarias)
+                    {
+                        <MudSelectItem T="int?" Value="@f.Id">@f.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
             @* --- BOTÃO DE AÇÃO --- *@
             <MudItem xs="12" Class="d-flex justify-end mt-4">
                 <MudButton Variant="Variant.Text" Color="Color.Default" Class="mr-2" OnClick="@Cancelar">Cancelar</MudButton>
@@ -116,6 +148,13 @@
         Responsavel = new Responsavel(),
         Falecido = new Falecido()
     };
+    
+    private List<Funeraria> funerarias = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        funerarias = await DbContext.Funerarias.ToListAsync();
+    }
 
     private async Task SalvarAtendimento()
     {
@@ -124,7 +163,29 @@
         {
             try
             {
-                // Salva os dados diretamente no banco usando o Entity Framework
+                // Salvar Responsável primeiro se for novo
+                if (novoAtendimento.ResponsavelId == 0 || novoAtendimento.Responsavel.Id == 0)
+                {
+                    DbContext.Responsaveis.Add(novoAtendimento.Responsavel);
+                    await DbContext.SaveChangesAsync();
+                    novoAtendimento.ResponsavelId = novoAtendimento.Responsavel.Id;
+                }
+
+                // Salvar Falecido primeiro se for novo
+                if (novoAtendimento.FalecidoId == 0 || novoAtendimento.Falecido.Id == 0)
+                {
+                    // Definir data de sepultamento como hoje por padrão
+                    if (novoAtendimento.Falecido.DataFalecimento == default)
+                    {
+                        novoAtendimento.Falecido.DataFalecimento = DateTime.UtcNow;
+                    }
+                    
+                    DbContext.Falecidos.Add(novoAtendimento.Falecido);
+                    await DbContext.SaveChangesAsync();
+                    novoAtendimento.FalecidoId = novoAtendimento.Falecido.Id;
+                }
+
+                // Agora salvar o Atendimento com as FK corrigidas
                 DbContext.Atendimentos.Add(novoAtendimento);
                 await DbContext.SaveChangesAsync();
                 

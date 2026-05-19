@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Sakrus.Core.Entities;
 
 namespace Sakrus.Infrastructure.Data;
@@ -23,6 +23,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<ModeloJazigo> ModelosJazigos { get; set; }
     public DbSet<Jazigo> Jazigos { get; set; }
     public DbSet<ExumacaoRegistro> ExumacoesRegistros { get; set; }
+    public DbSet<HistoricoTitularidadeJazigo> HistoricoTitularidadeJazigos { get; set; }
+    public DbSet<Funeraria> Funerarias { get; set; }
+    public DbSet<ProdutoEstoque> ProdutosEstoque { get; set; }
+    public DbSet<MovimentacaoEstoque> MovimentacoesEstoque { get; set; }
+    public DbSet<Ossuario> Ossuarios { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,22 +43,41 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.ValorMetroQuadrado).HasPrecision(10, 2);
         modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.TaxaManutencaoBase).HasPrecision(10, 2);
         modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.TaxaConcessaoBase).HasPrecision(10, 2);
+        modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.PrecoUrnaBasica).HasPrecision(10, 2);
+        modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.PrecoUrnaEspecial).HasPrecision(10, 2);
+        modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.PrecoTransladoPorKm).HasPrecision(10, 4);
+        modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.PrecoPompa).HasPrecision(10, 2);
+        modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.PrecoPreparoCorpo).HasPrecision(10, 2);
         modelBuilder.Entity<ModeloJazigo>().Property(m => m.PercentualConcessao).HasPrecision(5, 2);
         modelBuilder.Entity<ModeloJazigo>().Property(m => m.PercentualManutencao).HasPrecision(5, 2);
         modelBuilder.Entity<ModeloJazigo>().Property(m => m.TaxaConstrucao).HasPrecision(10, 2);
+        
+        // Precisão Estoque
+        modelBuilder.Entity<ProdutoEstoque>().Property(p => p.Custo).HasPrecision(10, 2);
+        modelBuilder.Entity<ProdutoEstoque>().Property(p => p.ValorVenda).HasPrecision(10, 2);
 
         // Deleções Restritas (DRY)
         modelBuilder.Entity<Atendimento>().HasOne(a => a.Responsavel).WithMany().HasForeignKey(a => a.ResponsavelId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Atendimento>().HasOne(a => a.Falecido).WithMany().HasForeignKey(a => a.FalecidoId).OnDelete(DeleteBehavior.Restrict);
         
+        // Exumação: Se o Jazigo for desvinculado (ou deletado), setar a referência no Falecido como NULL
+        modelBuilder.Entity<Falecido>().HasOne(f => f.Jazigo).WithMany(j => j.Falecidos).HasForeignKey(f => f.JazigoId).OnDelete(DeleteBehavior.SetNull);
+        
         // Auto-relacionamento (Desmembramento de Jazigo)
         modelBuilder.Entity<Jazigo>().HasOne(j => j.JazigoPai).WithMany().HasForeignKey(j => j.JazigoPaiId).OnDelete(DeleteBehavior.Restrict);
+
+        // Histórico de Titularidade: Evitar ciclos ou cascade delete múltiplos no Responsavel
+        modelBuilder.Entity<HistoricoTitularidadeJazigo>().HasOne(h => h.ResponsavelAntigo).WithMany().HasForeignKey(h => h.ResponsavelAntigoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<HistoricoTitularidadeJazigo>().HasOne(h => h.ResponsavelNovo).WithMany().HasForeignKey(h => h.ResponsavelNovoId).OnDelete(DeleteBehavior.Restrict);
 
         // Conversões de Enum (Visibilidade no Postgres)
         modelBuilder.Entity<Atendimento>().Property(a => a.Perfil).HasConversion<string>();
         modelBuilder.Entity<Atendimento>().Property(a => a.Origem).HasConversion<string>();
         modelBuilder.Entity<Atendimento>().Property(a => a.Procedimento).HasConversion<string>();
-        modelBuilder.Entity<Falecido>().Property(f => f.CausaDaMorte).HasConversion<string>();
+        modelBuilder.Entity<Falecido>().Property(f => f.CausaMorte).HasConversion<string>();
         modelBuilder.Entity<ExumacaoRegistro>().Property(e => e.Executor).HasConversion<string>();
+        modelBuilder.Entity<Falecido>().Property(f => f.TipoRestosMortais).HasConversion<string>();
+        modelBuilder.Entity<Ossuario>().Property(o => o.Tipo).HasConversion<string>();
+        modelBuilder.Entity<MovimentacaoEstoque>().Property(m => m.TipoMovimentacao).HasConversion<string>();
     }
 }

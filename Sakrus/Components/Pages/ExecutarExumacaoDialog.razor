@@ -1,0 +1,139 @@
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+            Executar Exumação - Gaveta @GavetaNumero
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            Atenção: Ao confirmar, a gaveta pública será desocupada e disponibilizada para novos sepultamentos.
+        </MudAlert>
+
+        <MudForm @ref="form" @bind-IsValid="sucesso">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Data da Execução" @bind-Date="registro.DataExecucao" Required="true" RequiredError="Data é obrigatória" Editable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Data Autorização" @bind-Date="dataAutorizacaoAux" Required="true" Editable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="registro.SetorAutorizador" Label="Setor Autorizador" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="ExecutorExumacao" Label="Executor" @bind-Value="registro.Executor" Required="true">
+                        @foreach (ExecutorExumacao executor in Enum.GetValues(typeof(ExecutorExumacao)))
+                        {
+                            <MudSelectItem Value="@executor">@executor.ToString()</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudSelect T="int?" Label="Destino da Ossada (Ossuário Geral)" @bind-Value="registro.OssuarioDestinoId" Clearable="true">
+                        <MudSelectItem T="int?" Value="null">Outro (Ex: Jazigo/Cremação)</MudSelectItem>
+                        @foreach (var o in ossuariosGerais)
+                        {
+                            <MudSelectItem T="int?" Value="@o.Id">@o.Identificador (Capacidade: @o.Capacidade)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudSelect T="int?" Label="Selecione o Jazigo (se não for Ossuário Geral)" @bind-Value="registro.JazigoId" Clearable="true">
+                        <MudSelectItem T="int?" Value="null">Nenhum</MudSelectItem>
+                        @foreach (var j in jazigosList)
+                        {
+                            <MudSelectItem T="int?" Value="@j.Id">Jazigo @j.CodigoIdentificador</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="registro.Observacoes" Label="Observações Adicionais" Lines="3" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Confirmar" Disabled="@(!sucesso)">Confirmar Exumação</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int GavetaId { get; set; }
+    [Parameter] public string GavetaNumero { get; set; } = "";
+
+    private MudForm form = null!;
+    private bool sucesso;
+    private ExumacaoRegistro registro = new ExumacaoRegistro
+    {
+        DataExecucao = DateTime.Today,
+        SetorAutorizador = "CAAF"
+    };
+    private DateTime? dataAutorizacaoAux = DateTime.Today;
+    private string destinoOssada = "Ossário Geral";
+    private List<Jazigo> jazigosList = new();
+    private List<Ossuario> ossuariosGerais = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        jazigosList = await DbContext.Jazigos.OrderBy(j => j.CodigoIdentificador).ToListAsync();
+        ossuariosGerais = await DbContext.Ossuarios.Where(o => o.Tipo == TipoOssuario.Geral).ToListAsync();
+    }
+
+    private async Task Confirmar()
+    {
+        await form.Validate();
+        if (!form.IsValid) return;
+
+        // Buscar a gaveta no banco de dados para atualizar o status
+        var gaveta = await DbContext.GavetasPublicas.FindAsync(GavetaId);
+        
+        if (gaveta == null || gaveta.FalecidoId == null)
+        {
+            Snackbar.Add("Gaveta não encontrada ou sem falecido vinculado.", Severity.Error);
+            return;
+        }
+
+        // Configurar os dados do registro de exumação
+        registro.GavetaPublicaId = GavetaId;
+        registro.FalecidoId = gaveta.FalecidoId.Value;
+        registro.DataAutorizacao = dataAutorizacaoAux ?? DateTime.Today;
+        
+        // Se selecionou Ossuário Destino, vamos atualizar o Falecido também
+        if (registro.OssuarioDestinoId.HasValue)
+        {
+            var falecido = await DbContext.Falecidos.FindAsync(registro.FalecidoId);
+            if (falecido != null)
+            {
+                falecido.OssuarioId = registro.OssuarioDestinoId;
+            }
+        }
+
+        DbContext.ExumacoesRegistros.Add(registro);
+
+        // Desocupar a gaveta para liberar para novo uso
+        gaveta.Ocupada = false;
+        gaveta.FalecidoId = null;
+        gaveta.DataOcupacao = null;
+        gaveta.DataPrevisaoExumacao = null;
+
+        await DbContext.SaveChangesAsync();
+        
+        Snackbar.Add($"Exumação concluída! A Gaveta {GavetaNumero} agora está disponível.", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

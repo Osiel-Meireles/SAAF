@@ -1,0 +1,89 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Class="mr-2" />
+            Transferência de Titularidade
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="sucesso">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.body2" Color="Color.Warning">
+                        O Responsável Antigo perderá os direitos sobre este jazigo. Todo o histórico será registrado.
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="int" Label="Selecione o Novo Responsável" @bind-Value="historico.ResponsavelNovoId" Required="true" RequiredError="Selecione um responsável">
+                        @foreach (var resp in responsaveis)
+                        {
+                            <MudSelectItem Value="@resp.Id">@resp.Nome (CPF: @resp.CPF)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="historico.Motivo" Label="Motivo da Transferência" Required="true" Lines="3" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Confirmar" Disabled="@(!sucesso)">Confirmar Transferência</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter] public int JazigoId { get; set; }
+    [Parameter] public int ResponsavelAntigoId { get; set; }
+
+    private MudForm form = null!;
+    private bool sucesso;
+    
+    private HistoricoTitularidadeJazigo historico = new();
+    private List<Responsavel> responsaveis = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Carrega responsáveis, exceto o antigo
+        responsaveis = await DbContext.Responsaveis
+            .Where(r => r.Id != ResponsavelAntigoId)
+            .OrderBy(r => r.Nome)
+            .ToListAsync();
+            
+        historico.JazigoId = JazigoId;
+        historico.ResponsavelAntigoId = ResponsavelAntigoId;
+        historico.DataTransferencia = DateTime.UtcNow;
+    }
+
+    private async Task Confirmar()
+    {
+        await form.Validate();
+        if (!form.IsValid) return;
+
+        try
+        {
+            DbContext.HistoricoTitularidadeJazigos.Add(historico);
+            await DbContext.SaveChangesAsync();
+            
+            Snackbar.Add("Titularidade transferida com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao transferir: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

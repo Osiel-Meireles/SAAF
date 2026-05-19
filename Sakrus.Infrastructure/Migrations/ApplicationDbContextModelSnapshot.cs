@@ -36,43 +36,54 @@ namespace Sakrus.Infrastructure.Migrations
                     b.Property<int>("FalecidoId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("FunerariaId")
+                        .HasColumnType("integer");
+
                     b.Property<TimeSpan?>("HorarioSepultamento")
                         .HasColumnType("interval");
 
                     b.Property<string>("LocalFalecimento")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<string>("LocalSepultamento")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<string>("NumeroDeclaracaoObito")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("NumeroOsAuxilio")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Origem")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PecaAnatomicaCidadeOrigem")
-                        .HasColumnType("text");
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.Property<DateTime?>("PecaAnatomicaDataCirurgia")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PecaAnatomicaEstadoOrigem")
-                        .HasColumnType("text");
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
 
                     b.Property<string>("PecaAnatomicaHospital")
-                        .HasColumnType("text");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<string>("PecaAnatomicaIdentificacao")
-                        .HasColumnType("text");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<string>("Perfil")
                         .IsRequired()
@@ -89,6 +100,8 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.HasIndex("FalecidoId");
 
+                    b.HasIndex("FunerariaId");
+
                     b.HasIndex("ResponsavelId");
 
                     b.ToTable("Atendimentos");
@@ -104,15 +117,18 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.Property<string>("Localizacao")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<string>("Nome")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
@@ -127,8 +143,32 @@ namespace Sakrus.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AtualizadoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
                     b.Property<DateTime>("DataUltimaAtualizacao")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("PrecoPompa")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal>("PrecoPreparoCorpo")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal>("PrecoTransladoPorKm")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)");
+
+                    b.Property<decimal>("PrecoUrnaBasica")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal>("PrecoUrnaEspecial")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
 
                     b.Property<decimal>("TaxaConcessaoBase")
                         .HasPrecision(10, 2)
@@ -176,11 +216,16 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.Property<string>("Observacoes")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("OssuarioDestinoId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("SetorAutorizador")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
@@ -189,6 +234,8 @@ namespace Sakrus.Infrastructure.Migrations
                     b.HasIndex("GavetaPublicaId");
 
                     b.HasIndex("JazigoId");
+
+                    b.HasIndex("OssuarioDestinoId");
 
                     b.ToTable("ExumacoesRegistros");
                 });
@@ -201,13 +248,72 @@ namespace Sakrus.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("CausaDaMorte")
+                    b.Property<string>("CausaMorte")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Cpf")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DataFalecimento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("JazigoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("OssuarioId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TipoRestosMortais")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("JazigoId");
+
+                    b.HasIndex("OssuarioId");
+
                     b.ToTable("Falecidos");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.Funeraria", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CNPJ")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Endereco")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Telefone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Funerarias");
                 });
 
             modelBuilder.Entity("Sakrus.Core.Entities.GavetaPublica", b =>
@@ -229,24 +335,30 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.Property<string>("Lote")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("NumeroGaveta")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<bool>("Ocupada")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Quadra")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Setor")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FalecidoId");
 
                     b.HasIndex("Ocupada");
 
@@ -254,6 +366,47 @@ namespace Sakrus.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("GavetasPublicas");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.HistoricoTitularidadeJazigo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("DataTransferencia")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("JazigoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("ResponsavelAntigoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ResponsavelNovoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JazigoId");
+
+                    b.HasIndex("ResponsavelAntigoId");
+
+                    b.HasIndex("ResponsavelNovoId");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("HistoricoTitularidadeJazigos");
                 });
 
             modelBuilder.Entity("Sakrus.Core.Entities.ItemFaturado", b =>
@@ -272,7 +425,8 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.Property<string>("CategoriaItem")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<decimal>("QuantidadeOuKm")
                         .HasPrecision(10, 2)
@@ -299,11 +453,13 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.Property<string>("CodigoIdentificador")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("CoordenadasMapa")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<bool>("IsInfantil")
                         .HasColumnType("boolean");
@@ -336,7 +492,8 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.Property<string>("Nome")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<decimal>("PercentualConcessao")
                         .HasPrecision(5, 2)
@@ -353,6 +510,104 @@ namespace Sakrus.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ModelosJazigos");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.MovimentacaoEstoque", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("DataMovimentacao")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<int>("ProdutoEstoqueId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Quantidade")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TipoMovimentacao")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProdutoEstoqueId");
+
+                    b.ToTable("MovimentacoesEstoque");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.Ossuario", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Capacidade")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Identificador")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("JazigoVinculadoId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Ocupado")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JazigoVinculadoId");
+
+                    b.ToTable("Ossuarios");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.ProdutoEstoque", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Custo")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<int>("EstoqueMinimo")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("QuantidadeDisponivel")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("ValorVenda")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ProdutosEstoque");
                 });
 
             modelBuilder.Entity("Sakrus.Core.Entities.RegistroCapela", b =>
@@ -377,6 +632,10 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AtendimentoId");
+
+                    b.HasIndex("CapelaId");
+
                     b.ToTable("RegistrosCapela");
                 });
 
@@ -394,27 +653,33 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.Property<string>("Endereco")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<string>("Nome")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.Property<string>("OrgaoEmissor")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Profissao")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("RG")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Telefone")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
 
@@ -441,7 +706,8 @@ namespace Sakrus.Infrastructure.Migrations
 
                     b.Property<string>("Nome")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.Property<string>("SenhaHash")
                         .IsRequired()
@@ -460,6 +726,10 @@ namespace Sakrus.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Sakrus.Core.Entities.Funeraria", "Funeraria")
+                        .WithMany("Atendimentos")
+                        .HasForeignKey("FunerariaId");
+
                     b.HasOne("Sakrus.Core.Entities.Responsavel", "Responsavel")
                         .WithMany()
                         .HasForeignKey("ResponsavelId")
@@ -467,6 +737,8 @@ namespace Sakrus.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Falecido");
+
+                    b.Navigation("Funeraria");
 
                     b.Navigation("Responsavel");
                 });
@@ -487,11 +759,75 @@ namespace Sakrus.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("JazigoId");
 
+                    b.HasOne("Sakrus.Core.Entities.Ossuario", "OssuarioDestino")
+                        .WithMany()
+                        .HasForeignKey("OssuarioDestinoId");
+
                     b.Navigation("Falecido");
 
                     b.Navigation("GavetaPublica");
 
                     b.Navigation("Jazigo");
+
+                    b.Navigation("OssuarioDestino");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.Falecido", b =>
+                {
+                    b.HasOne("Sakrus.Core.Entities.Jazigo", "Jazigo")
+                        .WithMany("Falecidos")
+                        .HasForeignKey("JazigoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Sakrus.Core.Entities.Ossuario", "Ossuario")
+                        .WithMany("Falecidos")
+                        .HasForeignKey("OssuarioId");
+
+                    b.Navigation("Jazigo");
+
+                    b.Navigation("Ossuario");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.GavetaPublica", b =>
+                {
+                    b.HasOne("Sakrus.Core.Entities.Falecido", "Falecido")
+                        .WithMany()
+                        .HasForeignKey("FalecidoId");
+
+                    b.Navigation("Falecido");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.HistoricoTitularidadeJazigo", b =>
+                {
+                    b.HasOne("Sakrus.Core.Entities.Jazigo", "Jazigo")
+                        .WithMany()
+                        .HasForeignKey("JazigoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sakrus.Core.Entities.Responsavel", "ResponsavelAntigo")
+                        .WithMany()
+                        .HasForeignKey("ResponsavelAntigoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sakrus.Core.Entities.Responsavel", "ResponsavelNovo")
+                        .WithMany()
+                        .HasForeignKey("ResponsavelNovoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sakrus.Core.Entities.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId");
+
+                    b.Navigation("Jazigo");
+
+                    b.Navigation("ResponsavelAntigo");
+
+                    b.Navigation("ResponsavelNovo");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("Sakrus.Core.Entities.ItemFaturado", b =>
@@ -523,9 +859,68 @@ namespace Sakrus.Infrastructure.Migrations
                     b.Navigation("ModeloJazigo");
                 });
 
+            modelBuilder.Entity("Sakrus.Core.Entities.MovimentacaoEstoque", b =>
+                {
+                    b.HasOne("Sakrus.Core.Entities.ProdutoEstoque", "ProdutoEstoque")
+                        .WithMany("Movimentacoes")
+                        .HasForeignKey("ProdutoEstoqueId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProdutoEstoque");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.Ossuario", b =>
+                {
+                    b.HasOne("Sakrus.Core.Entities.Jazigo", "JazigoVinculado")
+                        .WithMany()
+                        .HasForeignKey("JazigoVinculadoId");
+
+                    b.Navigation("JazigoVinculado");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.RegistroCapela", b =>
+                {
+                    b.HasOne("Sakrus.Core.Entities.Atendimento", "Atendimento")
+                        .WithMany()
+                        .HasForeignKey("AtendimentoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sakrus.Core.Entities.Capela", "Capela")
+                        .WithMany()
+                        .HasForeignKey("CapelaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Atendimento");
+
+                    b.Navigation("Capela");
+                });
+
             modelBuilder.Entity("Sakrus.Core.Entities.Atendimento", b =>
                 {
                     b.Navigation("ItensFaturados");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.Funeraria", b =>
+                {
+                    b.Navigation("Atendimentos");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.Jazigo", b =>
+                {
+                    b.Navigation("Falecidos");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.Ossuario", b =>
+                {
+                    b.Navigation("Falecidos");
+                });
+
+            modelBuilder.Entity("Sakrus.Core.Entities.ProdutoEstoque", b =>
+                {
+                    b.Navigation("Movimentacoes");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,0 +1,141 @@
+@page "/usuarios"
+@using Sakrus.Core.Entities
+@using Sakrus.Services
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject IAuthService AuthService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Gestão de Usuários - SAAF</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Gestão de Usuários</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirDialogNovoUsuario">Novo Usuário</MudButton>
+</div>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    Apenas administradores podem criar e gerenciar usuários do sistema.
+</MudAlert>
+
+@if (isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="@usuarios" Hover="true" Striped="true" Elevation="2">
+        <HeaderContent>
+            <MudTh>Nome</MudTh>
+            <MudTh>E-mail</MudTh>
+            <MudTh>Nível de Acesso</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Nome">@context.Nome</MudTd>
+            <MudTd DataLabel="E-mail">@context.Email</MudTd>
+            <MudTd DataLabel="Nível">
+                <MudChip T="string" Size="Size.Small">
+                    @MapearNivelAcesso(context.NivelAcesso)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Color="@(context.Ativo ? Color.Success : Color.Error)" Size="Size.Small">
+                    @(context.Ativo ? "Ativo" : "Inativo")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small" OnClick="@(() => AbrirDialogEditarUsuario(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DesativarUsuario(context.Id, context.Nome))" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<Usuario> usuarios = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarUsuarios();
+    }
+
+    private async Task CarregarUsuarios()
+    {
+        isLoading = true;
+        usuarios = await DbContext.Usuarios.OrderBy(u => u.Nome).ToListAsync();
+        isLoading = false;
+    }
+
+    private async Task AbrirDialogNovoUsuario()
+    {
+        var parameters = new DialogParameters();
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<UsuarioDialog>("Novo Usuário", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await CarregarUsuarios();
+            Snackbar.Add("Usuário criado com sucesso!", Severity.Success);
+        }
+    }
+
+    private async Task AbrirDialogEditarUsuario(Usuario usuario)
+    {
+        var parameters = new DialogParameters { ["UsuarioId"] = usuario.Id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<UsuarioDialog>("Editar Usuário", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await CarregarUsuarios();
+            Snackbar.Add("Usuário atualizado com sucesso!", Severity.Success);
+        }
+    }
+
+    private async Task DesativarUsuario(int usuarioId, string nome)
+    {
+        bool? resultado = await DialogService.ShowMessageBoxAsync(
+            "Desativar Usuário",
+            $"Tem certeza que deseja desativar {nome}? Esta ação pode ser revertida.",
+            yesText: "Sim, Desativar", cancelText: "Cancelar");
+
+        if (resultado == true)
+        {
+            try
+            {
+                var usuario = await DbContext.Usuarios.FindAsync(usuarioId);
+                if (usuario != null)
+                {
+                    usuario.Ativo = false;
+                    DbContext.Usuarios.Update(usuario);
+                    await DbContext.SaveChangesAsync();
+                    await CarregarUsuarios();
+                    Snackbar.Add("Usuário desativado com sucesso!", Severity.Success);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao desativar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private string MapearNivelAcesso(int nivel)
+    {
+        return nivel switch
+        {
+            1 => "Administrador",
+            2 => "Supervisor",
+            3 => "Operador",
+            _ => "Desconhecido"
+        };
+    }
+}

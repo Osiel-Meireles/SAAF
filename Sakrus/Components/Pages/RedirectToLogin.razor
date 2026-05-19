@@ -1,0 +1,11 @@
+@inject NavigationManager Navigation
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Redireciona para o login preservando a URL original como returnUrl
+        var uri = Navigation.Uri;
+        var returnUrl = Uri.EscapeDataString(new Uri(uri).PathAndQuery);
+        Navigation.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: true);
+    }
+}

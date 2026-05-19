@@ -1,11 +1,10 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace Sakrus.Core.Entities;
 
 public class ExumacaoRegistro
 {
-    [Key]
     public int Id { get; set; }
     
     // Mantém o histórico do corpo desvinculado
@@ -20,9 +19,16 @@ public class ExumacaoRegistro
     public Jazigo? Jazigo { get; set; }
     
     public DateTime DataAutorizacao { get; set; }
+    
+    [MaxLength(50)]
     public string SetorAutorizador { get; set; } = "CAAF";
     
     public DateTime? DataExecucao { get; set; }
     public ExecutorExumacao Executor { get; set; }
+    
+    [MaxLength(500)]
     public string Observacoes { get; set; } = string.Empty;
+
+    public int? OssuarioDestinoId { get; set; }
+    public Ossuario? OssuarioDestino { get; set; }
 }

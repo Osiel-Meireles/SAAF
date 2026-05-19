@@ -1,29 +1,61 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
 
 @* Provedores globais obrigatórios do MudBlazor *@
 <MudThemeProvider Theme="_currentTheme" />
 <MudDialogProvider />
 <MudSnackbarProvider />
-<MudPopoverProvider />     @* <--- ADICIONE ESTA LINHA AQUI *@
+<MudPopoverProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1" Color="Color.Dark">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
-        <MudText Typo="Typo.h5" Class="ml-3">SAAF</MudText>
+    <MudAppBar Elevation="1" Style="background-color: #F5F3EF; color: #2C3531;">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@(() => DrawerToggle())" />
+        <img src="/images/logo2.svg" alt="SAAF Logo" style="height: 36px; margin-right: 12px; margin-left: 12px;" />
+        <MudText Typo="Typo.h5" Style="font-family: 'Playfair Display', serif; font-weight: 700; color: #2C3531;">SAAF</MudText>
         <MudSpacer />
-        
-        <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
-            <MudMenuItem Icon="@Icons.Material.Filled.Lock">Alterar Senha</MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Filled.Logout">Sair</MudMenuItem>
-        </MudMenu>
+
+        <AuthorizeView Context="authContext">
+            <Authorized>
+                <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                    <ActivatorContent>
+                        <div class="d-flex align-center gap-2" style="cursor:pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s;"
+                             onmouseover="this.style.background='rgba(44, 53, 49, 0.05)'"
+                             onmouseout="this.style.background='transparent'">
+                            <MudAvatar Color="Color.Primary" Size="Size.Small" Style="font-size:0.8rem;">
+                                @GetIniciais(authContext.User.Identity?.Name)
+                            </MudAvatar>
+                            <div class="d-none d-sm-flex flex-column" style="line-height:1.2;">
+                                <MudText Typo="Typo.body2" Style="color:#2C3531; font-weight:600;">
+                                    @authContext.User.Identity?.Name
+                                </MudText>
+                                <MudText Typo="Typo.caption" Style="color:#707070; font-size:0.68rem;">
+                                    @GetRoleLabel(authContext.User)
+                                </MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Style="color:#2C3531;" Size="Size.Small" />
+                        </div>
+                    </ActivatorContent>
+                    <ChildContent>
+                        <MudMenuItem Icon="@Icons.Material.Filled.Lock" IconColor="Color.Primary">
+                            Alterar Senha
+                        </MudMenuItem>
+                        <MudDivider />
+                        <MudMenuItem Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error"
+                                     OnClick="@RealizarLogout">
+                            <MudText Color="Color.Error">Sair</MudText>
+                        </MudMenuItem>
+                    </ChildContent>
+                </MudMenu>
+            </Authorized>
+        </AuthorizeView>
     </MudAppBar>
 
-    <MudDrawer @bind-Open="_drawerOpen" Elevation="2" ClipMode="DrawerClipMode.Always">
-        <div class="pa-4 d-flex justify-center">
-            @* Se tiver uma logo, pode colocar a tag <img src="images/logo.png" /> aqui *@
-            <MudText Typo="Typo.h6" Color="Color.Primary">Menu Principal</MudText>
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="2" ClipMode="DrawerClipMode.Always" Style="background-color: #FDFCFB;">
+        <div class="pa-4 d-flex justify-center align-center flex-column" style="background-color: #F5F3EF; border-bottom: 1px solid rgba(180, 172, 161, 0.2);">
+            <img src="/images/logo1.svg" alt="SAAF Logo" style="height: 60px; margin-bottom: 8px;" />
+            <MudText Typo="Typo.h6" Style="font-family: 'Playfair Display', serif; font-weight: 600; color: #2C3531;">Menu Principal</MudText>
         </div>
-        <MudDivider />
         <NavMenu />
     </MudDrawer>
 
@@ -37,14 +69,22 @@
 @code {
     private bool _drawerOpen = true;
 
-    // Definição de um tema customizado (pode ajustar as cores depois)
     private MudTheme _currentTheme = new MudTheme()
     {
         PaletteLight = new PaletteLight()
         {
-            Primary = Colors.Blue.Darken3,
-            Secondary = Colors.Amber.Darken2,
-            AppbarBackground = Colors.Blue.Darken4
+            Primary = "#8FA88C", // Verde Pastel
+            Secondary = "#B4ACA1", // Greige médio
+            Tertiary = "#2C3531", // Texto escuro / verde bem escuro
+            Background = "#FDFCFB",
+            AppbarBackground = "#F5F3EF",
+            DrawerBackground = "#FDFCFB",
+            Surface = "#ffffff",
+            TextPrimary = "#3A3A3A",
+            TextSecondary = "#707070",
+            ActionDefault = "#B4ACA1",
+            ActionDisabled = "rgba(180, 172, 161, 0.5)",
+            TextDisabled = "rgba(58, 58, 58, 0.4)"
         }
     };
 
@@ -52,4 +92,26 @@
     {
         _drawerOpen = !_drawerOpen;
     }
-}
+
+    private async Task RealizarLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+
+    private string GetIniciais(string? nomeCompleto)
+    {
+        if (string.IsNullOrWhiteSpace(nomeCompleto)) return "?";
+        var partes = nomeCompleto.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return partes.Length >= 2
+            ? $"{partes[0][0]}{partes[^1][0]}".ToUpper()
+            : nomeCompleto[..Math.Min(2, nomeCompleto.Length)].ToUpper();
+    }
+
+    private string GetRoleLabel(System.Security.Claims.ClaimsPrincipal user)
+    {
+        if (user.IsInRole("Admin")) return "Administrador";
+        if (user.IsInRole("Operador")) return "Operador";
+        return "Visualizador";
+    }
+}

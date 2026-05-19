@@ -1,0 +1,138 @@
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Services
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudTextField 
+                @bind-Value="_usuario.Nome" 
+                Label="Nome Completo" 
+                Required="true"
+                RequiredError="Nome obrigatório"
+                Class="mb-4" />
+
+            <MudTextField 
+                @bind-Value="_usuario.Email" 
+                Label="E-mail" 
+                Required="true"
+                RequiredError="E-mail obrigatório"
+                InputType="InputType.Email"
+                Class="mb-4" />
+
+            @if (_isNovo)
+            {
+                <MudTextField 
+                    @bind-Value="_senha" 
+                    Label="Senha" 
+                    Required="true"
+                    RequiredError="Senha obrigatória"
+                    InputType="@(_mostrarSenha ? InputType.Text : InputType.Password)"
+                    Adornment="Adornment.End"
+                    AdornmentIcon="@(_mostrarSenha ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                    OnAdornmentClick="() => _mostrarSenha = !_mostrarSenha"
+                    HelperText="Mínimo 6 caracteres"
+                    Class="mb-4" />
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    Para alterar a senha, use a página de perfil.
+                </MudAlert>
+            }
+
+            <MudSelect 
+                @bind-Value="_usuario.NivelAcesso" 
+                Label="Nível de Acesso" 
+                Required="true"
+                RequiredError="Nível obrigatório"
+                Class="mb-4">
+                <MudSelectItem Value="1">Administrador</MudSelectItem>
+                <MudSelectItem Value="2">Supervisor</MudSelectItem>
+                <MudSelectItem Value="3">Operador</MudSelectItem>
+            </MudSelect>
+
+            <MudCheckBox 
+                @bind-Value="_usuario.Ativo" 
+                Label="Usuário Ativo"
+                Color="Color.Primary"
+                Class="mb-4" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(!_isValid)">
+            @(_isNovo ? "Criar" : "Atualizar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int? UsuarioId { get; set; }
+
+    private Usuario _usuario = new();
+    private string _senha = "";
+    private bool _mostrarSenha = false;
+    private bool _isValid = false;
+    private bool _isNovo = true;
+    private MudForm _form = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UsuarioId.HasValue)
+        {
+            _isNovo = false;
+            _usuario = await DbContext.Usuarios.FindAsync(UsuarioId.Value) ?? new();
+        }
+        else
+        {
+            _usuario = new();
+        }
+    }
+
+    private async Task Salvar()
+    {
+        await _form.Validate();
+        if (!_isValid)
+            return;
+
+        try
+        {
+            if (_isNovo)
+            {
+                if (string.IsNullOrWhiteSpace(_senha) || _senha.Length < 6)
+                {
+                    Snackbar.Add("Senha deve ter no mínimo 6 caracteres", Severity.Error);
+                    return;
+                }
+
+                var (sucesso, erro) = await AuthService.RegistrarUsuarioAsync(_usuario, _senha);
+                if (!sucesso)
+                {
+                    Snackbar.Add(erro, Severity.Error);
+                    return;
+                }
+            }
+            else
+            {
+                DbContext.Usuarios.Update(_usuario);
+                await DbContext.SaveChangesAsync();
+            }
+
+            Snackbar.Add("Usuário salvo com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}
