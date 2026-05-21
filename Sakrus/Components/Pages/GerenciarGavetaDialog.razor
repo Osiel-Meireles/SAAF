@@ -1,0 +1,441 @@
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.MeetingRoom" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Gerenciar Gaveta @gaveta?.NumeroGaveta</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+        }
+        else if (gaveta == null)
+        {
+            <MudAlert Severity="Severity.Error">Gaveta não encontrada.</MudAlert>
+        }
+        else
+        {
+            <MudCard Outlined="true" Class="mb-4">
+                <MudCardContent>
+                    <div class="d-flex align-center justify-space-between mb-2">
+                        <MudText Typo="Typo.subtitle1"><strong>Informações Físicas</strong></MudText>
+                        @if (gaveta.Ocupada)
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small">Ocupada</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Livre</MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.body2"><strong>Setor:</strong> @gaveta.Setor</MudText>
+                    <MudText Typo="Typo.body2"><strong>Quadra:</strong> @gaveta.Quadra</MudText>
+                    @if (IsDividida(gaveta.NumeroGaveta))
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" Icon="@Icons.Material.Filled.AltRoute">
+                            Esta gaveta é uma <strong>divisão</strong> da gaveta original @GetParentNumber(gaveta.NumeroGaveta).
+                        </MudAlert>
+                    }
+                </MudCardContent>
+            </MudCard>
+
+            @if (gaveta.Ocupada && falecido != null)
+            {
+                <MudCard Outlined="true" Class="mb-4 border-left-error">
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle1" Color="Color.Error" Class="mb-2"><strong>Dados do Falecido</strong></MudText>
+                        <MudGrid>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.body2"><strong>Nome:</strong> @falecido.Nome</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.body2"><strong>CPF:</strong> @falecido.Cpf</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.body2"><strong>Causa da Morte:</strong> @falecido.CausaMorte.ToString()</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.body2"><strong>Restos Mortais:</strong> @falecido.TipoRestosMortais.ToString()</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.body2"><strong>Sepultado em:</strong> @gaveta.DataOcupacao?.ToString("dd/MM/yyyy")</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.body2">
+                                    <strong>Previsão de Exumação:</strong> @gaveta.DataPrevisaoExumacao?.ToString("dd/MM/yyyy")
+                                </MudText>
+                                @if (gaveta.DataPrevisaoExumacao < DateTime.Today)
+                                {
+                                    <span class="text-danger font-weight-bold ml-1">(Prazo Vencido!)</span>
+                                }
+                            </MudItem>
+                        </MudGrid>
+                    </MudCardContent>
+                </MudCard>
+            }
+
+            @if (mostrarFormularioSepultamento)
+            {
+                <MudCard Outlined="true" Class="mb-4 border-left-success">
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle1" Color="Color.Success" Class="mb-2"><strong>Simular Sepultamento</strong></MudText>
+                        <MudForm @ref="formSepultamento" @bind-IsValid="sepultamentoValido">
+                            <MudGrid>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="novoFalecido.Nome" Label="Nome do Falecido" Required="true" RequiredError="Nome é obrigatório" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="novoFalecido.Cpf" Label="CPF" Required="true" RequiredError="CPF é obrigatório" Mask="@(new PatternMask("000.000.000-00"))" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="CausaMorte" Label="Causa da Morte" @bind-Value="novoFalecido.CausaMorte" Required="true">
+                                        @foreach (CausaMorte causa in Enum.GetValues(typeof(CausaMorte)))
+                                        {
+                                            <MudSelectItem Value="@causa">@causa.ToString()</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="TipoRestosMortais" Label="Tipo de Restos Mortais" @bind-Value="novoFalecido.TipoRestosMortais" Required="true">
+                                        @foreach (TipoRestosMortais tipo in Enum.GetValues(typeof(TipoRestosMortais)))
+                                        {
+                                            <MudSelectItem Value="@tipo">@tipo.ToString()</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudDatePicker Label="Data do Sepultamento" @bind-Date="dataSepultamento" Required="true" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudNumericField T="int" Label="Anos de Permanência" @bind-Value="anosPermanencia" Min="1" Max="10" Required="true" />
+                                </MudItem>
+                            </MudGrid>
+                        </MudForm>
+                        <div class="d-flex justify-end gap-2 mt-3">
+                            <MudButton Size="Size.Small" OnClick="() => mostrarFormularioSepultamento = false">Cancelar</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" Disabled="@(!sepultamentoValido)" OnClick="EfetuarSepultamentoSimulado">Salvar</MudButton>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            }
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2"><strong>Ações Disponíveis</strong></MudText>
+            <div class="d-flex flex-wrap gap-2">
+                @if (gaveta.Ocupada)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.CheckCircle" OnClick="AbrirExecucaoExumacao">
+                        Executar Exumação
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Event" OnClick="AbrirAgendamentoExumacao">
+                        Reagendar Exumação
+                    </MudButton>
+                }
+                else if (!mostrarFormularioSepultamento)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="() => mostrarFormularioSepultamento = true">
+                        Vincular Falecido
+                    </MudButton>
+                }
+
+                @if (!IsDividida(gaveta.NumeroGaveta))
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.AltRoute" OnClick="DividirGaveta">
+                        Dividir Gaveta (A e B)
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Dark" StartIcon="@Icons.Material.Filled.MergeType" OnClick="AgruparDivisao" Disabled="@(!podeAgrupar)">
+                        Desfazer Divisão (Agrupar)
+                    </MudButton>
+                }
+            </div>
+            
+            @if (IsDividida(gaveta.NumeroGaveta) && !podeAgrupar)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" Icon="@Icons.Material.Filled.Warning">
+                    Para desfazer a divisão e agrupar as gavetas, tanto a divisão <strong>A</strong> quanto a <strong>B</strong> da gaveta @GetParentNumber(gaveta.NumeroGaveta) devem estar <strong>livres</strong> e sem ocupação.
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Fechar">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .border-left-error {
+        border-left: 4px solid var(--mud-palette-error);
+    }
+    .border-left-success {
+        border-left: 4px solid var(--mud-palette-success);
+    }
+    .text-danger {
+        color: var(--mud-palette-error);
+    }
+</style>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int GavetaId { get; set; }
+
+    private GavetaPublica? gaveta;
+    private Falecido? falecido;
+    private bool isLoading = true;
+    
+    // Sepultamento simulado
+    private bool mostrarFormularioSepultamento = false;
+    private MudForm formSepultamento = null!;
+    private bool sepultamentoValido = false;
+    private Falecido novoFalecido = new();
+    private DateTime? dataSepultamento = DateTime.Today;
+    private int anosPermanencia = 3;
+
+    private bool podeAgrupar = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        isLoading = true;
+        gaveta = await DbContext.GavetasPublicas.FirstOrDefaultAsync(g => g.Id == GavetaId);
+        
+        if (gaveta != null)
+        {
+            if (gaveta.FalecidoId != null)
+            {
+                falecido = await DbContext.Falecidos.FirstOrDefaultAsync(f => f.Id == gaveta.FalecidoId);
+            }
+            else
+            {
+                falecido = null;
+            }
+
+            // Se for dividida, verificar se pode agrupar
+            if (IsDividida(gaveta.NumeroGaveta))
+            {
+                var parentNum = GetParentNumber(gaveta.NumeroGaveta);
+                var numA = parentNum + "A";
+                var numB = parentNum + "B";
+
+                // Verifica se ambas estão livres
+                var gavetasDoGrupo = await DbContext.GavetasPublicas
+                    .Where(g => g.NumeroGaveta == numA || g.NumeroGaveta == numB)
+                    .ToListAsync();
+
+                podeAgrupar = gavetasDoGrupo.All(g => !g.Ocupada);
+            }
+        }
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private bool IsDividida(string numero)
+    {
+        if (string.IsNullOrEmpty(numero)) return false;
+        char ultimoChar = numero[^1];
+        return char.IsLetter(ultimoChar);
+    }
+
+    private string GetParentNumber(string numero)
+    {
+        if (string.IsNullOrEmpty(numero)) return "";
+        if (IsDividida(numero))
+        {
+            return numero[..^1];
+        }
+        return numero;
+    }
+
+    private async Task DividirGaveta()
+    {
+        if (gaveta == null) return;
+
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Dividir Gaveta Pública",
+            $"Tem certeza que deseja dividir a Gaveta {gaveta.NumeroGaveta}? " +
+            (gaveta.Ocupada 
+                ? $"O falecido '{falecido?.Nome}' será realocado na nova divisão {gaveta.NumeroGaveta}A, e a divisão {gaveta.NumeroGaveta}B será criada como livre."
+                : "A gaveta será dividida em A e B, ambas livres para sepultamento."),
+            yesText: "Sim, Dividir", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                string originalNum = gaveta.NumeroGaveta;
+                string numA = originalNum + "A";
+                string numB = originalNum + "B";
+
+                // 1. Modificar a gaveta original para virar 'A'
+                gaveta.NumeroGaveta = numA;
+                DbContext.GavetasPublicas.Update(gaveta);
+
+                // 2. Criar a nova gaveta 'B' (Livre)
+                var gavetaB = new GavetaPublica
+                {
+                    NumeroGaveta = numB,
+                    Ocupada = false,
+                    Setor = gaveta.Setor,
+                    Quadra = gaveta.Quadra,
+                    Lote = gaveta.Lote
+                };
+                DbContext.GavetasPublicas.Add(gavetaB);
+
+                await DbContext.SaveChangesAsync();
+                
+                Snackbar.Add($"Gaveta {originalNum} dividida com sucesso em {numA} e {numB}!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao dividir gaveta: {ex.Message}", Severity.Error);
+                await CarregarDados();
+            }
+        }
+    }
+
+    private async Task AgruparDivisao()
+    {
+        if (gaveta == null || !podeAgrupar) return;
+
+        string parentNum = GetParentNumber(gaveta.NumeroGaveta);
+        
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Desfazer Divisão",
+            $"Tem certeza que deseja unificar as divisões e restaurar a Gaveta original {parentNum}? " +
+            "As divisões A e B serão unificadas em uma única gaveta livre.",
+            yesText: "Sim, Agrupar", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                var numA = parentNum + "A";
+                var numB = parentNum + "B";
+
+                var gavetasDoGrupo = await DbContext.GavetasPublicas
+                    .Where(g => g.NumeroGaveta == numA || g.NumeroGaveta == numB)
+                    .ToListAsync();
+
+                var gavetaA = gavetasDoGrupo.FirstOrDefault(g => g.NumeroGaveta == numA);
+                var gavetaB = gavetasDoGrupo.FirstOrDefault(g => g.NumeroGaveta == numB);
+
+                if (gavetaA != null && gavetaB != null)
+                {
+                    // 1. Alterar o número de A de volta para o original
+                    gavetaA.NumeroGaveta = parentNum;
+                    gavetaA.Ocupada = false;
+                    gavetaA.FalecidoId = null;
+                    gavetaA.DataOcupacao = null;
+                    gavetaA.DataPrevisaoExumacao = null;
+                    DbContext.GavetasPublicas.Update(gavetaA);
+
+                    // 2. Excluir a gaveta B
+                    DbContext.GavetasPublicas.Remove(gavetaB);
+
+                    await DbContext.SaveChangesAsync();
+
+                    Snackbar.Add($"Divisões {numA} e {numB} unificadas com sucesso na Gaveta {parentNum}!", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao agrupar gavetas: {ex.Message}", Severity.Error);
+                await CarregarDados();
+            }
+        }
+    }
+
+    private async Task EfetuarSepultamentoSimulado()
+    {
+        if (gaveta == null) return;
+        await formSepultamento.Validate();
+        if (!formSepultamento.IsValid) return;
+
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            // Salvar Falecido
+            DbContext.Falecidos.Add(novoFalecido);
+            await DbContext.SaveChangesAsync();
+
+            // Ocupar Gaveta
+            gaveta.Ocupada = true;
+            gaveta.FalecidoId = novoFalecido.Id;
+            gaveta.DataOcupacao = dataSepultamento;
+            gaveta.DataPrevisaoExumacao = (dataSepultamento ?? DateTime.Today).AddYears(anosPermanencia);
+
+            DbContext.GavetasPublicas.Update(gaveta);
+            await DbContext.SaveChangesAsync();
+
+            Snackbar.Add($"Sepultamento de {novoFalecido.Nome} registrado com sucesso na Gaveta {gaveta.NumeroGaveta}!", Severity.Success);
+            
+            mostrarFormularioSepultamento = false;
+            await CarregarDados();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao realizar sepultamento: {ex.Message}", Severity.Error);
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task AbrirExecucaoExumacao()
+    {
+        if (gaveta == null) return;
+        
+        var parameters = new DialogParameters { ["GavetaId"] = gaveta.Id, ["GavetaNumero"] = gaveta.NumeroGaveta };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<ExecutarExumacaoDialog>("Executar Exumação", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("Exumação efetuada com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+    }
+
+    private async Task AbrirAgendamentoExumacao()
+    {
+        if (gaveta == null) return;
+
+        var parameters = new DialogParameters { ["GavetaId"] = gaveta.Id, ["GavetaNumero"] = gaveta.NumeroGaveta };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<AgendarExumacaoDialog>("Programar Retirada", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarDados();
+        }
+    }
+
+    private void Fechar() => MudDialog.Close();
+}

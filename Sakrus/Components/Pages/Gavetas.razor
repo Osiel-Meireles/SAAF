@@ -1,4 +1,4 @@
-﻿@page "/gavetas"
+@page "/gavetas"
 @using MudBlazor
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
@@ -6,6 +6,7 @@
 @inject ApplicationDbContext DbContext
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@rendermode InteractiveServer
 
 <PageTitle>Mapa de Gavetas - Sakrus</PageTitle>
 
@@ -23,7 +24,7 @@ else
             <MudPaper Class="pa-4 d-flex align-center justify-space-between bg-dark-custom" Elevation="2">
                 <div>
                     <MudText Typo="Typo.subtitle2">Total de Vagas</MudText>
-                    <MudText Typo="Typo.h4"><strong>256</strong></MudText>
+                    <MudText Typo="Typo.h4"><strong>@gavetas.Count</strong></MudText>
                 </div>
                 <MudIcon Icon="@Icons.Material.Filled.AllOut" Size="Size.Large" />
             </MudPaper>
@@ -59,14 +60,17 @@ else
     @* MAPA VISUAL (CSS Grid moderno) *@
     <MudPaper Class="pa-6" Elevation="2">
         <div class="gaveta-grid">
-            @foreach (var gaveta in gavetas.OrderBy(g => g.Id))
+            @foreach (var gaveta in gavetas.OrderBy(g => g.NumeroGaveta))
             {
                 var isLivre = !gaveta.Ocupada;
                 var colorClass = isLivre ? "bg-livre" : "bg-ocupada";
-                var tooltipText = isLivre ? "Vaga Livre" : $"Ocupada - Clique para Exumar (Previsão: {gaveta.DataPrevisaoExumacao?.ToString("dd/MM/yyyy") ?? "N/A"})";
+                var borderClass = gaveta.NumeroGaveta.Length > 3 ? "border-dashed" : "";
+                var tooltipText = isLivre 
+                    ? $"Vaga Livre {(gaveta.NumeroGaveta.Length > 3 ? "(Divisão)" : "")}" 
+                    : $"Ocupada {(gaveta.NumeroGaveta.Length > 3 ? "(Divisão) " : "")}- Clique para gerenciar (Previsão: {gaveta.DataPrevisaoExumacao?.ToString("dd/MM/yyyy") ?? "N/A"})";
 
                 <MudTooltip Text="@tooltipText" Placement="Placement.Top">
-                    <div class="gaveta-item @colorClass" @onclick="() => GerenciarGaveta(gaveta)">
+                    <div class="gaveta-item @colorClass @borderClass" @onclick="() => GerenciarGaveta(gaveta)">
                         @gaveta.NumeroGaveta
                     </div>
                 </MudTooltip>
@@ -109,6 +113,11 @@ else
     .bg-dark-custom { background-color: var(--mud-palette-dark); color: white; }
     .bg-error-custom { background-color: var(--mud-palette-error); color: white; }
     .bg-success-custom { background-color: var(--mud-palette-success); color: white; }
+    
+    .border-dashed {
+        border: 2.5px dashed rgba(255, 255, 255, 0.75) !important;
+        font-size: 0.8rem !important;
+    }
 </style>
 
 @code {
@@ -151,40 +160,15 @@ else
 
     private async Task GerenciarGaveta(GavetaPublica gaveta)
     {
-        if (!gaveta.Ocupada)
-        {
-            Snackbar.Add($"A gaveta {gaveta.NumeroGaveta} está livre. A alocação é feita ao registrar um Novo Atendimento.", Severity.Info);
-            return;
-        }
+        var parameters = new DialogParameters { ["GavetaId"] = gaveta.Id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<GerenciarGavetaDialog>($"Gerenciar Gaveta {gaveta.NumeroGaveta}", parameters, options);
+        var result = await dialog.Result;
 
-        // Se estiver ocupada, abre o modal de confirmação de Exumação
-        bool? result = await DialogService.ShowMessageBoxAsync(
-            "Exumação de Restos Mortais",
-            $"Tem certeza que deseja registrar a exumação da Gaveta Pública {gaveta.NumeroGaveta}? Esta ação irá liberar a vaga imediatamente.",
-            yesText: "Sim, Registrar Exumação", cancelText: "Cancelar");
-
-        if (result == true)
+        if (result != null && !result.Canceled)
         {
-            try
-            {
-                // Regra de Negócio: Libera a gaveta e limpa os dados do falecido
-                gaveta.Ocupada = false;
-                gaveta.FalecidoId = null;
-                gaveta.DataOcupacao = null;
-                gaveta.DataPrevisaoExumacao = null;
-                
-                // Em um cenário real, aqui também adicionaríamos o registro na tabela ExumacaoRegistro
-                
-                DbContext.GavetasPublicas.Update(gaveta);
-                await DbContext.SaveChangesAsync();
-                
-                Snackbar.Add($"Exumação concluída. Gaveta {gaveta.NumeroGaveta} liberada para novo uso!", Severity.Success);
-                await CarregarDados(); // Recarrega o mapa
-            }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Erro ao exumar: {ex.Message}", Severity.Error);
-            }
+            await CarregarDados();
         }
     }
 }
