@@ -1,9 +1,11 @@
 @page "/relatorios"
+@attribute [Authorize]
 @using Sakrus.Core.Entities
 @using Sakrus.Services
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject RelatorioService RelatorioService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
@@ -95,6 +97,17 @@
 </MudGrid>
 
 @code {
+    private ApplicationDbContext DbContext = default!;
+    protected override void OnInitialized()
+    {
+        DbContext = DbFactory.CreateDbContext();
+    }
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
     private async Task GerarRelatorioAtendimentos()
     {
         try
@@ -197,3 +210,4 @@
         }
     }
 }
+

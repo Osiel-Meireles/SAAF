@@ -12,11 +12,13 @@ public class AtendimentoFaturamentoService : IAtendimentoFaturamentoService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<AtendimentoFaturamentoService> _logger;
+    private readonly EstoqueService _estoqueService;
 
-    public AtendimentoFaturamentoService(ApplicationDbContext context, ILogger<AtendimentoFaturamentoService> logger)
+    public AtendimentoFaturamentoService(ApplicationDbContext context, ILogger<AtendimentoFaturamentoService> logger, EstoqueService estoqueService)
     {
         _context = context;
         _logger = logger;
+        _estoqueService = estoqueService;
     }
 
     // 1. Regra de Negócio: Abatimento e Precificação Dinâmica
@@ -48,7 +50,7 @@ public class AtendimentoFaturamentoService : IAtendimentoFaturamentoService
             CategoriaItem        = categoria,
             QuantidadeOuKm       = quantidadeOuKm,
             ValorTotalCalculado  = valorUnitario * quantidadeOuKm,
-            AbatidoDoEstoque     = true
+            AbatidoDoEstoque     = false
         };
 
         _context.ItensFaturados.Add(item);
@@ -67,6 +69,10 @@ public class AtendimentoFaturamentoService : IAtendimentoFaturamentoService
 
         if (atendimento.ItensFaturados.Count == 0)
             throw new InvalidOperationException("Não é possível gerar uma OS sem itens faturados.");
+
+        // BUG-03: Processar a baixa de estoque ANTES de gerar a OS
+        // Se der erro (estoque negativo), vai dar um throw e não finaliza a OS.
+        await _estoqueService.ProcessarFaturamentoAtendimentoAsync(atendimentoId);
 
         // Regra DRY: A Ordem de Serviço e o Auxílio Funeral devem ter obrigatoriamente a mesma numeração.
         // Se já tiver uma numeração, não gera novamente. Se não tiver, usa o número da Guia ou cria um sequencial.

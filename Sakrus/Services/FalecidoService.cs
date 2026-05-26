@@ -55,7 +55,7 @@ namespace Sakrus.Services
 
             // Delega ao JazigoService para liberar o jazigo e registrar a exumação
             // Isso mantém a lógica centralizada e segue o SRP
-            await _jazigoService.ExumarJazigoAsync(falecido.JazigoId.Value, executor, observacoes);
+            await _jazigoService.ExumarJazigoAsync(falecido.Id, falecido.JazigoId.Value, executor, observacoes);
         }
     }
 }

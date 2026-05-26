@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using QuestPDF.Infrastructure;
 using Sakrus.Components;
+using Sakrus.Endpoints;
 using Sakrus.Data;
 using Sakrus.Infrastructure.Data;
 using Sakrus.Services;
@@ -19,8 +21,12 @@ builder.Services.AddRazorComponents()
 builder.Services.AddMudServices();
 
 // --- Banco de Dados (PostgreSQL) ---
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Serviços Scoped ainda podem usar o ApplicationDbContext
+builder.Services.AddScoped<ApplicationDbContext>(p => 
+    p.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 
 // --- Autenticação com Cookie ---
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -36,11 +42,24 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = SameSiteMode.Strict;
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // SEC-06: Política padrão: todas as páginas exigem autenticação
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 builder.Services.AddHttpContextAccessor();
 
+// --- AuthenticationStateProvider para Blazor Server ---
+builder.Services.AddScoped<AuthenticationStateProvider, PersistingAuthenticationStateProvider>();
+
 // --- Data Protection: persiste chaves entre reinicializações do container ---
-var keysPath = new System.IO.DirectoryInfo("/app/dataprotection-keys");
+// ARQ-06: Path condicional para funcionar tanto em Docker (Linux) quanto em dev (Windows)
+var keysPathStr = builder.Environment.IsProduction()
+    ? "/app/dataprotection-keys"
+    : Path.Combine(builder.Environment.ContentRootPath, "dataprotection-keys");
+var keysPath = new System.IO.DirectoryInfo(keysPathStr);
 if (!keysPath.Exists) keysPath.Create();
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(keysPath)
@@ -53,6 +72,7 @@ builder.Services.AddScoped<IJazigoService, JazigoService>();
 builder.Services.AddScoped<IFalecidoService, FalecidoService>();  // sem duplicata
 builder.Services.AddScoped<ICapelaService, CapelaService>();
 builder.Services.AddScoped<RelatorioService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<PdfGeneratorService>();
 builder.Services.AddScoped<EstoqueService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -64,15 +84,19 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
+    // HSTS é desativado em containers sem HTTPS configurado
+    // Se ativar HTTPS no futuro, descomentar: app.UseHsts();
 }
 
 app.UseStaticFiles();
-app.UseAntiforgery();
 
-// A ORDEM IMPORTA: Authentication antes de Authorization
+// A ORDEM IMPORTA: Authentication → Authorization → Antiforgery
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
+
+// Endpoints HTTP para login/logout (cookie auth precisa de request HTTP real)
+app.MapAuthEndpoints();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
@@ -110,4 +134,4 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.Run();
+app.Run();

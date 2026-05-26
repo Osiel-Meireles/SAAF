@@ -1,0 +1,121 @@
+@using MudBlazor
+@using Microsoft.EntityFrameworkCore
+@using Sakrus.Infrastructure.Data
+@using Sakrus.Services
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudTextField @bind-Value="_senhaAtual" Label="Senha Atual" Required="true" RequiredError="Informe sua senha atual" InputType="@(_mostrarSenha ? InputType.Text : InputType.Password)" Class="mb-4" />
+            
+            <MudTextField @bind-Value="_novaSenha" Label="Nova Senha" Required="true" RequiredError="Informe a nova senha" InputType="@(_mostrarSenha ? InputType.Text : InputType.Password)" HelperText="Mínimo de 6 caracteres" Class="mb-4" />
+            
+            <MudTextField @bind-Value="_confirmarNovaSenha" Label="Confirmar Nova Senha" Required="true" RequiredError="Confirme a nova senha" InputType="@(_mostrarSenha ? InputType.Text : InputType.Password)" 
+                          Validation="@(new Func<string, string>(ValidarConfirmacaoSenha))" Class="mb-4" />
+            
+            <MudCheckBox @bind-Value="_mostrarSenha" Label="Mostrar senhas" Color="Color.Primary" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SalvarSenha" Disabled="@(!_isValid || _salvando)">Salvar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    private ApplicationDbContext DbContext = default!;
+    private MudForm _form = null!;
+    
+    private string _senhaAtual = "";
+    private string _novaSenha = "";
+    private string _confirmarNovaSenha = "";
+    private bool _mostrarSenha = false;
+    private bool _isValid = false;
+    private bool _salvando = false;
+    
+    private int _usuarioLogadoId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var idClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (int.TryParse(idClaim, out int id))
+        {
+            _usuarioLogadoId = id;
+        }
+    }
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    private string ValidarConfirmacaoSenha(string arg)
+    {
+        if (_novaSenha != arg)
+            return "As senhas não coincidem.";
+        return null!;
+    }
+
+    private async Task SalvarSenha()
+    {
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        if (_novaSenha.Length < 6)
+        {
+            Snackbar.Add("A nova senha deve ter no mínimo 6 caracteres.", Severity.Error);
+            return;
+        }
+
+        _salvando = true;
+        
+        try
+        {
+            var usuario = await DbContext.Usuarios.FindAsync(_usuarioLogadoId);
+            if (usuario == null)
+            {
+                Snackbar.Add("Usuário não encontrado.", Severity.Error);
+                MudDialog.Close();
+                return;
+            }
+
+            // Verifica se a senha atual está correta usando BCrypt
+            if (!BCrypt.Net.BCrypt.Verify(_senhaAtual, usuario.SenhaHash))
+            {
+                Snackbar.Add("Senha atual incorreta.", Severity.Error);
+                _salvando = false;
+                return;
+            }
+
+            // Atualiza a senha
+            usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(_novaSenha);
+            DbContext.Usuarios.Update(usuario);
+            await DbContext.SaveChangesAsync();
+
+            Snackbar.Add("Senha alterada com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao alterar senha: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

@@ -1,8 +1,10 @@
 @page "/dashboards"
+@attribute [Authorize]
 @using Sakrus.Services
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject RelatorioService RelatorioService
 
 <PageTitle>Dashboards Gerenciais - Sakrus</PageTitle>
@@ -56,19 +58,27 @@ else
 }
 
 @code {
-    private Dictionary<string, int> ocupacaoGeral;
-    private double[] ocupacaoData;
-    private string[] ocupacaoLabels;
+    private ApplicationDbContext DbContext = default!;
 
-    private Dictionary<string, int> causasObito;
-    private double[] causasData;
-    private string[] causasLabels;
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    private Dictionary<string, int> ocupacaoGeral = new();
+    private double[] ocupacaoData = Array.Empty<double>();
+    private string[] ocupacaoLabels = Array.Empty<string>();
+
+    private Dictionary<string, int> causasObito = new();
+    private double[] causasData = Array.Empty<double>();
+    private string[] causasLabels = Array.Empty<string>();
 
     private List<ChartSeries<double>> funerariasSeries = new();
-    private string[] funerariasLabels;
+    private string[] funerariasLabels = Array.Empty<string>();
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         // 1. Ocupação Geral
         ocupacaoGeral = await RelatorioService.GetOcupacaoGeralAsync(DbContext);
         ocupacaoLabels = ocupacaoGeral.Keys.ToArray();
@@ -106,3 +116,4 @@ else
         }
     }
 }
+

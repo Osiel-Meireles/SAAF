@@ -1,10 +1,14 @@
 @page "/novo-atendimento"
+@attribute [Authorize]
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject Sakrus.Services.IAuditService AuditService
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Novo Atendimento - Sakrus</PageTitle>
 
@@ -23,7 +27,7 @@
                 <MudTextField @bind-Value="novoAtendimento.Responsavel.Nome" Label="Nome Completo" Required="true" RequiredError="O nome é obrigatório" />
             </MudItem>
             <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.Responsavel.CPF" Label="CPF" Required="true" RequiredError="CPF obrigatório" Mask="@(new PatternMask("000.000.000-00"))" />
+                <MudTextField @bind-Value="novoAtendimento.Responsavel.CPF" Label="CPF (somente números)" Required="true" RequiredError="CPF obrigatório" HelperText="11 dígitos, sem pontuação" />
             </MudItem>
             <MudItem xs="12" sm="3">
                 <MudTextField @bind-Value="novoAtendimento.Responsavel.RG" Label="RG" Required="true" />
@@ -35,17 +39,26 @@
                 <MudTextField @bind-Value="novoAtendimento.Responsavel.Profissao" Label="Profissão" Required="true" />
             </MudItem>
             <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.Responsavel.Telefone" Label="Telefone" Required="true" Mask="@(new PatternMask("(00) 00000-0000"))" />
+                <MudTextField @bind-Value="novoAtendimento.Responsavel.Telefone" Label="Telefone" Required="true" />
             </MudItem>
             <MudItem xs="12" sm="9">
                 <MudTextField @bind-Value="novoAtendimento.Responsavel.Endereco" Label="Endereço Completo" Required="true" />
             </MudItem>
 
-            @* --- 2. DADOS DO FALECIDO (Restritos) --- *@
+            @* --- 2. DADOS DO FALECIDO --- *@
             <MudItem xs="12" Class="mt-4">
                 <MudText Typo="Typo.h6" Color="Color.Primary">Dados do Falecido</MudText>
-                <MudAlert Severity="Severity.Warning" Class="mb-2">Campos de identificação civil ocultados por regra de negócio.</MudAlert>
                 <MudDivider Class="mb-3" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="novoAtendimento.Falecido.Nome" Label="Nome Completo do Falecido" Required="true" RequiredError="Nome é obrigatório" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="novoAtendimento.Falecido.Cpf" Label="CPF do Falecido (somente números)" Required="true" RequiredError="CPF é obrigatório" HelperText="11 dígitos, sem pontuação" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudDatePicker Label="Data de Falecimento" @bind-Date="dataFalecimento" Required="true" RequiredError="Data obrigatória" />
             </MudItem>
             
             @if (novoAtendimento.Falecido.TipoRestosMortais != TipoRestosMortais.PecaAnatomica)
@@ -79,7 +92,7 @@
             </MudItem>
             
             <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" Required="true" />
+                <MudTextField @bind-Value="novoAtendimento.NumeroDeclaracaoObito" Label="NÂº Declaração de Óbito" Required="true" />
             </MudItem>
 
             <MudItem xs="12" sm="4">
@@ -129,7 +142,7 @@
                 </MudSelect>
             </MudItem>
 
-            @* --- BOTÃO DE AÇÃO --- *@
+            @* --- BOTÃƒO DE AÇÃƒO --- *@
             <MudItem xs="12" Class="d-flex justify-end mt-4">
                 <MudButton Variant="Variant.Text" Color="Color.Default" Class="mr-2" OnClick="@Cancelar">Cancelar</MudButton>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!sucesso)" OnClick="@SalvarAtendimento">Salvar Atendimento</MudButton>
@@ -139,6 +152,13 @@
 </MudPaper>
 
 @code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
     private MudForm form = null!;
     private bool sucesso;
     
@@ -149,10 +169,12 @@
         Falecido = new Falecido()
     };
     
+    private DateTime? dataFalecimento = DateTime.Today;
     private List<Funeraria> funerarias = new();
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         funerarias = await DbContext.Funerarias.ToListAsync();
     }
 
@@ -161,11 +183,44 @@
         await form.Validate();
         if (form.IsValid)
         {
+            // FEAT-02: Validação matemática do CPF
+            if (!Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Responsavel.CPF))
+            {
+                Snackbar.Add("O CPF do Responsável é inválido.", Severity.Error);
+                return;
+            }
+            if (!string.IsNullOrWhiteSpace(novoAtendimento.Falecido.Cpf) && !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Falecido.Cpf))
+            {
+                Snackbar.Add("O CPF do Falecido é inválido.", Severity.Error);
+                return;
+            }
+            await using var transaction = await DbContext.Database.BeginTransactionAsync();
             try
             {
-                // Salvar Responsável primeiro se for novo
-                if (novoAtendimento.ResponsavelId == 0 || novoAtendimento.Responsavel.Id == 0)
+                // Atribuir data de falecimento do DatePicker
+                if (dataFalecimento.HasValue)
                 {
+                    novoAtendimento.Falecido.DataFalecimento = DateTime.SpecifyKind(dataFalecimento.Value, DateTimeKind.Utc);
+                }
+                else
+                {
+                    novoAtendimento.Falecido.DataFalecimento = DateTime.UtcNow;
+                }
+
+                // BUG-07: Verificar se Responsável já existe pelo CPF (apenas números)
+                var cpfLimpo = new string(novoAtendimento.Responsavel.CPF.Where(char.IsDigit).ToArray());
+                var responsavelExistente = await DbContext.Responsaveis
+                    .FirstOrDefaultAsync(r => r.CPF.Replace(".", "").Replace("-", "") == cpfLimpo);
+
+                if (responsavelExistente != null)
+                {
+                    novoAtendimento.Responsavel = responsavelExistente;
+                    novoAtendimento.ResponsavelId = responsavelExistente.Id;
+                }
+                else
+                {
+                    // Força o CPF sem máscara antes de salvar
+                    novoAtendimento.Responsavel.CPF = cpfLimpo;
                     DbContext.Responsaveis.Add(novoAtendimento.Responsavel);
                     await DbContext.SaveChangesAsync();
                     novoAtendimento.ResponsavelId = novoAtendimento.Responsavel.Id;
@@ -174,12 +229,11 @@
                 // Salvar Falecido primeiro se for novo
                 if (novoAtendimento.FalecidoId == 0 || novoAtendimento.Falecido.Id == 0)
                 {
-                    // Definir data de sepultamento como hoje por padrão
-                    if (novoAtendimento.Falecido.DataFalecimento == default)
+                    // Limpar CPF do falecido também
+                    if (!string.IsNullOrEmpty(novoAtendimento.Falecido.Cpf))
                     {
-                        novoAtendimento.Falecido.DataFalecimento = DateTime.UtcNow;
+                        novoAtendimento.Falecido.Cpf = new string(novoAtendimento.Falecido.Cpf.Where(char.IsDigit).ToArray());
                     }
-                    
                     DbContext.Falecidos.Add(novoAtendimento.Falecido);
                     await DbContext.SaveChangesAsync();
                     novoAtendimento.FalecidoId = novoAtendimento.Falecido.Id;
@@ -189,11 +243,28 @@
                 DbContext.Atendimentos.Add(novoAtendimento);
                 await DbContext.SaveChangesAsync();
                 
+                await transaction.CommitAsync();
+                
+                // FEAT-01: Auditoria
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                if (user.Identity?.IsAuthenticated == true)
+                {
+                    int userId = int.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
+                    string userName = user.Identity.Name ?? "Desconhecido";
+                    
+                    await AuditService.LogAcaoAsync(
+                        userId, userName, "CREATE", "Atendimento", novoAtendimento.Id.ToString(), null, 
+                        new { novoAtendimento.NumeroOsAuxilio, FalecidoId = novoAtendimento.FalecidoId, ResponsavelId = novoAtendimento.ResponsavelId }
+                    );
+                }
+                
                 Snackbar.Add("Atendimento registrado com sucesso!", Severity.Success);
                 Navigation.NavigateTo("/obitos");
             }
             catch (Exception ex)
             {
+                await transaction.RollbackAsync();
                 Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
             }
         }

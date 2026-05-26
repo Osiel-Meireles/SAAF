@@ -2,7 +2,8 @@
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
@@ -73,7 +74,7 @@
                                 <MudText Typo="Typo.body2">
                                     <strong>Previsão de Exumação:</strong> @gaveta.DataPrevisaoExumacao?.ToString("dd/MM/yyyy")
                                 </MudText>
-                                @if (gaveta.DataPrevisaoExumacao < DateTime.Today)
+                                @if (gaveta.DataPrevisaoExumacao < DateTime.UtcNow.Date)
                                 {
                                     <span class="text-danger font-weight-bold ml-1">(Prazo Vencido!)</span>
                                 }
@@ -94,7 +95,7 @@
                                     <MudTextField @bind-Value="novoFalecido.Nome" Label="Nome do Falecido" Required="true" RequiredError="Nome é obrigatório" />
                                 </MudItem>
                                 <MudItem xs="12" sm="6">
-                                    <MudTextField @bind-Value="novoFalecido.Cpf" Label="CPF" Required="true" RequiredError="CPF é obrigatório" Mask="@(new PatternMask("000.000.000-00"))" />
+                                    <MudTextField @bind-Value="novoFalecido.Cpf" Label="CPF (somente números)" Required="true" RequiredError="CPF é obrigatório" HelperText="11 dígitos, sem pontuação" />
                                 </MudItem>
                                 <MudItem xs="12" sm="6">
                                     <MudSelect T="CausaMorte" Label="Causa da Morte" @bind-Value="novoFalecido.CausaMorte" Required="true">
@@ -111,6 +112,9 @@
                                             <MudSelectItem Value="@tipo">@tipo.ToString()</MudSelectItem>
                                         }
                                     </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudDatePicker Label="Data do Falecimento" @bind-Date="dataFalecimento" Required="true" />
                                 </MudItem>
                                 <MudItem xs="12" sm="6">
                                     <MudDatePicker Label="Data do Sepultamento" @bind-Date="dataSepultamento" Required="true" />
@@ -186,6 +190,13 @@
 </style>
 
 @code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public int GavetaId { get; set; }
 
@@ -198,6 +209,7 @@
     private MudForm formSepultamento = null!;
     private bool sepultamentoValido = false;
     private Falecido novoFalecido = new();
+    private DateTime? dataFalecimento = DateTime.Today;
     private DateTime? dataSepultamento = DateTime.Today;
     private int anosPermanencia = 3;
 
@@ -205,6 +217,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         await CarregarDados();
     }
 
@@ -378,6 +391,11 @@
             isLoading = true;
             StateHasChanged();
 
+            // PostgreSQL exige que as datas sejam UTC quando o campo é 'timestamp with time zone'
+            novoFalecido.DataFalecimento = dataFalecimento.HasValue 
+                ? DateTime.SpecifyKind(dataFalecimento.Value, DateTimeKind.Utc) 
+                : DateTime.UtcNow;
+
             // Salvar Falecido
             DbContext.Falecidos.Add(novoFalecido);
             await DbContext.SaveChangesAsync();
@@ -385,8 +403,10 @@
             // Ocupar Gaveta
             gaveta.Ocupada = true;
             gaveta.FalecidoId = novoFalecido.Id;
-            gaveta.DataOcupacao = dataSepultamento;
-            gaveta.DataPrevisaoExumacao = (dataSepultamento ?? DateTime.Today).AddYears(anosPermanencia);
+            gaveta.DataOcupacao = dataSepultamento.HasValue 
+                ? DateTime.SpecifyKind(dataSepultamento.Value, DateTimeKind.Utc) 
+                : DateTime.UtcNow;
+            gaveta.DataPrevisaoExumacao = (gaveta.DataOcupacao ?? DateTime.UtcNow).AddYears(anosPermanencia);
 
             DbContext.GavetasPublicas.Update(gaveta);
             await DbContext.SaveChangesAsync();
@@ -398,7 +418,13 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao realizar sepultamento: {ex.Message}", Severity.Error);
+            var innerMsg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+            Snackbar.Add($"Erro ao realizar sepultamento: {innerMsg}", Severity.Error);
+            
+            // Console logging para debug detalhado no Rider/Terminal
+            Console.WriteLine("=== ERRO AO SALVAR NO DB ===");
+            Console.WriteLine(ex.ToString());
+            
             isLoading = false;
             StateHasChanged();
         }
@@ -439,3 +465,4 @@
 
     private void Fechar() => MudDialog.Close();
 }
+

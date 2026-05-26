@@ -17,6 +17,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<GavetaPublica> GavetasPublicas { get; set; }
     public DbSet<Usuario> Usuarios { get; set; }
     public DbSet<Capela> Capelas { get; set; } // Referência para a UI existente
+    public DbSet<AuditLog> AuditLogs { get; set; }
 
     // Novas Entidades
     public DbSet<ConfiguracaoFinanceira> ConfiguracoesFinanceiras { get; set; }

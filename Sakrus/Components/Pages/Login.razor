@@ -1,94 +1,70 @@
 @page "/login"
 @attribute [AllowAnonymous]
 @layout LoginLayout
-@inject IAuthService AuthService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
 
-<PageTitle>Login — Sakrus</PageTitle>
+<PageTitle>Login — SAAF</PageTitle>
 
 <div class="login-form-wrapper">
     <div class="login-form-header">
-        <MudText Typo="Typo.h4" Class="login-form-title">Bem-vindo(a)</MudText>
-        <MudText Typo="Typo.body1" Class="login-form-subtitle">Por favor, acesse a sua conta</MudText>
+        <h4 class="login-form-title">Bem-vindo(a)</h4>
+        <p class="login-form-subtitle">Por favor, acesse a sua conta</p>
     </div>
 
-    <EditForm Model="Input" OnValidSubmit="RealizarLogin" FormName="loginForm">
-        <DataAnnotationsValidator />
-        <div class="login-fields">
-            <MudTextField @bind-Value="Input.Email"
-                          For="@(() => Input.Email)"
-                          name="Input.Email"
-                          Label="Usuário"
-                          Variant="Variant.Outlined"
-                          InputType="InputType.Text"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Person"
-                          AdornmentColor="Color.Primary"
-                          Required="true"
-                          RequiredError="Informe o usuário"
-                          Class="login-field"
-                          Disabled="_carregando" />
+    <form method="post" action="/api/auth/login" class="login-fields">
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="@ReturnUrl" />
 
-            <MudTextField @bind-Value="Input.Senha"
-                          For="@(() => Input.Senha)"
-                          name="Input.Senha"
-                          Label="Senha"
-                          Variant="Variant.Outlined"
-                          InputType="InputType.Password"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Lock"
-                          AdornmentColor="Color.Primary"
-                          Required="true"
-                          RequiredError="Informe a senha"
-                          Class="login-field"
-                          Disabled="_carregando" />
-
-            <div class="login-options">
-                <MudCheckBox @bind-Value="Input.LembrarMe"
-                             name="Input.LembrarMe"
-                             Label="Lembrar por 7 dias"
-                             Color="Color.Primary"
-                             Size="Size.Small"
-                             Disabled="_carregando" />
-                <MudSpacer />
-                <MudLink Href="#" Typo="Typo.body2" Color="Color.Primary" Class="login-forgot-pwd">Esqueceu a senha?</MudLink>
+        <div class="login-field-group">
+            <label class="login-label" for="email">Usuário</label>
+            <div class="login-input-wrapper">
+                <svg class="login-input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+                <input type="text" id="email" name="email" required
+                       placeholder="seu@email.com"
+                       class="login-input" />
             </div>
-
-            @if (_erroLogin is not null)
-            {
-                <MudAlert Severity="Severity.Error"
-                          Dense="true"
-                          Class="login-alert"
-                          Icon="@Icons.Material.Filled.ErrorOutline">
-                    @_erroLogin
-                </MudAlert>
-            }
-
-            <MudButton ButtonType="ButtonType.Submit"
-                       Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       FullWidth="true"
-                       Size="Size.Large"
-                       Class="login-btn"
-                       Disabled="@_carregando">
-                @if (_carregando)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    <span>Autenticando...</span>
-                }
-                else
-                {
-                    <span>Acessar o Sistema</span>
-                }
-            </MudButton>
         </div>
-    </EditForm>
+
+        <div class="login-field-group">
+            <label class="login-label" for="senha">Senha</label>
+            <div class="login-input-wrapper">
+                <svg class="login-input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                </svg>
+                <input type="password" id="senha" name="senha" required
+                       placeholder="••••••••"
+                       class="login-input" />
+            </div>
+        </div>
+
+        <div class="login-options">
+            <label class="login-checkbox-label">
+                <input type="checkbox" name="lembrarMe" value="true" class="login-checkbox" />
+                <span>Lembrar por 7 dias</span>
+            </label>
+        </div>
+
+        @if (_erroLogin)
+        {
+            <div class="login-alert">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+                <span>E-mail ou senha incorretos. Verifique suas credenciais.</span>
+            </div>
+        }
+
+        <button type="submit" class="login-btn">
+            Acessar o Sistema
+        </button>
+    </form>
 
     <div class="login-footer">
-        <MudText Typo="Typo.caption" Class="login-footer-text">
+        <p class="login-footer-text">
             © @DateTime.Now.Year Prefeitura Municipal de Luís Eduardo Magalhães
-        </MudText>
+        </p>
     </div>
 </div>
 
@@ -109,15 +85,17 @@
     }
 
     .login-form-title {
-        font-family: 'Playfair Display', serif !important;
-        font-weight: 700 !important;
-        color: #2C3531 !important;
-        margin-bottom: 0.5rem !important;
+        font-family: 'Playfair Display', serif;
+        font-weight: 700;
+        color: #2C3531;
+        margin: 0 0 0.5rem 0;
+        font-size: 2rem;
     }
 
     .login-form-subtitle {
-        color: #707070 !important;
-        font-size: 1rem !important;
+        color: #707070;
+        font-size: 1rem;
+        margin: 0;
     }
 
     .login-fields {
@@ -126,14 +104,55 @@
         gap: 16px;
     }
 
-    .login-field .mud-input-outlined-border {
-        border-color: rgba(180, 172, 161, 0.4) !important;
-        border-radius: 12px;
+    .login-field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
     }
-    
-    .login-field .mud-input-outlined:focus-within .mud-input-outlined-border {
-        border-color: #8FA88C !important;
-        border-width: 2px !important;
+
+    .login-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #3A3A3A;
+    }
+
+    .login-input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .login-input-icon {
+        position: absolute;
+        left: 14px;
+        width: 20px;
+        height: 20px;
+        color: #8FA88C;
+        pointer-events: none;
+    }
+
+    .login-input {
+        width: 100%;
+        padding: 14px 14px 14px 44px;
+        border: 1px solid rgba(180, 172, 161, 0.4);
+        border-radius: 12px;
+        font-size: 1rem;
+        font-family: 'Inter', sans-serif;
+        color: #3A3A3A;
+        background: #ffffff;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    .login-input::placeholder {
+        color: #B4ACA1;
+    }
+
+    .login-input:focus {
+        border-color: #8FA88C;
+        border-width: 2px;
+        box-shadow: 0 0 0 3px rgba(143, 168, 140, 0.15);
     }
 
     .login-options {
@@ -142,34 +161,64 @@
         margin-top: 4px;
         margin-bottom: 12px;
     }
-    
-    .login-forgot-pwd {
-        font-weight: 500;
-        text-decoration: none;
+
+    .login-checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.875rem;
+        color: #3A3A3A;
+        cursor: pointer;
+    }
+
+    .login-checkbox {
+        accent-color: #8FA88C;
+        width: 16px;
+        height: 16px;
     }
 
     .login-alert {
-        border-radius: 12px !important;
-        background-color: #fff0f0 !important;
-        color: #d32f2f !important;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background-color: #fff0f0;
+        color: #d32f2f;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .login-alert svg {
+        flex-shrink: 0;
     }
 
     .login-btn {
-        margin-top: 8px !important;
-        border-radius: 12px !important;
+        margin-top: 8px;
+        border-radius: 12px;
         height: 54px;
-        font-weight: 600 !important;
-        font-size: 1.05rem !important;
-        background-color: #8FA88C !important;
-        color: white !important;
-        box-shadow: 0 8px 20px rgba(143, 168, 140, 0.3) !important;
-        transition: all 0.3s ease !important;
+        font-weight: 600;
+        font-size: 1.05rem;
+        font-family: 'Inter', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        background-color: #8FA88C;
+        color: white;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 8px 20px rgba(143, 168, 140, 0.3);
+        transition: all 0.3s ease;
+        width: 100%;
     }
 
-    .login-btn:hover:not(:disabled) {
+    .login-btn:hover {
         transform: translateY(-2px);
-        box-shadow: 0 12px 24px rgba(143, 168, 140, 0.4) !important;
-        background-color: #7e987c !important;
+        box-shadow: 0 12px 24px rgba(143, 168, 140, 0.4);
+        background-color: #7e987c;
+    }
+
+    .login-btn:active {
+        transform: translateY(0);
     }
 
     .login-footer {
@@ -178,8 +227,9 @@
     }
 
     .login-footer-text {
-        color: #909090 !important;
-        font-size: 0.8rem !important;
+        color: #909090;
+        font-size: 0.8rem;
+        margin: 0;
     }
 </style>
 
@@ -187,39 +237,8 @@
     [SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
 
-    [SupplyParameterFromForm]
-    public LoginModel Input { get; set; } = new();
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
 
-    private bool _carregando;
-    private string? _erroLogin;
-
-    public class LoginModel
-    {
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Informe o usuário")]
-        public string Email { get; set; } = string.Empty;
-
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Informe a senha")]
-        public string Senha { get; set; } = string.Empty;
-
-        public bool LembrarMe { get; set; }
-    }
-
-    private async Task RealizarLogin()
-    {
-        _carregando = true;
-        _erroLogin = null;
-
-        var sucesso = await AuthService.LoginAsync(Input.Email, Input.Senha, Input.LembrarMe);
-
-        if (sucesso)
-        {
-            var destino = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : Uri.UnescapeDataString(ReturnUrl);
-            Navigation.NavigateTo(destino, forceLoad: true);
-        }
-        else
-        {
-            _erroLogin = "E-mail ou senha incorretos. Verifique suas credenciais.";
-            _carregando = false;
-        }
-    }
+    private bool _erroLogin => !string.IsNullOrEmpty(Error);
 }

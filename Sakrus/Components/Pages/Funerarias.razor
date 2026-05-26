@@ -1,18 +1,21 @@
 @page "/funerarias"
+@attribute [Authorize]
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject ISnackbar Snackbar
 
 <PageTitle>Funerárias Parceiras - Sakrus</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Gerenciamento de Funerárias</MudText>
 
-<MudTable Items="@funerarias" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@isLoading" LoadingProgressColor="Color.Info" Dense="true" Elevation="2">
+<MudTable Items="@funerarias" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@isLoading" LoadingProgressColor="Color.Info" Dense="true" Elevation="2" Filter="new Func<Funeraria,bool>(FilterFunc)">
     <ToolBarContent>
         <MudText Typo="Typo.h6">Funerárias Credenciadas</MudText>
         <MudSpacer />
+        <MudTextField @bind-Value="searchString" Placeholder="Buscar..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 mr-4"></MudTextField>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddForm">Nova Funerária</MudButton>
     </ToolBarContent>
     <HeaderContent>
@@ -34,6 +37,9 @@
             <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => Delete(context))" />
         </MudTd>
     </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
 </MudTable>
 
 @if (showForm)
@@ -64,17 +70,37 @@
 }
 
 @code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
     private List<Funeraria> funerarias = new();
     private bool isLoading = true;
     private bool showForm = false;
     private bool isEditing = false;
     private bool sucesso;
     private MudForm form = null!;
+    private string searchString = "";
     
     private Funeraria currentFuneraria = new();
 
+    private bool FilterFunc(Funeraria funeraria)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (funeraria.Nome?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+        if (funeraria.CNPJ?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+        return false;
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         await LoadData();
     }
 
@@ -117,6 +143,13 @@
     {
         await form.Validate();
         if (!form.IsValid) return;
+
+        // FEAT-03: Validação de CNPJ
+        if (!string.IsNullOrWhiteSpace(currentFuneraria.CNPJ) && !Sakrus.Core.Helpers.DocumentValidator.IsCnpjValido(currentFuneraria.CNPJ))
+        {
+            Snackbar.Add("O CNPJ informado é inválido.", Severity.Error);
+            return;
+        }
 
         try
         {
@@ -168,3 +201,4 @@
         }
     }
 }
+

@@ -1,9 +1,11 @@
 @page "/obitos"
+@attribute [Authorize]
 @using Microsoft.EntityFrameworkCore
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Sakrus.Services
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject IDialogService DialogService
 @inject RelatorioService RelatorioService
 @inject IJSRuntime JSRuntime
@@ -16,19 +18,23 @@
     <MudButton Href="/novo-atendimento" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Novo Registro</MudButton>
 </div>
 
-<MudTable Items="@listaAtendimentos" Hover="true" Striped="true" Elevation="2" T="Atendimento" Loading="@isLoading">
+<MudTable Items="@listaAtendimentos" Hover="true" Striped="true" Elevation="2" T="Atendimento" Loading="@isLoading" Filter="new Func<Atendimento,bool>(FilterFunc)">
+    <ToolBarContent>
+        <MudSpacer />
+        <MudTextField @bind-Value="searchString" Placeholder="Buscar por responsável ou OS..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+    </ToolBarContent>
     <HeaderContent>
         <MudTh>ID</MudTh>
         <MudTh>Responsável</MudTh>
         <MudTh>Causa da Morte</MudTh>
-        <MudTh>Nº OS / Auxílio</MudTh>
+        <MudTh>NÂº OS / Auxílio</MudTh>
         <MudTh>Ações</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
         <MudTd DataLabel="Responsável">@context.Responsavel.Nome</MudTd>
         <MudTd DataLabel="Causa da Morte">@context.Falecido.CausaMorte.ToString()</MudTd>
-        <MudTd DataLabel="Nº OS / Auxílio">
+        <MudTd DataLabel="NÂº OS / Auxílio">
             @if (string.IsNullOrEmpty(context.NumeroOsAuxilio))
             {
                 <MudChip T="string" Color="Color.Warning" Size="Size.Small">Pendente</MudChip>
@@ -55,11 +61,30 @@
 </MudTable>
 
 @code {
+    private ApplicationDbContext DbContext = default!;
     private List<Atendimento> listaAtendimentos = new();
     private bool isLoading = true;
+    private string searchString = "";
+
+    private bool FilterFunc(Atendimento atendimento)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (atendimento.Responsavel?.Nome?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+        if (atendimento.NumeroOsAuxilio?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+        return false;
+    }
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         await CarregarDadosAsync();
     }
 
@@ -86,7 +111,7 @@
         var dialog = await DialogService.ShowAsync<FaturamentoDialog>("Faturamento do Atendimento", parameters, options);
         var result = await dialog.Result;
 
-        // Se o usuário finalizou a OS (não cancelou), recarrega a tabela para atualizar a coluna "Nº OS / Auxílio"
+        // Se o usuário finalizou a OS (não cancelou), recarrega a tabela para atualizar a coluna "NÂº OS / Auxílio"
         if (!result.Canceled)
         {
             await CarregarDadosAsync();

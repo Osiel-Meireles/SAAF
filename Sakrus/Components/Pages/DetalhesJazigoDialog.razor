@@ -2,7 +2,8 @@
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
 @using Sakrus.Services
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject PdfGeneratorService PdfGeneratorService
@@ -64,6 +65,13 @@
 </MudDialog>
 
 @code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public int JazigoId { get; set; }
 
@@ -73,6 +81,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         jazigo = await DbContext.Jazigos
             .Include(j => j.ModeloJazigo)
             .FirstOrDefaultAsync(j => j.Id == JazigoId);
@@ -148,3 +157,4 @@
         }
     }
 }
+

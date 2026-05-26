@@ -101,7 +101,20 @@ function validarCPF(cpf) {
     return true;
 }
 
+/**
+ * SEC-05: Submete o form POST oculto para logout seguro (anti-CSRF).
+ */
+function submitLogoutForm() {
+    const form = document.getElementById('logoutForm');
+    if (form) {
+        form.submit();
+    } else {
+        console.error("Formulário de logout não encontrado");
+    }
+}
+
 // Inicialização do SAAF
 window.addEventListener('load', () => {
     logSakrus('Sistema SAAF iniciado com sucesso', 'info');
 });
+

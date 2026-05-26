@@ -1,6 +1,9 @@
+@rendermode InteractiveServer
 @inherits LayoutComponentBase
-@inject IAuthService AuthService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IDialogService DialogService
+@inject AuthenticationStateProvider AuthStateProvider
 
 @* Provedores globais obrigatórios do MudBlazor *@
 <MudThemeProvider Theme="_currentTheme" />
@@ -20,6 +23,7 @@
                 <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
                     <ActivatorContent>
                         <div class="d-flex align-center gap-2" style="cursor:pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s;"
+                             @onclick="@context.ToggleAsync"
                              onmouseover="this.style.background='rgba(44, 53, 49, 0.05)'"
                              onmouseout="this.style.background='transparent'">
                             <MudAvatar Color="Color.Primary" Size="Size.Small" Style="font-size:0.8rem;">
@@ -37,7 +41,7 @@
                         </div>
                     </ActivatorContent>
                     <ChildContent>
-                        <MudMenuItem Icon="@Icons.Material.Filled.Lock" IconColor="Color.Primary">
+                        <MudMenuItem Icon="@Icons.Material.Filled.Lock" IconColor="Color.Primary" OnClick="@AbrirDialogAlterarSenha">
                             Alterar Senha
                         </MudMenuItem>
                         <MudDivider />
@@ -49,6 +53,8 @@
                 </MudMenu>
             </Authorized>
         </AuthorizeView>
+        <form id="logoutForm" action="/api/auth/logout" method="post" style="display:none;">
+        </form>
     </MudAppBar>
 
     <MudDrawer @bind-Open="_drawerOpen" Elevation="2" ClipMode="DrawerClipMode.Always" Style="background-color: #FDFCFB;">
@@ -93,10 +99,22 @@
         _drawerOpen = !_drawerOpen;
     }
 
-    private async Task RealizarLogout()
+    // SEC-05: Logout via POST — submete um form oculto via JS para evitar CSRF
+    private void RealizarLogout()
     {
-        await AuthService.LogoutAsync();
-        Navigation.NavigateTo("/login", forceLoad: true);
+        Navigation.NavigateTo("/api/auth/logout", forceLoad: true);
+    }
+
+    private async Task AbrirDialogAlterarSenha()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+            // The dialog will handle the user internally based on current auth state
+            await DialogService.ShowAsync<Sakrus.Components.Pages.AlterarSenhaDialog>("Alterar Minha Senha", options);
+        }
     }
 
     private string GetIniciais(string? nomeCompleto)
@@ -114,4 +132,4 @@
         if (user.IsInRole("Operador")) return "Operador";
         return "Visualizador";
     }
-}
+}

@@ -1,7 +1,8 @@
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -85,7 +86,7 @@
                     </MudItem>
 
                     <MudItem xs="12">
-                        <MudTextField @bind-Value="atendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" />
+                        <MudTextField @bind-Value="atendimento.NumeroDeclaracaoObito" Label="NÂº Declaração de Óbito" />
                     </MudItem>
                 </MudGrid>
             </MudForm>
@@ -98,6 +99,13 @@
 </MudDialog>
 
 @code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public int AtendimentoId { get; set; }
 
@@ -108,6 +116,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         await CarregarAtendimento();
     }
 
@@ -150,3 +159,4 @@
 
     private void Cancelar() => MudDialog.Cancel();
 }
+

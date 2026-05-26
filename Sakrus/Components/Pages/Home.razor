@@ -1,10 +1,11 @@
-@page "/"
+﻿@page "/"
+@attribute [Authorize]
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
 @using System.Globalization
-@inject ApplicationDbContext DbContext
-
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 <PageTitle>Dashboard — Sakrus</PageTitle>
 
 @if (_carregando)
@@ -259,6 +260,17 @@ else
 </style>
 
 @code {
+    private ApplicationDbContext DbContext = default!;
+    protected override void OnInitialized()
+    {
+        DbContext = DbFactory.CreateDbContext();
+    }
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
     // ─── Estado ───────────────────────────────────────────────
     private bool _carregando = true;
     private DateTime _ultimaAtualizacao;

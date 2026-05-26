@@ -1,0 +1,104 @@
+@page "/auditoria"
+@attribute [Authorize(Roles = "Admin")]
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+
+<PageTitle>Log de Auditoria - SAAF</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Log de Auditoria</MudText>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="CarregarLogs" StartIcon="@Icons.Material.Filled.Refresh">Atualizar</MudButton>
+</div>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    Esta página é restrita a Administradores. Ela registra as ações vitais realizadas no sistema.
+</MudAlert>
+
+@if (isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="@logs" Hover="true" Striped="true" Elevation="2" Filter="new Func<AuditLog,bool>(FilterFunc)">
+        <ToolBarContent>
+            <MudSpacer />
+            <MudTextField @bind-Value="searchString" Placeholder="Buscar por usuário, entidade ou ação..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Data/Hora (UTC)</MudTh>
+            <MudTh>Usuário</MudTh>
+            <MudTh>Ação</MudTh>
+            <MudTh>Entidade</MudTh>
+            <MudTh>ID</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Data/Hora">@context.DataHoraUtc.ToLocalTime().ToString("g")</MudTd>
+            <MudTd DataLabel="Usuário">@context.NomeUsuario</MudTd>
+            <MudTd DataLabel="Ação">
+                <MudChip T="string" Color="@GetActionColor(context.Acao)" Size="Size.Small">
+                    @context.Acao
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Entidade">@context.NomeEntidade</MudTd>
+            <MudTd DataLabel="ID">@context.EntidadeId</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+    private List<AuditLog> logs = new();
+    private bool isLoading = true;
+    private string searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        await CarregarLogs();
+    }
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    private async Task CarregarLogs()
+    {
+        isLoading = true;
+        logs = await DbContext.AuditLogs.OrderByDescending(x => x.DataHoraUtc).Take(500).ToListAsync();
+        isLoading = false;
+    }
+
+    private bool FilterFunc(AuditLog log)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (log.NomeUsuario.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (log.Acao.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (log.NomeEntidade.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (log.EntidadeId.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+    private Color GetActionColor(string action)
+    {
+        return action.ToUpper() switch
+        {
+            "CREATE" => Color.Success,
+            "UPDATE" => Color.Warning,
+            "DELETE" => Color.Error,
+            _ => Color.Info
+        };
+    }
+}

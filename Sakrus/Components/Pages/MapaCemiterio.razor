@@ -1,8 +1,10 @@
 @page "/mapa-cemiterio"
+@attribute [Authorize]
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject IDialogService DialogService
 
 <PageTitle>Mapa Espacial do Cemitério - Sakrus</PageTitle>
@@ -40,12 +42,20 @@ else
 }
 
 @code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
     private List<Jazigo> jazigos;
     private int livres = 0;
     private int ocupados = 0;
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         jazigos = await DbContext.Jazigos
             .Include(j => j.ModeloJazigo)
             .OrderBy(j => j.CodigoIdentificador)
@@ -70,3 +80,4 @@ else
         }
     }
 }
+

@@ -1,9 +1,12 @@
 @page "/usuarios"
+@attribute [Authorize(Roles = "Admin")]
 @using Sakrus.Core.Entities
+@using Sakrus.Core.Enums
 @using Sakrus.Services
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject IAuthService AuthService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -25,7 +28,11 @@
 }
 else
 {
-    <MudTable Items="@usuarios" Hover="true" Striped="true" Elevation="2">
+    <MudTable Items="@usuarios" Hover="true" Striped="true" Elevation="2" Filter="new Func<Usuario,bool>(FilterFunc)">
+        <ToolBarContent>
+            <MudSpacer />
+            <MudTextField @bind-Value="searchString" Placeholder="Buscar por nome ou e-mail..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
         <HeaderContent>
             <MudTh>Nome</MudTh>
             <MudTh>E-mail</MudTh>
@@ -38,7 +45,7 @@ else
             <MudTd DataLabel="E-mail">@context.Email</MudTd>
             <MudTd DataLabel="Nível">
                 <MudChip T="string" Size="Size.Small">
-                    @MapearNivelAcesso(context.NivelAcesso)
+                    @NivelAcessoHelper.ParaLabel(context.NivelAcesso)
                 </MudChip>
             </MudTd>
             <MudTd DataLabel="Status">
@@ -51,15 +58,37 @@ else
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DesativarUsuario(context.Id, context.Nome))" />
             </MudTd>
         </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
     </MudTable>
 }
 
 @code {
+    private ApplicationDbContext DbContext = default!;
     private List<Usuario> usuarios = new();
     private bool isLoading = true;
+    private string searchString = "";
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    private bool FilterFunc(Usuario usuario)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (usuario.Nome?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+        if (usuario.Email?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+        return false;
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         await CarregarUsuarios();
     }
 
@@ -127,15 +156,5 @@ else
             }
         }
     }
-
-    private string MapearNivelAcesso(int nivel)
-    {
-        return nivel switch
-        {
-            1 => "Administrador",
-            2 => "Supervisor",
-            3 => "Operador",
-            _ => "Desconhecido"
-        };
-    }
 }
+

@@ -3,7 +3,8 @@
 @using Sakrus.Services
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext DbContext
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
 @inject IAuthService AuthService
 @inject ISnackbar Snackbar
 
@@ -41,9 +42,20 @@
             }
             else
             {
-                <MudAlert Severity="Severity.Info" Class="mb-4">
-                    Para alterar a senha, use a página de perfil.
-                </MudAlert>
+                <div class="d-flex align-center justify-space-between mb-4">
+                    <MudAlert Severity="Severity.Info" Class="flex-grow-1 mr-2">
+                        Senha protegida (hash Bcrypt).
+                    </MudAlert>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="GerarNovaSenha">Redefinir Senha</MudButton>
+                </div>
+                
+                @if (!string.IsNullOrEmpty(_novaSenhaGerada))
+                {
+                    <MudAlert Severity="Severity.Success" Class="mb-4">
+                        A nova senha temporária é: <strong>@_novaSenhaGerada</strong><br/>
+                        Copie e envie ao usuário. Ela não será mostrada novamente.
+                    </MudAlert>
+                }
             }
 
             <MudSelect 
@@ -52,9 +64,9 @@
                 Required="true"
                 RequiredError="Nível obrigatório"
                 Class="mb-4">
-                <MudSelectItem Value="1">Administrador</MudSelectItem>
-                <MudSelectItem Value="2">Supervisor</MudSelectItem>
-                <MudSelectItem Value="3">Operador</MudSelectItem>
+                <MudSelectItem Value="10">Administrador</MudSelectItem>
+                <MudSelectItem Value="5">Operador</MudSelectItem>
+                <MudSelectItem Value="1">Visualizador</MudSelectItem>
             </MudSelect>
 
             <MudCheckBox 
@@ -73,18 +85,45 @@
 </MudDialog>
 
 @code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public int? UsuarioId { get; set; }
 
     private Usuario _usuario = new();
     private string _senha = "";
+    private string _novaSenhaGerada = "";
     private bool _mostrarSenha = false;
+
+    // FEAT-11: Redefinir senha (Admin)
+    private async Task GerarNovaSenha()
+    {
+        // Gera uma senha aleatória de 8 caracteres alfanuméricos
+        const string chars = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#";
+        var random = new Random();
+        _novaSenhaGerada = new string(Enumerable.Repeat(chars, 8).Select(s => s[random.Next(s.Length)]).ToArray());
+        
+        var u = await DbContext.Usuarios.FindAsync(_usuario.Id);
+        if (u != null)
+        {
+            u.SenhaHash = BCrypt.Net.BCrypt.HashPassword(_novaSenhaGerada);
+            DbContext.Usuarios.Update(u);
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add("Senha redefinida com sucesso!", Severity.Success);
+        }
+    }
     private bool _isValid = false;
     private bool _isNovo = true;
     private MudForm _form = null!;
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext = DbFactory.CreateDbContext();
         if (UsuarioId.HasValue)
         {
             _isNovo = false;
@@ -136,3 +175,4 @@
 
     private void Cancelar() => MudDialog.Cancel();
 }
+

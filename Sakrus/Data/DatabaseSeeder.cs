@@ -12,11 +12,13 @@ public class DatabaseSeeder
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<DatabaseSeeder> _logger;
+    private readonly IConfiguration _configuration;
 
-    public DatabaseSeeder(ApplicationDbContext context, ILogger<DatabaseSeeder> logger)
+    public DatabaseSeeder(ApplicationDbContext context, ILogger<DatabaseSeeder> logger, IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
+        _configuration = configuration;
     }
 
     public async Task SeedAsync()
@@ -35,11 +37,13 @@ public class DatabaseSeeder
 
         _logger.LogWarning("Nenhum usuário encontrado. Criando usuário administrador padrão...");
 
+        var initialPassword = _configuration["ADMIN_INITIAL_PASSWORD"] ?? "Admin@123";
+
         var admin = new Usuario
         {
             Nome = "Administrador",
             Email = "admin@sakrus.local",
-            SenhaHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
+            SenhaHash = BCrypt.Net.BCrypt.HashPassword(initialPassword),
             NivelAcesso = 10,
             Ativo = true
         };

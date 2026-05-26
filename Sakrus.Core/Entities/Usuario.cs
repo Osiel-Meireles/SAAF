@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Sakrus.Core.Entities;
 
@@ -21,4 +21,8 @@ public class Usuario
     public int NivelAcesso { get; set; } // Substitui o antigo MM_NVL
     
     public bool Ativo { get; set; } = true;
+
+    // SEC-04: Campos para proteção contra brute-force (lockout)
+    public int TentativasLoginFalhas { get; set; } = 0;
+    public DateTime? BloqueadoAte { get; set; }
 }

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Sakrus.Core.Entities;
+using Sakrus.Core.Enums;
 using Sakrus.Infrastructure.Data;
 
 namespace Sakrus.Services;
@@ -39,21 +40,44 @@ public class AuthService : IAuthService
             return false;
         }
 
+        // SEC-04: Verifica se o usuário está bloqueado por excesso de tentativas
+        if (usuario.BloqueadoAte.HasValue && usuario.BloqueadoAte.Value > DateTime.UtcNow)
+        {
+            _logger.LogWarning("Conta temporariamente bloqueada (brute-force): {Email}", email);
+            return false;
+        }
+
         // Verifica a senha contra o hash armazenado
         if (!BCrypt.Net.BCrypt.Verify(senha, usuario.SenhaHash))
         {
             _logger.LogWarning("Senha incorreta para o usuário: {Email}", email);
+            
+            // Incrementa falhas e bloqueia se necessário
+            usuario.TentativasLoginFalhas++;
+            if (usuario.TentativasLoginFalhas >= 5)
+            {
+                usuario.BloqueadoAte = DateTime.UtcNow.AddMinutes(15);
+                _logger.LogWarning("Conta bloqueada por 15 minutos (brute-force): {Email}", email);
+            }
+            
+            await _context.SaveChangesAsync();
             return false;
         }
 
-        // Cria as claims da sessão
+        // Reseta tentativas após login com sucesso
+        usuario.TentativasLoginFalhas = 0;
+        usuario.BloqueadoAte = null;
+        await _context.SaveChangesAsync();
+
+        // Cria as claims da sessão usando o helper centralizado
+        var role = NivelAcessoHelper.ParaRole(usuario.NivelAcesso);
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
             new(ClaimTypes.Name, usuario.Nome),
             new(ClaimTypes.Email, usuario.Email),
             new("NivelAcesso", usuario.NivelAcesso.ToString()),
-            new(ClaimTypes.Role, ResolverRole(usuario.NivelAcesso))
+            new(ClaimTypes.Role, role)
         };
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -74,7 +98,7 @@ public class AuthService : IAuthService
             authProperties);
 
         _logger.LogInformation("Login realizado com sucesso: {Email} (Role: {Role})",
-            usuario.Email, ResolverRole(usuario.NivelAcesso));
+            usuario.Email, role);
 
         return true;
     }
@@ -138,12 +162,4 @@ public class AuthService : IAuthService
 
         return await _context.Usuarios.FindAsync(id);
     }
-
-    // Mapeia NivelAcesso (1-10) para Role string
-    private static string ResolverRole(int nivelAcesso) => nivelAcesso switch
-    {
-        >= 8 => "Admin",
-        >= 5 => "Operador",
-        _    => "Visualizador"
-    };
 }

@@ -164,6 +164,31 @@ Total de **25 erros** identificados. **13 foram corrigidos**, **12 recomendaçõ
 
 ---
 
+## 🏆 Sprints Realizadas e Concluídas (Novas Features)
+
+Após a análise inicial, foram concluídas com sucesso 4 Sprints focadas em segurança, integridade e novas regras de negócio.
+
+### 🏃‍♂️ Sprint 1: Autenticação, Lockout e Logs (Segurança)
+- **Bloqueio contra Força Bruta (Lockout)**: Implementado bloqueio automático de 15 minutos na conta após 5 tentativas falhas. Adicionado os campos `TentativasLoginFalhas` e `BloqueadoAte` na entidade `Usuario`.
+- **Limpeza de Warnings no Razor**: Correção em massa de mais de 30 warnings no Blazor Server (ex: `MudIconButton ToolTip` para `Title`, `MudChart InputData`, variáveis nullable `??`).
+
+### 🏃‍♂️ Sprint 2: Transações e Baixa Automática de Estoque
+- **Concorrência (`InvalidOperationException`)**: Migrado o sistema de repositórios Scoped para `IDbContextFactory`, garantindo instâncias transitórias e independentes do banco de dados em cada chamada SignalR (Blazor Server), resolvendo conflitos em multi-threading.
+- **Baixa de Estoque Seguro**: Atrelada à liberação de capelas/itens e protegida por bloco `try-catch` com controle transacional rigoroso no Entity Framework.
+- **Botão de Sair**: Corrigida falha no deslogamento limpando devidamente a autenticação baseada em Cookie.
+
+### 🏃‍♂️ Sprint 3: Regras de Negócio e Auto-Healing
+- **Controle Rigoroso de Datas**: Sistema agora bloqueia Atendimentos retroativos muito antigos ou futuros. Exumação restrita a um limite mínimo de carência (ex: 3 anos) e imposta validação de datas no C#.
+- **Auto-Healing de Capelas**: Cron Job embutido / Serviço Inteligente que detecta capelas que deveriam ter sido liberadas às 08h e aplica um `Update` em massa limpando suas ocupações atrasadas, evitando retenção de salas virtuais.
+
+### 🏃‍♂️ Sprint 4: Gestão Essencial e Auditoria
+- **Log de Auditoria**: Criação da entidade `AuditLog` e página `Auditoria.razor` que rastreiam ações sistêmicas sensíveis (Ação, Entidade, ID, Timestamp) e são exclusivas para o Administrador.
+- **Algoritmo de CPF e CNPJ**: Helper nativo criado para validação matemática rigorosa usando cálculo de dígito verificador. Implantado em Atendimento (Responsável e Falecido) e Cadastro de Funerárias.
+- **Acessibilidade e Filtros**: Adicionados componentes `<MudTablePager>` e `<MudTextField>` com funcionalidade de Filtro Case-Insensitive em Funerárias, Óbitos e Usuários.
+- **Redefinição de Senhas Segura**: Administradores agora possuem um botão para gerar uma senha alfanumérica temporária que é submetida ao Bcrypt e mostrada apenas uma vez na tela do Admin.
+
+---
+
 ## 📋 Próximas Ações Recomendadas
 
 ### IMEDIATO (Hoje)

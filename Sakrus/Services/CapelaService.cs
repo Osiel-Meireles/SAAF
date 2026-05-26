@@ -19,7 +19,31 @@ public class CapelaService : ICapelaService
 
     public async Task<List<Capela>> ObterTodasAsync()
     {
-        return await _context.Capelas.ToListAsync();
+        var capelas = await _context.Capelas.ToListAsync();
+        
+        // BUG-11: Auto-correção (Self-healing) dos status das capelas
+        var ativos = await ObterRegistrosAtivosAsync();
+        bool precisaSalvar = false;
+
+        foreach (var capela in capelas)
+        {
+            bool deveriaEstarOcupada = ativos.Any(r => r.CapelaId == capela.Id);
+            string statusCorreto = deveriaEstarOcupada ? "Ocupada" : "Disponível";
+            
+            if (capela.Status != statusCorreto)
+            {
+                capela.Status = statusCorreto;
+                _context.Capelas.Update(capela);
+                precisaSalvar = true;
+            }
+        }
+
+        if (precisaSalvar)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        return capelas;
     }
 
     public async Task<List<RegistroCapela>> ObterRegistrosAtivosAsync()
@@ -39,9 +63,9 @@ public class CapelaService : ICapelaService
         if (capela == null)
             throw new InvalidOperationException("Capela não encontrada.");
 
-        // Verifica se há conflito de horários (simplificado: se a capela já está ocupada agora)
+        // BUG-11: Verifica se há conflito de horários (se não tem data de saída, ou se a data de saída ainda está no futuro)
         var ocupada = await _context.RegistrosCapela
-            .AnyAsync(r => r.CapelaId == capelaId && r.HoraSaida == null);
+            .AnyAsync(r => r.CapelaId == capelaId && (r.HoraSaida == null || r.HoraSaida > DateTime.UtcNow));
 
         if (ocupada)
             throw new InvalidOperationException("Esta capela já encontra-se ocupada no momento.");

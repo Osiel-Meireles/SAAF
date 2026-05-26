@@ -32,8 +32,9 @@ public class EstoqueService
 
         if (produto.QuantidadeDisponivel < quantidade)
         {
-            _logger.LogWarning("Estoque insuficiente para {Nome}. Requisitado: {Req}, Disponível: {Disp}", nomeProduto, quantidade, produto.QuantidadeDisponivel);
-            // Dependendo da regra, pode jogar uma exception ou permitir estoque negativo
+            var msgErro = $"Estoque insuficiente para {nomeProduto}. Requisitado: {quantidade}, Disponível: {produto.QuantidadeDisponivel}";
+            _logger.LogWarning(msgErro);
+            throw new InvalidOperationException(msgErro);
         }
 
         produto.QuantidadeDisponivel -= quantidade;
@@ -66,11 +67,13 @@ public class EstoqueService
             
         if (atendimento == null) return;
         
-        foreach (var item in atendimento.ItensFaturados)
+        foreach (var item in atendimento.ItensFaturados.Where(i => !i.AbatidoDoEstoque))
         {
             // Tenta dar baixa buscando pelo nome da categoria/item
             // "Urna Básica", "Placa de Bronze", etc
             await DarBaixaEstoqueAsync(item.CategoriaItem, (int)item.QuantidadeOuKm, $"Faturamento Atendimento OS {atendimento.NumeroOsAuxilio}");
+            item.AbatidoDoEstoque = true;
         }
+        await _context.SaveChangesAsync();
     }
 }

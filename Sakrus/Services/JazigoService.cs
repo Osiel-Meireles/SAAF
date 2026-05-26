@@ -125,7 +125,7 @@ public class JazigoService : IJazigoService
     // --- Regra de Ouro: Exumação de Jazigo ---
     // Libera o jazigo ao remover o falecido, movendo dados para ExumacaoRegistro
     // Implementa a regra crítica: "A gaveta DEVE libertar o Jazigo para novo sepultamento"
-    public async Task ExumarJazigoAsync(int jazigoId, ExecutorExumacao executor, string observacoes = "")
+    public async Task ExumarJazigoAsync(int falecidoId, int jazigoId, ExecutorExumacao executor, string observacoes = "")
     {
         // Utiliza transação para garantir consistência dos dados
         using var transaction = await _context.Database.BeginTransactionAsync();
@@ -140,35 +140,35 @@ public class JazigoService : IJazigoService
                 throw new InvalidOperationException("Jazigo não encontrado ou já está vago.");
             }
 
-            if (jazigo.Falecidos.Count == 0)
+            var falecido = jazigo.Falecidos.FirstOrDefault(f => f.Id == falecidoId);
+            if (falecido == null)
             {
-                throw new InvalidOperationException("Nenhum falecido vinculado a este jazigo.");
+                throw new InvalidOperationException("O falecido especificado não está vinculado a este jazigo.");
             }
 
-            // Processa cada falecido relacionado (para casos de múltiplos)
-            foreach (var falecido in jazigo.Falecidos)
+            // Cria o registro histórico da exumação (Rastreabilidade)
+            var exumacao = new ExumacaoRegistro
             {
-                // Cria o registro histórico da exumação (Rastreabilidade)
-                var exumacao = new ExumacaoRegistro
-                {
-                    FalecidoId = falecido.Id,
-                    JazigoId = jazigo.Id,
-                    DataAutorizacao = DateTime.UtcNow,
-                    SetorAutorizador = "CAAF",
-                    DataExecucao = DateTime.UtcNow,
-                    Executor = executor,
-                    Observacoes = observacoes
-                };
+                FalecidoId = falecido.Id,
+                JazigoId = jazigo.Id,
+                DataAutorizacao = DateTime.UtcNow,
+                SetorAutorizador = "CAAF",
+                DataExecucao = DateTime.UtcNow,
+                Executor = executor,
+                Observacoes = observacoes
+            };
 
-                _context.ExumacoesRegistros.Add(exumacao);
-                
-                // Desvincula o falecido do jazigo (O corpo foi removido)
-                falecido.JazigoId = null;
+            _context.ExumacoesRegistros.Add(exumacao);
+            
+            // Desvincula o falecido do jazigo (O corpo foi removido)
+            falecido.JazigoId = null;
+
+            // BUG-06: Apenas libera o Jazigo se não houver MAIS NENHUM falecido ocupando ele
+            if (jazigo.Falecidos.Count(f => f.JazigoId == jazigo.Id) == 0)
+            {
+                jazigo.Ocupado = false;
+                _context.Jazigos.Update(jazigo);
             }
-
-            // 🔥 REGRA DE OURO: Libera o Jazigo para novo sepultamento
-            jazigo.Ocupado = false;
-            _context.Jazigos.Update(jazigo);
             
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
