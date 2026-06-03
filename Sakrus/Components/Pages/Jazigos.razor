@@ -7,6 +7,8 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject IDialogService DialogService
+@inject IJazigoService JazigoService
+@inject ISnackbar Snackbar
 
 <MudText Typo="Typo.h4" Class="mb-4">Gestão de Jazigos</MudText>
 
@@ -43,6 +45,13 @@
                                Color="Color.Secondary" 
                                ToolTip="Desmembrar Lote"
                                OnClick="@(() => AbrirDialogDesmembramento(context))" />
+            }
+            else if (context.JazigoPaiId == null && listaJazigos.Any(j => j.JazigoPaiId == context.Id))
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.CallMerge" 
+                               Color="Color.Warning" 
+                               ToolTip="Desfazer Divisão"
+                               OnClick="@(() => DesfazerDivisao(context))" />
             }
         </MudTd>
     </RowTemplate>
@@ -119,6 +128,28 @@
         if (result != null && !result.Canceled) 
         {
             await CarregarDados();
+        }
+    }
+
+    private async Task DesfazerDivisao(Jazigo jazigo)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Desfazer Divisão",
+            $"Tem certeza que deseja desfazer a divisão do lote {jazigo.CodigoIdentificador}? Os sub-lotes associados serão excluídos permanentemente.",
+            yesText: "Confirmar", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await JazigoService.DesfazerDesmembramentoJazigoAsync(jazigo.Id);
+                Snackbar.Add($"Divisão do lote {jazigo.CodigoIdentificador} desfeita com sucesso.", Severity.Success);
+                await CarregarDados();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
         }
     }
 }

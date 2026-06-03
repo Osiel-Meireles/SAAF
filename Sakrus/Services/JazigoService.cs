@@ -122,6 +122,60 @@ public class JazigoService : IJazigoService
         }
     }
 
+    public async Task DesfazerDesmembramentoJazigoAsync(int jazigoPaiId)
+    {
+        var jazigoPai = await _context.Jazigos
+            .Include(j => j.Falecidos)
+            .FirstOrDefaultAsync(j => j.Id == jazigoPaiId);
+        
+        if (jazigoPai == null)
+            throw new InvalidOperationException("Jazigo pai não encontrado.");
+            
+        // Obter os sub-lotes
+        var subLotes = await _context.Jazigos
+            .Include(j => j.Falecidos)
+            .Where(j => j.JazigoPaiId == jazigoPaiId)
+            .ToListAsync();
+            
+        if (!subLotes.Any())
+            throw new InvalidOperationException("Este jazigo não possui subdivisões para desfazer.");
+            
+        // Verificar se algum sub-lote está ocupado ou tem falecidos associados
+        if (subLotes.Any(s => s.Ocupado || s.Falecidos.Any()))
+            throw new InvalidOperationException("Não é possível desfazer a divisão pois um ou mais sub-lotes estão ocupados ou contêm sepultamentos.");
+
+        var subLotesIds = subLotes.Select(s => s.Id).ToList();
+
+        // Verificar se há histórico de titularidade vinculado aos sub-lotes
+        var temHistorico = await _context.HistoricoTitularidadeJazigos.AnyAsync(h => subLotesIds.Contains(h.JazigoId));
+        if (temHistorico)
+            throw new InvalidOperationException("Não é possível desfazer a divisão pois existem registros de histórico de titularidade vinculados aos sub-lotes.");
+
+        // Verificar se há exumações vinculadas aos sub-lotes
+        var temExumacao = await _context.ExumacoesRegistros.AnyAsync(e => e.JazigoId != null && subLotesIds.Contains(e.JazigoId.Value));
+        if (temExumacao)
+            throw new InvalidOperationException("Não é possível desfazer a divisão pois existem registros de exumação vinculados aos sub-lotes.");
+
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            // Remover todos os sub-lotes
+            _context.Jazigos.RemoveRange(subLotes);
+            
+            // Liberar o pai
+            jazigoPai.Ocupado = false;
+            _context.Jazigos.Update(jazigoPai);
+            
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
     // --- Regra de Ouro: Exumação de Jazigo ---
     // Libera o jazigo ao remover o falecido, movendo dados para ExumacaoRegistro
     // Implementa a regra crítica: "A gaveta DEVE libertar o Jazigo para novo sepultamento"

@@ -21,20 +21,22 @@
 <MudTable Items="@listaAtendimentos" Hover="true" Striped="true" Elevation="2" T="Atendimento" Loading="@isLoading" Filter="new Func<Atendimento,bool>(FilterFunc)">
     <ToolBarContent>
         <MudSpacer />
-        <MudTextField @bind-Value="searchString" Placeholder="Buscar por responsável ou OS..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        <MudTextField @bind-Value="searchString" Placeholder="Buscar por responsável, falecido ou OS..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
     </ToolBarContent>
     <HeaderContent>
         <MudTh>ID</MudTh>
         <MudTh>Responsável</MudTh>
+        <MudTh>Falecido</MudTh>
         <MudTh>Causa da Morte</MudTh>
-        <MudTh>NÂº OS / Auxílio</MudTh>
+        <MudTh>Nº OS / Auxílio</MudTh>
         <MudTh>Ações</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
         <MudTd DataLabel="Responsável">@context.Responsavel.Nome</MudTd>
+        <MudTd DataLabel="Falecido">@context.Falecido.Nome</MudTd>
         <MudTd DataLabel="Causa da Morte">@context.Falecido.CausaMorte.ToString()</MudTd>
-        <MudTd DataLabel="NÂº OS / Auxílio">
+        <MudTd DataLabel="Nº OS / Auxílio">
             @if (string.IsNullOrEmpty(context.NumeroOsAuxilio))
             {
                 <MudChip T="string" Color="Color.Warning" Size="Size.Small">Pendente</MudChip>
@@ -52,7 +54,14 @@
             
             <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Primary" Size="Size.Small" OnClick="@(() => BaixarGuiaSepultamento(context))" Title="Guia de Sepultamento" />
             
-            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeletarAtendimento(context))" Title="Deletar" />
+            @if (IsSepultado(context))
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Color="Color.Warning" Size="Size.Small" OnClick="@(() => AbrirRealizarExumacao(context))" Title="Realizar Exumação" />
+            }
+            else
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Color="Color.Success" Size="Size.Small" OnClick="@(() => AbrirRealizarSepultamento(context))" Title="Realizar Sepultamento" />
+            }
         </MudTd>
     </RowTemplate>
     <PagerContent>
@@ -63,6 +72,7 @@
 @code {
     private ApplicationDbContext DbContext = default!;
     private List<Atendimento> listaAtendimentos = new();
+    private Dictionary<int, GavetaPublica> falecidosGavetaMap = new();
     private bool isLoading = true;
     private string searchString = "";
 
@@ -72,9 +82,17 @@
             return true;
         if (atendimento.Responsavel?.Nome?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
             return true;
+        if (atendimento.Falecido?.Nome?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
         if (atendimento.NumeroOsAuxilio?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
             return true;
         return false;
+    }
+
+    private bool IsSepultado(Atendimento a)
+    {
+        if (a?.Falecido == null) return false;
+        return a.Falecido.JazigoId != null || falecidosGavetaMap.ContainsKey(a.FalecidoId);
     }
 
     public void Dispose()
@@ -94,8 +112,23 @@
         listaAtendimentos = await DbContext.Atendimentos
             .Include(a => a.Responsavel)
             .Include(a => a.Falecido)
+            .Include(a => a.Falecido.Jazigo)
             .OrderByDescending(a => a.Id)
             .ToListAsync();
+
+        var falecidosIds = listaAtendimentos.Select(a => a.FalecidoId).ToList();
+        var gavetasOcupadas = await DbContext.GavetasPublicas
+            .Where(g => g.FalecidoId != null && falecidosIds.Contains(g.FalecidoId.Value) && g.Ocupada)
+            .ToListAsync();
+
+        falecidosGavetaMap = new Dictionary<int, GavetaPublica>();
+        foreach (var g in gavetasOcupadas)
+        {
+            if (g.FalecidoId.HasValue)
+            {
+                falecidosGavetaMap[g.FalecidoId.Value] = g;
+            }
+        }
             
         isLoading = false;
         StateHasChanged();
@@ -111,7 +144,7 @@
         var dialog = await DialogService.ShowAsync<FaturamentoDialog>("Faturamento do Atendimento", parameters, options);
         var result = await dialog.Result;
 
-        // Se o usuário finalizou a OS (não cancelou), recarrega a tabela para atualizar a coluna "NÂº OS / Auxílio"
+        // Se o usuário finalizou a OS (não cancelou), recarrega a tabela para atualizar a coluna "Nº OS / Auxílio"
         if (!result.Canceled)
         {
             await CarregarDadosAsync();
@@ -156,26 +189,41 @@
         }
     }
 
-    private async Task DeletarAtendimento(Atendimento atendimento)
+    private async Task AbrirRealizarSepultamento(Atendimento atendimento)
     {
-        bool? result = await DialogService.ShowMessageBoxAsync(
-            "Confirmação",
-            $"Tem certeza que deseja deletar o atendimento de {atendimento.Responsavel?.Nome}? Esta ação é irreversível!",
-            yesText: "Deletar", cancelText: "Cancelar");
+        var parameters = new DialogParameters 
+        { 
+            ["AtendimentoId"] = atendimento.Id,
+            ["FalecidoId"] = atendimento.FalecidoId,
+            ["FalecidoNome"] = atendimento.Falecido?.Nome ?? ""
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<RealizarSepultamentoDialog>("Realizar Sepultamento", parameters, options);
+        var result = await dialog.Result;
 
-        if (result == true)
+        if (result != null && !result.Canceled)
         {
-            try
-            {
-                DbContext.Atendimentos.Remove(atendimento);
-                await DbContext.SaveChangesAsync();
-                await CarregarDadosAsync();
-                Snackbar.Add("Atendimento deletado com sucesso!", Severity.Success);
-            }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Erro ao deletar: {ex.Message}", Severity.Error);
-            }
+            await CarregarDadosAsync();
+        }
+    }
+
+    private async Task AbrirRealizarExumacao(Atendimento atendimento)
+    {
+        var parameters = new DialogParameters 
+        { 
+            ["AtendimentoId"] = atendimento.Id,
+            ["FalecidoId"] = atendimento.FalecidoId,
+            ["FalecidoNome"] = atendimento.Falecido?.Nome ?? ""
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<RealizarExumacaoObitoDialog>("Realizar Exumação", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarDadosAsync();
         }
     }
 }

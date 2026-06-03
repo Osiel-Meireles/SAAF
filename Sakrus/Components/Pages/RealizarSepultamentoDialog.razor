@@ -1,0 +1,237 @@
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowDownward" Color="Color.Success" />
+            <MudText Typo="Typo.h6">Realizar Sepultamento - @FalecidoNome</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <MudProgressLinear Color="Color.Success" Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudForm @ref="form" @bind-IsValid="sucesso">
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="Data do Sepultamento" @bind-Date="dataSepultamento" Required="true" RequiredError="Data é obrigatória" Editable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTimePicker Label="Horário do Sepultamento" @bind-Time="horarioSepultamento" Editable="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudRadioGroup @bind-Value="tipoLocal" T="string" Required="true">
+                            <MudRadio Value="@("Jazigo")" Color="Color.Primary">Jazigo</MudRadio>
+                            <MudRadio Value="@("Gaveta")" Color="Color.Secondary">Gaveta Pública</MudRadio>
+                        </MudRadioGroup>
+                    </MudItem>
+
+                    @if (tipoLocal == "Jazigo")
+                    {
+                        <MudItem xs="12">
+                            <MudSelect T="int?" Label="Selecione o Jazigo" @bind-Value="selectedJazigoId" Required="true" RequiredError="Jazigo é obrigatório">
+                                @foreach (var j in jazigosList)
+                                {
+                                    <MudSelectItem T="int?" Value="@j.Id">
+                                        @j.CodigoIdentificador @(j.Ocupado ? "(Ocupado)" : "(Livre)")
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+                    else if (tipoLocal == "Gaveta")
+                    {
+                        <MudItem xs="12" sm="8">
+                            <MudSelect T="int?" Label="Selecione a Gaveta Pública Livre" @bind-Value="selectedGavetaId" Required="true" RequiredError="Gaveta é obrigatória">
+                                @foreach (var g in gavetasLivresList)
+                                {
+                                    <MudSelectItem T="int?" Value="@g.Id">
+                                        Gaveta @g.NumeroGaveta (Setor: @g.Setor, Quadra: @g.Quadra)
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField T="int" Label="Anos Permanência" @bind-Value="anosPermanencia" Min="1" Max="10" Required="true" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="Confirmar" Disabled="@(!sucesso || isLoading)">Confirmar Sepultamento</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int AtendimentoId { get; set; }
+    [Parameter] public int FalecidoId { get; set; }
+    [Parameter] public string FalecidoNome { get; set; } = "";
+
+    private MudForm form = null!;
+    private bool sucesso;
+    private bool isLoading = true;
+
+    private DateTime? dataSepultamento = DateTime.Today;
+    private TimeSpan? horarioSepultamento = DateTime.Now.TimeOfDay;
+    private string tipoLocal = "Jazigo";
+    private int? selectedJazigoId;
+    private int? selectedGavetaId;
+    private int anosPermanencia = 3;
+
+    private List<Jazigo> jazigosList = new();
+    private List<GavetaPublica> gavetasLivresList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        await CarregarLocaisAsync();
+    }
+
+    private async Task CarregarLocaisAsync()
+    {
+        isLoading = true;
+        
+        jazigosList = await DbContext.Jazigos
+            .OrderBy(j => j.CodigoIdentificador)
+            .ToListAsync();
+            
+        gavetasLivresList = await DbContext.GavetasPublicas
+            .Where(g => !g.Ocupada)
+            .OrderBy(g => g.NumeroGaveta)
+            .ToListAsync();
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task Confirmar()
+    {
+        await form.Validate();
+        if (!form.IsValid) return;
+
+        isLoading = true;
+        StateHasChanged();
+
+        using var transaction = await DbContext.Database.BeginTransactionAsync();
+        try
+        {
+            var atendimento = await DbContext.Atendimentos
+                .Include(a => a.Falecido)
+                .FirstOrDefaultAsync(a => a.Id == AtendimentoId);
+
+            if (atendimento == null || atendimento.Falecido == null)
+            {
+                Snackbar.Add("Registro de atendimento não encontrado.", Severity.Error);
+                isLoading = false;
+                StateHasChanged();
+                return;
+            }
+
+            var falecido = atendimento.Falecido;
+            
+            // Garantir que a data seja salva como UTC se aplicável
+            var dataSep = dataSepultamento.HasValue 
+                ? DateTime.SpecifyKind(dataSepultamento.Value, DateTimeKind.Utc)
+                : DateTime.UtcNow;
+
+            atendimento.DataSepultamento = dataSep;
+            atendimento.HorarioSepultamento = horarioSepultamento;
+
+            if (tipoLocal == "Jazigo")
+            {
+                if (!selectedJazigoId.HasValue)
+                {
+                    Snackbar.Add("Selecione um Jazigo.", Severity.Error);
+                    isLoading = false;
+                    StateHasChanged();
+                    return;
+                }
+
+                var jazigo = await DbContext.Jazigos.FindAsync(selectedJazigoId.Value);
+                if (jazigo == null)
+                {
+                    Snackbar.Add("Jazigo não encontrado.", Severity.Error);
+                    isLoading = false;
+                    StateHasChanged();
+                    return;
+                }
+
+                // Vincula o falecido ao jazigo
+                falecido.JazigoId = jazigo.Id;
+                jazigo.Ocupado = true;
+
+                atendimento.LocalSepultamento = $"Jazigo {jazigo.CodigoIdentificador}";
+                
+                DbContext.Jazigos.Update(jazigo);
+            }
+            else if (tipoLocal == "Gaveta")
+            {
+                if (!selectedGavetaId.HasValue)
+                {
+                    Snackbar.Add("Selecione uma Gaveta Pública.", Severity.Error);
+                    isLoading = false;
+                    StateHasChanged();
+                    return;
+                }
+
+                var gaveta = await DbContext.GavetasPublicas.FindAsync(selectedGavetaId.Value);
+                if (gaveta == null || gaveta.Ocupada)
+                {
+                    Snackbar.Add("Gaveta não disponível.", Severity.Error);
+                    isLoading = false;
+                    StateHasChanged();
+                    return;
+                }
+
+                // Ocupa a gaveta
+                gaveta.Ocupada = true;
+                gaveta.FalecidoId = falecido.Id;
+                gaveta.DataOcupacao = dataSep;
+                gaveta.DataPrevisaoExumacao = dataSep.AddYears(anosPermanencia);
+
+                atendimento.LocalSepultamento = $"Gaveta Pública {gaveta.NumeroGaveta}";
+
+                DbContext.GavetasPublicas.Update(gaveta);
+            }
+
+            DbContext.Falecidos.Update(falecido);
+            DbContext.Atendimentos.Update(atendimento);
+
+            await DbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            Snackbar.Add($"Sepultamento de {FalecidoNome} realizado com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            Snackbar.Add($"Erro ao realizar sepultamento: {ex.Message}", Severity.Error);
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}
