@@ -56,10 +56,6 @@
 
 @code {
     private ApplicationDbContext DbContext = default!;
-    protected override void OnInitialized()
-    {
-        DbContext = DbFactory.CreateDbContext();
-    }
 
     public void Dispose()
     {
@@ -69,7 +65,11 @@
     private List<GavetaPublica> gavetasOcupadas = new();
     private bool isLoading = true;
 
-    protected override async Task OnInitializedAsync() => await CarregarDados();
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        await CarregarDados();
+    }
 
     private async Task CarregarDados()
     {

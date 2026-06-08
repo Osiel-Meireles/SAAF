@@ -150,8 +150,7 @@
         };
         var dialog = await DialogService.ShowAsync<TransferirTitularidadeDialog>("Transferir Titularidade", parameters);
         var result = await dialog.Result;
-        
-        if (!result.Canceled)
+        if (result != null && !result.Canceled)
         {
             MudDialog.Close(DialogResult.Ok(true)); // Repassa o OK para o grid atualizar
         }

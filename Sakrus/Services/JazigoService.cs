@@ -186,7 +186,6 @@ public class JazigoService : IJazigoService
         try
         {
             var jazigo = await _context.Jazigos
-                .Include(j => j.Falecidos)
                 .FirstOrDefaultAsync(j => j.Id == jazigoId);
 
             if (jazigo == null || !jazigo.Ocupado)
@@ -194,7 +193,8 @@ public class JazigoService : IJazigoService
                 throw new InvalidOperationException("Jazigo não encontrado ou já está vago.");
             }
 
-            var falecido = jazigo.Falecidos.FirstOrDefault(f => f.Id == falecidoId);
+            var falecido = await _context.Falecidos
+                .FirstOrDefaultAsync(f => f.Id == falecidoId && f.JazigoId == jazigoId);
             if (falecido == null)
             {
                 throw new InvalidOperationException("O falecido especificado não está vinculado a este jazigo.");
@@ -216,9 +216,13 @@ public class JazigoService : IJazigoService
             
             // Desvincula o falecido do jazigo (O corpo foi removido)
             falecido.JazigoId = null;
+            _context.Falecidos.Update(falecido);
 
-            // BUG-06: Apenas libera o Jazigo se não houver MAIS NENHUM falecido ocupando ele
-            if (jazigo.Falecidos.Count(f => f.JazigoId == jazigo.Id) == 0)
+            // Verifica via query direta ao banco se restam outros falecidos neste jazigo
+            var existeOutroFalecido = await _context.Falecidos
+                .AnyAsync(f => f.JazigoId == jazigoId && f.Id != falecidoId);
+
+            if (!existeOutroFalecido)
             {
                 jazigo.Ocupado = false;
                 _context.Jazigos.Update(jazigo);
@@ -226,11 +230,87 @@ public class JazigoService : IJazigoService
             
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            // Após a transação, tenta desfazer a divisão automaticamente se aplicável
+            await TentarDesfazerDivisaoAutomaticaAsync(jazigoId);
         }
         catch
         {
             await transaction.RollbackAsync();
             throw;
+        }
+    }
+
+    // --- Desfazimento Automático de Divisão ---
+    // Após exumação, se todos os sub-lotes de um jazigo pai ficarem livres,
+    // desfaz o desmembramento automaticamente (remove sub-lotes, libera o pai)
+    public async Task TentarDesfazerDivisaoAutomaticaAsync(int jazigoId)
+    {
+        // Busca o jazigo para verificar se é um sub-lote (tem JazigoPaiId)
+        var jazigo = await _context.Jazigos.FirstOrDefaultAsync(j => j.Id == jazigoId);
+        if (jazigo == null || jazigo.JazigoPaiId == null)
+            return; // Não é sub-lote, nada a fazer
+
+        int jazigoPaiId = jazigo.JazigoPaiId.Value;
+
+        // Busca todos os sub-lotes do mesmo pai
+        var subLotes = await _context.Jazigos
+            .Where(j => j.JazigoPaiId == jazigoPaiId)
+            .ToListAsync();
+
+        if (!subLotes.Any())
+            return;
+
+        // Verifica se TODOS os sub-lotes estão livres (não ocupados E sem falecidos)
+        var subLotesIds = subLotes.Select(s => s.Id).ToList();
+        var algumOcupado = subLotes.Any(s => s.Ocupado);
+        var algumComFalecido = await _context.Falecidos
+            .AnyAsync(f => f.JazigoId != null && subLotesIds.Contains(f.JazigoId.Value));
+
+        if (algumOcupado || algumComFalecido)
+            return; // Ainda há sub-lotes em uso, não desfaz
+
+        // Tudo limpo — desfazer a divisão automaticamente
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var jazigoPai = await _context.Jazigos.FindAsync(jazigoPaiId);
+            if (jazigoPai == null)
+                return;
+
+            // Remove todos os sub-lotes
+            _context.Jazigos.RemoveRange(subLotes);
+
+            // Libera o pai
+            jazigoPai.Ocupado = false;
+            _context.Jazigos.Update(jazigoPai);
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            // Falha silenciosa — o desfazimento automático é melhor esforço
+        }
+    }
+
+    // --- Garantir Ossuário Geral ---
+    // Cria um ossuário geral padrão caso nenhum exista no sistema
+    public async Task GarantirOssuarioGeralExisteAsync()
+    {
+        var existeGeral = await _context.Ossuarios.AnyAsync(o => o.Tipo == TipoOssuario.Geral);
+        if (!existeGeral)
+        {
+            var ossuario = new Ossuario
+            {
+                Identificador = "Ossuário Geral Municipal",
+                Tipo = TipoOssuario.Geral,
+                Capacidade = 500,
+                Ocupado = false
+            };
+            _context.Ossuarios.Add(ossuario);
+            await _context.SaveChangesAsync();
         }
     }
 }

@@ -153,7 +153,8 @@ else
                     NumeroGaveta = i.ToString("D3"), // D3 gera "001", "002"...
                     Ocupada = false,
                     Setor = "Único",
-                    Quadra = "Pública"
+                    Quadra = "Pública",
+                    Lote = i.ToString("D3") // Preenche Lote para satisfazer [Required] e índice único
                 });
             }
             await DbContext.SaveChangesAsync();

@@ -1,10 +1,13 @@
 @using MudBlazor
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
+@using Sakrus.Services
 @using Microsoft.EntityFrameworkCore
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject IJazigoService JazigoService
+@inject IDialogService DialogService
 
 <MudDialog>
     <TitleContent>
@@ -37,8 +40,17 @@
                         }
                     </MudSelect>
                 </MudItem>
-                
-                <MudItem xs="12">
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="TipoRestosMortais" Label="Tipo de Restos Mortais" @bind-Value="tipoRestosMortais" Required="true">
+                        @foreach (TipoRestosMortais tipo in Enum.GetValues(typeof(TipoRestosMortais)))
+                        {
+                            <MudSelectItem Value="@tipo">@tipo.ToString()</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
                     <MudSelect T="int?" Label="Destino da Ossada (Ossuário Geral)" @bind-Value="registro.OssuarioDestinoId" Clearable="true">
                         <MudSelectItem T="int?" Value="null">Outro (Ex: Jazigo/Cremação)</MudSelectItem>
                         @foreach (var o in ossuariosGerais)
@@ -47,7 +59,7 @@
                         }
                     </MudSelect>
                 </MudItem>
-                
+
                 <MudItem xs="12">
                     <MudSelect T="int?" Label="Selecione o Jazigo (se não for Ossuário Geral)" @bind-Value="registro.JazigoId" Clearable="true">
                         <MudSelectItem T="int?" Value="null">Nenhum</MudSelectItem>
@@ -90,13 +102,17 @@
         SetorAutorizador = "CAAF"
     };
     private DateTime? dataAutorizacaoAux = DateTime.Today;
-    private string destinoOssada = "Ossário Geral";
+    private TipoRestosMortais tipoRestosMortais = TipoRestosMortais.PecaAnatomica;
     private List<Jazigo> jazigosList = new();
     private List<Ossuario> ossuariosGerais = new();
 
     protected override async Task OnInitializedAsync()
     {
         DbContext = DbFactory.CreateDbContext();
+
+        // Garante que existe pelo menos um ossuário geral
+        await JazigoService.GarantirOssuarioGeralExisteAsync();
+
         jazigosList = await DbContext.Jazigos.OrderBy(j => j.CodigoIdentificador).ToListAsync();
         ossuariosGerais = await DbContext.Ossuarios.Where(o => o.Tipo == TipoOssuario.Geral).ToListAsync();
     }
@@ -108,7 +124,7 @@
 
         // Buscar a gaveta no banco de dados para atualizar o status
         var gaveta = await DbContext.GavetasPublicas.FindAsync(GavetaId);
-        
+
         if (gaveta == null || gaveta.FalecidoId == null)
         {
             Snackbar.Add("Gaveta não encontrada ou sem falecido vinculado.", Severity.Error);
@@ -119,12 +135,15 @@
         registro.GavetaPublicaId = GavetaId;
         registro.FalecidoId = gaveta.FalecidoId.Value;
         registro.DataAutorizacao = dataAutorizacaoAux ?? DateTime.Today;
-        
-        // Se selecionou Ossuário Destino, vamos atualizar o Falecido também
-        if (registro.OssuarioDestinoId.HasValue)
+
+        // Atualizar tipo de restos mortais do falecido (operador seleciona)
+        var falecido = await DbContext.Falecidos.FindAsync(registro.FalecidoId);
+        if (falecido != null)
         {
-            var falecido = await DbContext.Falecidos.FindAsync(registro.FalecidoId);
-            if (falecido != null)
+            falecido.TipoRestosMortais = tipoRestosMortais;
+
+            // Se selecionou Ossuário Destino, vincular o falecido ao ossuário
+            if (registro.OssuarioDestinoId.HasValue)
             {
                 falecido.OssuarioId = registro.OssuarioDestinoId;
             }
@@ -139,11 +158,10 @@
         gaveta.DataPrevisaoExumacao = null;
 
         await DbContext.SaveChangesAsync();
-        
+
         Snackbar.Add($"Exumação concluída! A Gaveta {GavetaNumero} agora está disponível.", Severity.Success);
         MudDialog.Close(DialogResult.Ok(true));
     }
 
     private void Cancelar() => MudDialog.Cancel();
 }
-

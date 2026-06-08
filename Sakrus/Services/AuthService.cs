@@ -154,12 +154,20 @@ public class AuthService : IAuthService
     public async Task<Usuario?> GetUsuarioAtualAsync()
     {
         var httpContext = _httpContextAccessor.HttpContext;
-        if (httpContext is null || !httpContext.User.Identity?.IsAuthenticated == true)
+        if (httpContext is null || httpContext.User.Identity?.IsAuthenticated != true)
             return null;
 
         var idClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(idClaim, out var id)) return null;
 
         return await _context.Usuarios.FindAsync(id);
+    }
+
+    public async Task<bool> ValidarSenhaUsuarioAtualAsync(string senha)
+    {
+        var usuario = await GetUsuarioAtualAsync();
+        if (usuario is null) return false;
+
+        return BCrypt.Net.BCrypt.Verify(senha, usuario.SenhaHash);
     }
 }

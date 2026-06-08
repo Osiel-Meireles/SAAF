@@ -10,4 +10,6 @@ public interface IJazigoService
     Task<List<Jazigo>> DesmembrarJazigoAsync(int jazigoPaiId, int quantidadePartes);
     Task DesfazerDesmembramentoJazigoAsync(int jazigoPaiId);
     Task ExumarJazigoAsync(int falecidoId, int jazigoId, ExecutorExumacao executor, string observacoes = "");
+    Task TentarDesfazerDivisaoAutomaticaAsync(int jazigoId);
+    Task GarantirOssuarioGeralExisteAsync();
 }

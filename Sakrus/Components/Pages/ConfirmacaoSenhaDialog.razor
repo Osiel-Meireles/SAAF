@@ -1,0 +1,131 @@
+@using MudBlazor
+@using Sakrus.Services
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Warning" />
+            <MudText Typo="Typo.h6">@TituloOperacao</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Class="mb-4" Icon="@Icons.Material.Filled.Shield">
+            @MensagemConfirmacao
+        </MudAlert>
+
+        <MudText Typo="Typo.body2" Class="mb-3" Style="color: var(--mud-palette-text-secondary);">
+            Para prosseguir, confirme sua identidade digitando sua senha atual:
+        </MudText>
+
+        <MudTextField @bind-Value="senha"
+                      Label="Sua Senha"
+                      InputType="InputType.Password"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      RequiredError="Senha é obrigatória"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Key"
+                      Immediate="true"
+                      OnKeyUp="@OnKeyUp"
+                      Disabled="@isValidando" />
+
+        @if (tentativasFalhas > 0)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">
+                Senha incorreta. Tentativa @tentativasFalhas de 3.
+            </MudAlert>
+        }
+
+        @if (tentativasFalhas >= 3)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2" Icon="@Icons.Material.Filled.Block">
+                Operação bloqueada por excesso de tentativas. Feche este diálogo e tente novamente.
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Disabled="@isValidando">Cancelar</MudButton>
+        <MudButton Color="Color.Warning"
+                   Variant="Variant.Filled"
+                   OnClick="Confirmar"
+                   Disabled="@(string.IsNullOrWhiteSpace(senha) || isValidando || tentativasFalhas >= 3)"
+                   StartIcon="@Icons.Material.Filled.Verified">
+            @if (isValidando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Validando...</span>
+            }
+            else
+            {
+                <span>Confirmar</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>
+    /// Título exibido no cabeçalho do dialog (ex: "Excluir Funerária", "Editar Usuário").
+    /// </summary>
+    [Parameter] public string TituloOperacao { get; set; } = "Confirmação de Segurança";
+
+    /// <summary>
+    /// Mensagem de aviso exibida ao usuário antes do campo de senha.
+    /// </summary>
+    [Parameter] public string MensagemConfirmacao { get; set; } = "Esta operação requer confirmação de identidade.";
+
+    private string senha = "";
+    private bool isValidando = false;
+    private int tentativasFalhas = 0;
+
+    private async Task OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(senha) && tentativasFalhas < 3)
+        {
+            await Confirmar();
+        }
+    }
+
+    private async Task Confirmar()
+    {
+        if (string.IsNullOrWhiteSpace(senha) || tentativasFalhas >= 3) return;
+
+        isValidando = true;
+        StateHasChanged();
+
+        try
+        {
+            var valido = await AuthService.ValidarSenhaUsuarioAtualAsync(senha);
+
+            if (valido)
+            {
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                tentativasFalhas++;
+                senha = "";
+
+                if (tentativasFalhas >= 3)
+                {
+                    Snackbar.Add("Operação bloqueada: excesso de tentativas de senha.", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao validar: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isValidando = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

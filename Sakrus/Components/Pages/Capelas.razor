@@ -8,6 +8,7 @@
 @implements IDisposable
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject IAuthService AuthService
 @rendermode InteractiveServer
 
 <MudText Typo="Typo.h4" Class="mb-4">Gestão de Capelas</MudText>
@@ -40,10 +41,6 @@
 
 @code {
     private ApplicationDbContext DbContext = default!;
-    protected override void OnInitialized()
-    {
-        DbContext = DbFactory.CreateDbContext();
-    }
 
     public void Dispose()
     {
@@ -53,7 +50,11 @@
     private List<Capela> capelas = new();
     private bool isLoading = true;
 
-    protected override async Task OnInitializedAsync() => await CarregarCapelas();
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        await CarregarCapelas();
+    }
 
     private async Task CarregarCapelas()
     {
@@ -79,6 +80,17 @@
 
     private async Task ExcluirCapela(Capela capela)
     {
+        // 2FA — Confirmação de senha antes de excluir
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = "Excluir Capela",
+            ["MensagemConfirmacao"] = $"Você está prestes a excluir a capela '{capela.Nome}'. Esta ação é irreversível."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
+
         bool? confirm = await DialogService.ShowMessageBoxAsync("Confirmação", $"Excluir {capela.Nome}?", yesText: "Excluir", cancelText: "Cancelar");
         if (confirm == true)
         {

@@ -6,6 +6,8 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IAuthService AuthService
 
 <PageTitle>Almoxarifado e Estoque - Sakrus</PageTitle>
 
@@ -144,6 +146,17 @@
     {
         await form.Validate();
         if (!form.IsValid) return;
+
+        // 2FA — Confirmação de senha antes de salvar
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = isEditing ? "Editar Produto" : "Novo Produto",
+            ["MensagemConfirmacao"] = $"Você está prestes a {(isEditing ? "editar" : "criar")} o produto '{currentProduto.Nome}'. Confirme sua identidade."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
 
         try
         {

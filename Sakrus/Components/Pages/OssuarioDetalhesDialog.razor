@@ -1,0 +1,143 @@
+@using System
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Detalhes — @ossuario?.Identificador</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+        }
+        else if (ossuario == null)
+        {
+            <MudAlert Severity="Severity.Error">Ossuário não encontrado.</MudAlert>
+        }
+        else
+        {
+            <MudCard Outlined="true" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.body2"><strong>Identificador:</strong> @ossuario.Identificador</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.body2">
+                                <strong>Tipo:</strong>
+                                @if (ossuario.Tipo == TipoOssuario.Geral)
+                                {
+                                    <MudChip T="string" Color="Color.Info" Size="Size.Small" Class="ml-1">Geral (Público)</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="ml-1">Particular</MudChip>
+                                }
+                            </MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.body2">
+                                <strong>Ocupação:</strong> @falecidos.Count / @ossuario.Capacidade posições
+                            </MudText>
+                            <MudProgressLinear Color="@(percentualOcupacao >= 90 ? Color.Error : percentualOcupacao >= 70 ? Color.Warning : Color.Success)"
+                                               Value="@percentualOcupacao"
+                                               Class="mt-1"
+                                               Size="Size.Medium" />
+                        </MudItem>
+                        @if (ossuario.Tipo == TipoOssuario.Particular && jazigoVinculado != null)
+                        {
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.body2"><strong>Jazigo Vinculado:</strong> @jazigoVinculado.CodigoIdentificador</MudText>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (falecidos.Any())
+            {
+                <MudText Typo="Typo.subtitle1" Class="mb-2"><strong>Ossadas Depositadas</strong></MudText>
+                <MudTable Items="@falecidos" Hover="true" Striped="true" Elevation="1" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Nome</MudTh>
+                        <MudTh>CPF</MudTh>
+                        <MudTh>Data Falecimento</MudTh>
+                        <MudTh>Tipo Restos</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Nome">@context.Nome</MudTd>
+                        <MudTd DataLabel="CPF">@context.Cpf</MudTd>
+                        <MudTd DataLabel="Data Falecimento">@context.DataFalecimento.ToString("dd/MM/yyyy")</MudTd>
+                        <MudTd DataLabel="Tipo Restos">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">@context.TipoRestosMortais.ToString()</MudChip>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Inbox" Class="mr-1" Size="Size.Small" />
+                    Nenhuma ossada depositada neste ossuário.
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Fechar">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int OssuarioId { get; set; }
+
+    private Ossuario? ossuario;
+    private Jazigo? jazigoVinculado;
+    private List<Falecido> falecidos = new();
+    private bool isLoading = true;
+    private double percentualOcupacao = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+
+        ossuario = await DbContext.Ossuarios
+            .FirstOrDefaultAsync(o => o.Id == OssuarioId);
+
+        if (ossuario != null)
+        {
+            falecidos = await DbContext.Falecidos
+                .Where(f => f.OssuarioId == OssuarioId)
+                .OrderBy(f => f.Nome)
+                .ToListAsync();
+
+            percentualOcupacao = ossuario.Capacidade > 0
+                ? (double)falecidos.Count / ossuario.Capacidade * 100
+                : 0;
+
+            if (ossuario.JazigoVinculadoId.HasValue)
+            {
+                jazigoVinculado = await DbContext.Jazigos.FindAsync(ossuario.JazigoVinculadoId.Value);
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private void Fechar() => MudDialog.Close();
+}

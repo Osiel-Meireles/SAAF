@@ -10,52 +10,144 @@
 @inject IJazigoService JazigoService
 @inject ISnackbar Snackbar
 
-<MudText Typo="Typo.h4" Class="mb-4">Gestão de Jazigos</MudText>
+<PageTitle>Gestão de Jazigos - Sakrus</PageTitle>
 
-<MudTable Items="@listaJazigos" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="2" Loading="@isLoading">
-    <HeaderContent>
-        <MudTh>Identificador</MudTh>
-        <MudTh>Modelo</MudTh>
-        <MudTh>Tipo</MudTh>
-        <MudTh>Status</MudTh>
-        <MudTh>Ações</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd DataLabel="Identificador">@context.CodigoIdentificador</MudTd>
-        <MudTd DataLabel="Modelo">@context.ModeloJazigo?.Nome</MudTd>
-        <MudTd DataLabel="Tipo">@(context.IsInfantil ? "Infantil" : "Adulto")</MudTd>
-        <MudTd DataLabel="Status">
-            @if (context.JazigoPaiId != null)
-            {
-                <MudChip T="string" Color="Color.Info" Size="Size.Small">Sub-lote</MudChip>
-            }
-            @if (context.Ocupado)
-            {
-                <MudChip T="string" Color="Color.Error" Size="Size.Small">Ocupado / Divisivo</MudChip>
-            }
-            else
-            {
-                <MudChip T="string" Color="Color.Success" Size="Size.Small">Livre</MudChip>
-            }
-        </MudTd>
-        <MudTd>
-            @if (context.JazigoPaiId == null && !context.Ocupado)
-            {
-                <MudIconButton Icon="@Icons.Material.Filled.AccountTree" 
-                               Color="Color.Secondary" 
-                               ToolTip="Desmembrar Lote"
-                               OnClick="@(() => AbrirDialogDesmembramento(context))" />
-            }
-            else if (context.JazigoPaiId == null && listaJazigos.Any(j => j.JazigoPaiId == context.Id))
-            {
-                <MudIconButton Icon="@Icons.Material.Filled.CallMerge" 
-                               Color="Color.Warning" 
-                               ToolTip="Desfazer Divisão"
-                               OnClick="@(() => DesfazerDivisao(context))" />
-            }
-        </MudTd>
-    </RowTemplate>
-</MudTable>
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Gestão de Jazigos</MudText>
+</div>
+
+@if (isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    @* CARDS ESTATÍSTICOS *@
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2" Style="background-color: var(--mud-palette-dark); color: white;">
+                <div>
+                    <MudText Typo="Typo.subtitle2">Total</MudText>
+                    <MudText Typo="Typo.h4"><strong>@listaJazigos.Count</strong></MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Landscape" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2" Style="background-color: var(--mud-palette-error); color: white;">
+                <div>
+                    <MudText Typo="Typo.subtitle2">Ocupados</MudText>
+                    <MudText Typo="Typo.h4"><strong>@listaJazigos.Count(j => j.Ocupado)</strong></MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2" Style="background-color: var(--mud-palette-success); color: white;">
+                <div>
+                    <MudText Typo="Typo.subtitle2">Livres</MudText>
+                    <MudText Typo="Typo.h4"><strong>@listaJazigos.Count(j => !j.Ocupado)</strong></MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircleOutline" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2" Style="background-color: var(--mud-palette-info); color: white;">
+                <div>
+                    <MudText Typo="Typo.subtitle2">Sub-lotes</MudText>
+                    <MudText Typo="Typo.h4"><strong>@listaJazigos.Count(j => j.JazigoPaiId != null)</strong></MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable Items="@listaJazigos" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="2" Striped="true">
+        <HeaderContent>
+            <MudTh>Identificador</MudTh>
+            <MudTh>Modelo</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Falecidos</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Identificador"><strong>@context.CodigoIdentificador</strong></MudTd>
+            <MudTd DataLabel="Modelo">@context.ModeloJazigo?.Nome</MudTd>
+            <MudTd DataLabel="Tipo">@(context.IsInfantil ? "Infantil" : "Adulto")</MudTd>
+            <MudTd DataLabel="Falecidos">
+                @{
+                    var qtdFalecidos = context.Falecidos?.Count ?? 0;
+                }
+                @if (qtdFalecidos > 0)
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small">@qtdFalecidos sepultado(s)</MudChip>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="text-muted">—</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.JazigoPaiId != null)
+                {
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small">Sub-lote</MudChip>
+                }
+                @if (context.Ocupado)
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Ocupado / Divisivo</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Livre</MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                @* Botão de Detalhes — sempre visível *@
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                               Color="Color.Info"
+                               Size="Size.Small"
+                               Title="Ver Detalhes"
+                               OnClick="@(() => AbrirDetalhes(context))" />
+
+                @* Botão de Exumar — visível se jazigo tem falecidos *@
+                @{
+                    var temFalecidos = (context.Falecidos?.Count ?? 0) > 0;
+                }
+                @if (temFalecidos)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                                   Color="Color.Warning"
+                                   Size="Size.Small"
+                                   Title="Realizar Exumação"
+                                   OnClick="@(() => AbrirExumacao(context))" />
+                }
+
+                @* Botão de Desmembrar — se não é sub-lote e está livre *@
+                @if (context.JazigoPaiId == null && !context.Ocupado)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.AccountTree"
+                                   Color="Color.Secondary"
+                                   Size="Size.Small"
+                                   Title="Desmembrar Lote"
+                                   OnClick="@(() => AbrirDialogDesmembramento(context))" />
+                }
+                @* Botão de Desfazer Divisão — se é pai com sub-lotes *@
+                else if (context.JazigoPaiId == null && listaJazigos.Any(j => j.JazigoPaiId == context.Id))
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.CallMerge"
+                                   Color="Color.Warning"
+                                   Size="Size.Small"
+                                   Title="Desfazer Divisão"
+                                   OnClick="@(() => DesfazerDivisao(context))" />
+                }
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" RowsPerPageString="Linhas por página:" />
+        </PagerContent>
+    </MudTable>
+}
 
 @code {
     private ApplicationDbContext DbContext = default!;
@@ -107,25 +199,60 @@
         isLoading = true;
         listaJazigos = await DbContext.Jazigos
             .Include(j => j.ModeloJazigo)
+            .Include(j => j.Falecidos)
             .OrderBy(j => j.CodigoIdentificador)
             .ToListAsync();
         isLoading = false;
         StateHasChanged();
     }
 
+    private async Task AbrirDetalhes(Jazigo jazigo)
+    {
+        var parameters = new DialogParameters { ["JazigoId"] = jazigo.Id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<DetalhesJazigoDialog>($"Detalhes — {jazigo.CodigoIdentificador}", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            // Recriar contexto para pegar dados atualizados
+            DbContext.Dispose();
+            DbContext = DbFactory.CreateDbContext();
+            await CarregarDados();
+        }
+    }
+
+    private async Task AbrirExumacao(Jazigo jazigo)
+    {
+        var parameters = new DialogParameters { ["JazigoId"] = jazigo.Id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<ExumarJazigoDialog>($"Exumar — {jazigo.CodigoIdentificador}", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            // Recriar contexto após exumação (os dados mudaram via outro DbContext no service)
+            DbContext.Dispose();
+            DbContext = DbFactory.CreateDbContext();
+            await CarregarDados();
+        }
+    }
+
     private async Task AbrirDialogDesmembramento(Jazigo jazigo)
     {
-        var parameters = new DialogParameters { 
-            ["JazigoId"] = jazigo.Id, 
-            ["CodigoIdentificadorPai"] = jazigo.CodigoIdentificador 
+        var parameters = new DialogParameters {
+            ["JazigoId"] = jazigo.Id,
+            ["CodigoIdentificadorPai"] = jazigo.CodigoIdentificador
         };
-        
+
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
         var dialog = await DialogService.ShowAsync<DesmembramentoDialog>("Desmembrar Lote", parameters, options);
         var result = await dialog.Result;
 
         // Corrigido erro CS0023: Removido o operador '!' aplicado incorretamente ao DialogResult
-        if (result != null && !result.Canceled) 
+        if (result != null && !result.Canceled)
         {
             await CarregarDados();
         }

@@ -29,6 +29,24 @@ function downloadFile(fileName, base64Content) {
 }
 
 /**
+ * Baixa um arquivo PDF em base64 para o navegador.
+ * Foi movido do Obitos.razor para organizar o código (Bug B11).
+ */
+function downloadFileFromBase64(fileName, base64) {
+    try {
+        var link = document.createElement('a');
+        link.download = fileName;
+        link.href = 'data:application/pdf;base64,' + base64;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log(`Arquivo ${fileName} baixado com sucesso`);
+    } catch (error) {
+        console.error(`Erro ao baixar arquivo: ${error.message}`);
+    }
+}
+
+/**
  * Exibe uma notificação no console com timestamp
  * 
  * @param {string} mensagem - Mensagem a exibir

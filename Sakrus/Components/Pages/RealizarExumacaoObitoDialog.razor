@@ -2,9 +2,11 @@
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
+@using Sakrus.Services
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject IJazigoService JazigoService
 
 <MudDialog>
     <TitleContent>
@@ -45,7 +47,16 @@
                         </MudSelect>
                     </MudItem>
 
-                    <MudItem xs="12">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="TipoRestosMortais" Label="Tipo de Restos Mortais" @bind-Value="tipoRestosMortaisSelecionado" Required="true">
+                            @foreach (TipoRestosMortais tipo in Enum.GetValues(typeof(TipoRestosMortais)))
+                            {
+                                <MudSelectItem Value="@tipo">@tipo.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
                         <MudSelect T="int?" Label="Destino da Ossada (Ossuário Geral)" @bind-Value="selectedOssuarioId" Clearable="true">
                             <MudSelectItem T="int?" Value="null">Outro (Ex: Jazigo/Cremação)</MudSelectItem>
                             @foreach (var o in ossuariosGerais)
@@ -106,6 +117,7 @@
     private int? selectedOssuarioId;
     private int? destinoJazigoId;
     private string observacoes = "";
+    private TipoRestosMortais tipoRestosMortaisSelecionado = TipoRestosMortais.PecaAnatomica;
 
     private List<Ossuario> ossuariosGerais = new();
     private List<Jazigo> jazigosList = new();
@@ -113,6 +125,8 @@
     protected override async Task OnInitializedAsync()
     {
         DbContext = DbFactory.CreateDbContext();
+        // Garante que existe pelo menos um ossuário geral
+        await JazigoService.GarantirOssuarioGeralExisteAsync();
         await CarregarDadosAsync();
     }
 
@@ -216,6 +230,9 @@
             }
 
             // 2. Definir o novo destino
+            // Atualizar tipo de restos mortais (selecionado pelo operador)
+            falecido.TipoRestosMortais = tipoRestosMortaisSelecionado;
+
             if (selectedOssuarioId.HasValue)
             {
                 falecido.OssuarioId = selectedOssuarioId;
@@ -237,6 +254,12 @@
 
             await DbContext.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            // Após exumação, tenta desfazer divisão de jazigo automaticamente
+            if (currentJazigo != null)
+            {
+                await JazigoService.TentarDesfazerDivisaoAutomaticaAsync(currentJazigo.Id);
+            }
 
             Snackbar.Add($"Exumação de {FalecidoNome} concluída com sucesso!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));

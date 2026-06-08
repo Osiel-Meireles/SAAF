@@ -1,0 +1,229 @@
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Sakrus.Services
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+@inject IJazigoService JazigoService
+@inject IDialogService DialogService
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Color="Color.Warning" />
+            <MudText Typo="Typo.h6">Exumar — Jazigo @jazigo?.CodigoIdentificador</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <MudProgressLinear Color="Color.Warning" Indeterminate="true" Class="my-4" />
+        }
+        else if (jazigo == null)
+        {
+            <MudAlert Severity="Severity.Error">Jazigo não encontrado.</MudAlert>
+        }
+        else if (!falecidos.Any())
+        {
+            <MudAlert Severity="Severity.Info">Nenhum falecido vinculado a este jazigo.</MudAlert>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4" Icon="@Icons.Material.Filled.Warning">
+                Selecione o falecido a ser exumado. Após a exumação, se o jazigo ficar totalmente vago
+                e for parte de um desmembramento, a divisão será desfeita automaticamente.
+            </MudAlert>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2"><strong>Falecidos neste jazigo:</strong></MudText>
+            <MudRadioGroup T="int" @bind-Value="falecidoSelecionadoId">
+                @foreach (var f in falecidos)
+                {
+                    <MudRadio T="int" Value="@f.Id" Color="Color.Warning" Dense="true">
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.PersonOutline" Size="Size.Small" />
+                            <span>@f.Nome — CPF: @f.Cpf (Óbito: @f.DataFalecimento.ToString("dd/MM/yyyy"))</span>
+                        </div>
+                    </MudRadio>
+                }
+            </MudRadioGroup>
+
+            <MudDivider Class="my-4" />
+
+            <MudForm @ref="form" @bind-IsValid="sucesso">
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="Data da Execução" @bind-Date="dataExecucao" Required="true" RequiredError="Data é obrigatória" Editable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="Data da Autorização" @bind-Date="dataAutorizacao" Required="true" Editable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="setorAutorizador" Label="Setor Autorizador" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="ExecutorExumacao" Label="Executor" @bind-Value="executor" Required="true">
+                            @foreach (ExecutorExumacao exec in Enum.GetValues(typeof(ExecutorExumacao)))
+                            {
+                                <MudSelectItem Value="@exec">@exec.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="TipoRestosMortais" Label="Tipo de Restos Mortais" @bind-Value="tipoRestosMortais" Required="true">
+                            @foreach (TipoRestosMortais tipo in Enum.GetValues(typeof(TipoRestosMortais)))
+                            {
+                                <MudSelectItem Value="@tipo">@tipo.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int?" Label="Destino: Ossuário Geral" @bind-Value="selectedOssuarioId" Clearable="true">
+                            <MudSelectItem T="int?" Value="null">Outro (Ex: Jazigo/Cremação)</MudSelectItem>
+                            @foreach (var o in ossuariosGerais)
+                            {
+                                <MudSelectItem T="int?" Value="@o.Id">@o.Identificador (Cap: @o.Capacidade)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="observacoes" Label="Observações Adicionais" Lines="3" Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Warning"
+                   Variant="Variant.Filled"
+                   OnClick="Confirmar"
+                   Disabled="@(!sucesso || isLoading || falecidoSelecionadoId == 0)"
+                   StartIcon="@Icons.Material.Filled.CheckCircle">
+            Confirmar Exumação
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int JazigoId { get; set; }
+
+    private Jazigo? jazigo;
+    private List<Falecido> falecidos = new();
+    private List<Ossuario> ossuariosGerais = new();
+    private bool isLoading = true;
+
+    private MudForm form = null!;
+    private bool sucesso;
+    private int falecidoSelecionadoId;
+    private DateTime? dataExecucao = DateTime.Today;
+    private DateTime? dataAutorizacao = DateTime.Today;
+    private string setorAutorizador = "CAAF";
+    private ExecutorExumacao executor = ExecutorExumacao.CemiterioMunicipal;
+    private TipoRestosMortais tipoRestosMortais = TipoRestosMortais.PecaAnatomica;
+    private int? selectedOssuarioId;
+    private string observacoes = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+
+        // Garante que existe pelo menos um ossuário geral
+        await JazigoService.GarantirOssuarioGeralExisteAsync();
+
+        jazigo = await DbContext.Jazigos
+            .Include(j => j.ModeloJazigo)
+            .FirstOrDefaultAsync(j => j.Id == JazigoId);
+
+        if (jazigo != null)
+        {
+            falecidos = await DbContext.Falecidos
+                .Where(f => f.JazigoId == JazigoId)
+                .OrderBy(f => f.Nome)
+                .ToListAsync();
+
+            if (falecidos.Count == 1)
+            {
+                falecidoSelecionadoId = falecidos[0].Id;
+            }
+        }
+
+        ossuariosGerais = await DbContext.Ossuarios
+            .Where(o => o.Tipo == TipoOssuario.Geral)
+            .OrderBy(o => o.Identificador)
+            .ToListAsync();
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task Confirmar()
+    {
+        await form.Validate();
+        if (!form.IsValid || falecidoSelecionadoId == 0) return;
+
+        // 2FA — Confirmação de senha
+        var parametros2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = "Confirmar Exumação",
+            ["MensagemConfirmacao"] = $"Você está prestes a realizar a exumação de um falecido do Jazigo {jazigo?.CodigoIdentificador}. Esta operação é irreversível."
+        };
+        var options2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialog2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", parametros2FA, options2FA);
+        var result2FA = await dialog2FA.Result;
+
+        if (result2FA == null || result2FA.Canceled) return;
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Atualizar tipo de restos mortais do falecido
+            var falecido = await DbContext.Falecidos.FindAsync(falecidoSelecionadoId);
+            if (falecido != null)
+            {
+                falecido.TipoRestosMortais = tipoRestosMortais;
+
+                if (selectedOssuarioId.HasValue)
+                {
+                    falecido.OssuarioId = selectedOssuarioId;
+                }
+
+                DbContext.Falecidos.Update(falecido);
+                await DbContext.SaveChangesAsync();
+            }
+
+            // Registrar exumação no jazigo (libera o jazigo + tenta desfazer divisão)
+            await JazigoService.ExumarJazigoAsync(
+                falecidoSelecionadoId,
+                JazigoId,
+                executor,
+                observacoes
+            );
+
+            Snackbar.Add($"Exumação realizada com sucesso no Jazigo {jazigo?.CodigoIdentificador}!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao exumar: {ex.Message}", Severity.Error);
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

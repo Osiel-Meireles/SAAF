@@ -1,0 +1,305 @@
+@page "/ossuarios"
+@using System
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IAuthService AuthService
+@rendermode InteractiveServer
+
+<PageTitle>Ossuários - Sakrus</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Gestão de Ossuários</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovoOssuario">
+        Novo Ossuário
+    </MudButton>
+</div>
+
+@if (isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    @* CARDS ESTATÍSTICOS *@
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2" Style="background-color: var(--mud-palette-dark); color: white;">
+                <div>
+                    <MudText Typo="Typo.subtitle2">Total</MudText>
+                    <MudText Typo="Typo.h4"><strong>@ossuarios.Count</strong></MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2" Style="background-color: var(--mud-palette-info); color: white;">
+                <div>
+                    <MudText Typo="Typo.subtitle2">Gerais</MudText>
+                    <MudText Typo="Typo.h4"><strong>@ossuarios.Count(o => o.Tipo == TipoOssuario.Geral)</strong></MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Public" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2" Style="background-color: var(--mud-palette-warning); color: white;">
+                <div>
+                    <MudText Typo="Typo.subtitle2">Particulares</MudText>
+                    <MudText Typo="Typo.h4"><strong>@ossuarios.Count(o => o.Tipo == TipoOssuario.Particular)</strong></MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2" Style="background-color: var(--mud-palette-success); color: white;">
+                <div>
+                    <MudText Typo="Typo.subtitle2">Capacidade Livre</MudText>
+                    <MudText Typo="Typo.h4"><strong>@capacidadeLivreTotal</strong></MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircleOutline" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* FILTRO *@
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="filtroTexto" Placeholder="Buscar por identificador..."
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="TipoOssuario?" Label="Tipo" @bind-Value="filtroTipo" Clearable="true">
+                    <MudSelectItem T="TipoOssuario?" Value="null">Todos</MudSelectItem>
+                    <MudSelectItem T="TipoOssuario?" Value="TipoOssuario.Geral">Geral</MudSelectItem>
+                    <MudSelectItem T="TipoOssuario?" Value="TipoOssuario.Particular">Particular</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @* TABELA *@
+    <MudTable Items="@OssuariosFiltrados" Hover="true" Striped="true" Elevation="2" T="OssuarioViewModel">
+        <HeaderContent>
+            <MudTh>Identificador</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Capacidade</MudTh>
+            <MudTh>Ocupação</MudTh>
+            <MudTh>Jazigo Vinculado</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Identificador"><strong>@context.Ossuario.Identificador</strong></MudTd>
+            <MudTd DataLabel="Tipo">
+                @if (context.Ossuario.Tipo == TipoOssuario.Geral)
+                {
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small">Geral</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Particular</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Capacidade">@context.Ossuario.Capacidade posições</MudTd>
+            <MudTd DataLabel="Ocupação">
+                <div class="d-flex align-center gap-2">
+                    <MudText Typo="Typo.body2">@context.QtdFalecidos / @context.Ossuario.Capacidade</MudText>
+                    <MudProgressLinear Color="@(context.PercentualOcupacao >= 90 ? Color.Error : context.PercentualOcupacao >= 70 ? Color.Warning : Color.Success)"
+                                       Value="@context.PercentualOcupacao"
+                                       Style="width: 80px; min-width: 80px;"
+                                       Size="Size.Small" />
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Jazigo Vinculado">
+                @if (context.Ossuario.Tipo == TipoOssuario.Particular && context.JazigoNome != null)
+                {
+                    <MudChip T="string" Color="Color.Default" Size="Size.Small">@context.JazigoNome</MudChip>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="text-muted">—</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Ações">
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Small" Title="Ver Detalhes" OnClick="@(() => AbrirDetalhes(context.Ossuario))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small" Title="Editar" OnClick="@(() => AbrirEditar(context.Ossuario))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" Title="Excluir" OnClick="@(() => ExcluirOssuario(context.Ossuario))" Disabled="@(context.QtdFalecidos > 0)" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" RowsPerPageString="Linhas por página:" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    private List<Ossuario> ossuarios = new();
+    private List<OssuarioViewModel> ossuarioViewModels = new();
+    private bool isLoading = true;
+    private string filtroTexto = "";
+    private TipoOssuario? filtroTipo;
+    private int capacidadeLivreTotal = 0;
+
+    private IEnumerable<OssuarioViewModel> OssuariosFiltrados => ossuarioViewModels
+        .Where(vm =>
+            (string.IsNullOrEmpty(filtroTexto) || vm.Ossuario.Identificador.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)) &&
+            (filtroTipo == null || vm.Ossuario.Tipo == filtroTipo));
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        isLoading = true;
+
+        ossuarios = await DbContext.Ossuarios
+            .Include(o => o.JazigoVinculado)
+            .OrderBy(o => o.Identificador)
+            .ToListAsync();
+
+        // Conta os falecidos por ossuário em uma única query
+        var contagemPorOssuario = await DbContext.Falecidos
+            .Where(f => f.OssuarioId != null)
+            .GroupBy(f => f.OssuarioId)
+            .Select(g => new { OssuarioId = g.Key, Contagem = g.Count() })
+            .ToDictionaryAsync(x => x.OssuarioId!.Value, x => x.Contagem);
+
+        ossuarioViewModels = ossuarios.Select(o =>
+        {
+            var qtd = contagemPorOssuario.GetValueOrDefault(o.Id, 0);
+            return new OssuarioViewModel
+            {
+                Ossuario = o,
+                QtdFalecidos = qtd,
+                PercentualOcupacao = o.Capacidade > 0 ? (double)qtd / o.Capacidade * 100 : 0,
+                JazigoNome = o.JazigoVinculado?.CodigoIdentificador
+            };
+        }).ToList();
+
+        capacidadeLivreTotal = ossuarios.Sum(o => o.Capacidade) - contagemPorOssuario.Values.Sum();
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task AbrirNovoOssuario()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<OssuarioDialog>("Novo Ossuário", new DialogParameters(), options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            // Recriar contexto para pegar novos dados
+            DbContext.Dispose();
+            DbContext = DbFactory.CreateDbContext();
+            await CarregarDados();
+        }
+    }
+
+    private async Task AbrirEditar(Ossuario ossuario)
+    {
+        // 2FA — Confirmação de senha antes de editar
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = "Editar Ossuário",
+            ["MensagemConfirmacao"] = $"Você está prestes a editar o ossuário '{ossuario.Identificador}'. Confirme sua identidade."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
+
+        var parameters = new DialogParameters { ["OssuarioParaEditar"] = ossuario };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<OssuarioDialog>("Editar Ossuário", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            DbContext.Dispose();
+            DbContext = DbFactory.CreateDbContext();
+            await CarregarDados();
+        }
+    }
+
+    private async Task AbrirDetalhes(Ossuario ossuario)
+    {
+        var parameters = new DialogParameters { ["OssuarioId"] = ossuario.Id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<OssuarioDetalhesDialog>("Detalhes do Ossuário", parameters, options);
+    }
+
+    private async Task ExcluirOssuario(Ossuario ossuario)
+    {
+        // 2FA — Confirmação de senha antes de excluir
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = "Excluir Ossuário",
+            ["MensagemConfirmacao"] = $"Você está prestes a excluir o ossuário '{ossuario.Identificador}'. Esta ação é irreversível."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
+
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Excluir Ossuário",
+            $"Tem certeza que deseja excluir o ossuário '{ossuario.Identificador}'? Esta ação é irreversível.",
+            yesText: "Excluir", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                // Verificar se há falecidos associados
+                var temFalecido = await DbContext.Falecidos.AnyAsync(f => f.OssuarioId == ossuario.Id);
+                if (temFalecido)
+                {
+                    Snackbar.Add("Não é possível excluir: existem ossadas vinculadas a este ossuário.", Severity.Error);
+                    return;
+                }
+
+                // Verificar se há registros de exumação apontando para este ossuário
+                var temExumacao = await DbContext.ExumacoesRegistros.AnyAsync(e => e.OssuarioDestinoId == ossuario.Id);
+                if (temExumacao)
+                {
+                    Snackbar.Add("Não é possível excluir: existem registros de exumação vinculados a este ossuário.", Severity.Error);
+                    return;
+                }
+
+                DbContext.Ossuarios.Remove(ossuario);
+                await DbContext.SaveChangesAsync();
+                Snackbar.Add($"Ossuário '{ossuario.Identificador}' excluído com sucesso.", Severity.Success);
+                await CarregarDados();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    // ViewModel para enriquecer dados da tabela
+    private class OssuarioViewModel
+    {
+        public Ossuario Ossuario { get; set; } = null!;
+        public int QtdFalecidos { get; set; }
+        public double PercentualOcupacao { get; set; }
+        public string? JazigoNome { get; set; }
+    }
+}

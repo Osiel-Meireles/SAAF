@@ -116,13 +116,24 @@ else
 
     private async Task AbrirDialogEditarUsuario(Usuario usuario)
     {
+        // 2FA — Confirmação de senha antes de editar
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = "Editar Usuário",
+            ["MensagemConfirmacao"] = $"Você está prestes a editar o usuário '{usuario.Nome}'. Confirme sua identidade."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
+
         var parameters = new DialogParameters { ["UsuarioId"] = usuario.Id };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
         
         var dialog = await DialogService.ShowAsync<UsuarioDialog>("Editar Usuário", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result != null && !result.Canceled)
         {
             await CarregarUsuarios();
             Snackbar.Add("Usuário atualizado com sucesso!", Severity.Success);
@@ -131,6 +142,17 @@ else
 
     private async Task DesativarUsuario(int usuarioId, string nome)
     {
+        // 2FA — Confirmação de senha antes de desativar
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = "Desativar Usuário",
+            ["MensagemConfirmacao"] = $"Você está prestes a desativar o usuário '{nome}'. Confirme sua identidade."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
+
         bool? resultado = await DialogService.ShowMessageBoxAsync(
             "Desativar Usuário",
             $"Tem certeza que deseja desativar {nome}? Esta ação pode ser revertida.",

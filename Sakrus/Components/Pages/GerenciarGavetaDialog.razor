@@ -150,7 +150,7 @@
                     </MudButton>
                 }
 
-                @if (!IsDividida(gaveta.NumeroGaveta))
+                @if (!IsDividida(gaveta.NumeroGaveta) && !gaveta.Ocupada)
                 {
                     <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.AltRoute" OnClick="DividirGaveta">
                         Dividir Gaveta (A e B)
@@ -295,6 +295,17 @@
                 string originalNum = gaveta.NumeroGaveta;
                 string numA = originalNum + "A";
                 string numB = originalNum + "B";
+
+                // Verificar colisão de nomes antes de dividir
+                var existeColisao = await DbContext.GavetasPublicas
+                    .AnyAsync(g => g.NumeroGaveta == numA || g.NumeroGaveta == numB);
+                if (existeColisao)
+                {
+                    Snackbar.Add($"Já existem gavetas com o número {numA} ou {numB}. Divisão não permitida.", Severity.Error);
+                    isLoading = false;
+                    StateHasChanged();
+                    return;
+                }
 
                 // 1. Modificar a gaveta original para virar 'A'
                 gaveta.NumeroGaveta = numA;
@@ -442,8 +453,16 @@
 
         if (result != null && !result.Canceled)
         {
-            Snackbar.Add("Exumação efetuada com sucesso!", Severity.Success);
-            MudDialog.Close(DialogResult.Ok(true));
+            // Após exumação, tentar agrupar gaveta dividida automaticamente
+            if (IsDividida(gaveta.NumeroGaveta))
+            {
+                await TentarAgruparAutomaticamenteAsync();
+            }
+            else
+            {
+                Snackbar.Add("Exumação efetuada com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
         }
     }
 
@@ -464,5 +483,61 @@
     }
 
     private void Fechar() => MudDialog.Close();
+
+    private async Task TentarAgruparAutomaticamenteAsync()
+    {
+        if (gaveta == null || !IsDividida(gaveta.NumeroGaveta))
+        {
+            Snackbar.Add("Exumação efetuada com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+            return;
+        }
+
+        // Recarregar dados do contexto
+        DbContext.Dispose();
+        DbContext = DbFactory.CreateDbContext();
+
+        var parentNum = GetParentNumber(gaveta.NumeroGaveta);
+        var numA = parentNum + "A";
+        var numB = parentNum + "B";
+
+        var gavetasDoGrupo = await DbContext.GavetasPublicas
+            .Where(g => g.NumeroGaveta == numA || g.NumeroGaveta == numB)
+            .ToListAsync();
+
+        var todasLivres = gavetasDoGrupo.Count == 2 && gavetasDoGrupo.All(g => !g.Ocupada);
+
+        if (todasLivres)
+        {
+            // Agrupar automaticamente
+            var gavetaA = gavetasDoGrupo.FirstOrDefault(g => g.NumeroGaveta == numA);
+            var gavetaB2 = gavetasDoGrupo.FirstOrDefault(g => g.NumeroGaveta == numB);
+
+            if (gavetaA != null && gavetaB2 != null)
+            {
+                gavetaA.NumeroGaveta = parentNum;
+                gavetaA.Ocupada = false;
+                gavetaA.FalecidoId = null;
+                gavetaA.DataOcupacao = null;
+                gavetaA.DataPrevisaoExumacao = null;
+                DbContext.GavetasPublicas.Update(gavetaA);
+
+                DbContext.GavetasPublicas.Remove(gavetaB2);
+                await DbContext.SaveChangesAsync();
+
+                Snackbar.Add($"Exumação concluída! Gavetas {numA} e {numB} agrupadas automaticamente em {parentNum}.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Exumação efetuada com sucesso!", Severity.Success);
+            }
+        }
+        else
+        {
+            Snackbar.Add("Exumação efetuada com sucesso!", Severity.Success);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
 }
 

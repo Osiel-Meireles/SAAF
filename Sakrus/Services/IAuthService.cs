@@ -28,4 +28,9 @@ public interface IAuthService
     /// Retorna o usuário autenticado a partir do contexto atual, ou null.
     /// </summary>
     Task<Usuario?> GetUsuarioAtualAsync();
+
+    /// <summary>
+    /// Valida a senha do usuário atualmente logado (para confirmação de operações sensíveis).
+    /// </summary>
+    Task<bool> ValidarSenhaUsuarioAtualAsync(string senha);
 }

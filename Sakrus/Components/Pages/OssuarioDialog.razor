@@ -1,0 +1,137 @@
+@using System
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@(IsEdit ? "Editar Ossuário" : "Novo Ossuário")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="formValido">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="ossuario.Identificador" Label="Identificador" Required="true" RequiredError="Identificador é obrigatório" HelperText="Ex: OSS-001, Ossuário Geral Norte" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="int" @bind-Value="ossuario.Capacidade" Label="Capacidade (nº de posições)" Min="1" Required="true" RequiredError="Capacidade é obrigatória" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="TipoOssuario" Label="Tipo" @bind-Value="ossuario.Tipo" Required="true">
+                        <MudSelectItem Value="TipoOssuario.Geral">Geral (Público)</MudSelectItem>
+                        <MudSelectItem Value="TipoOssuario.Particular">Particular (Vinculado a Jazigo)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                @if (ossuario.Tipo == TipoOssuario.Particular)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int?" Label="Jazigo Vinculado" @bind-Value="ossuario.JazigoVinculadoId" Required="true" RequiredError="Jazigo é obrigatório para ossuários particulares" Clearable="true">
+                            @foreach (var j in jazigosList)
+                            {
+                                <MudSelectItem T="int?" Value="@j.Id">@j.CodigoIdentificador</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(!formValido)">
+            @(IsEdit ? "Salvar Alterações" : "Cadastrar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Ossuario? OssuarioParaEditar { get; set; }
+
+    private bool IsEdit => OssuarioParaEditar != null;
+    private MudForm form = null!;
+    private bool formValido;
+    private Ossuario ossuario = new() { Capacidade = 10 };
+    private List<Jazigo> jazigosList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+
+        if (OssuarioParaEditar != null)
+        {
+            // Clonar para edição sem afetar o objeto original
+            ossuario = new Ossuario
+            {
+                Id = OssuarioParaEditar.Id,
+                Identificador = OssuarioParaEditar.Identificador,
+                Tipo = OssuarioParaEditar.Tipo,
+                Capacidade = OssuarioParaEditar.Capacidade,
+                JazigoVinculadoId = OssuarioParaEditar.JazigoVinculadoId
+            };
+        }
+
+        jazigosList = await DbContext.Jazigos
+            .OrderBy(j => j.CodigoIdentificador)
+            .ToListAsync();
+    }
+
+    private async Task Salvar()
+    {
+        await form.Validate();
+        if (!form.IsValid) return;
+
+        try
+        {
+            // Se tipo é Geral, remove vínculo com jazigo
+            if (ossuario.Tipo == TipoOssuario.Geral)
+            {
+                ossuario.JazigoVinculadoId = null;
+            }
+
+            if (IsEdit)
+            {
+                var existente = await DbContext.Ossuarios.FindAsync(ossuario.Id);
+                if (existente == null)
+                {
+                    Snackbar.Add("Ossuário não encontrado.", Severity.Error);
+                    return;
+                }
+
+                existente.Identificador = ossuario.Identificador;
+                existente.Tipo = ossuario.Tipo;
+                existente.Capacidade = ossuario.Capacidade;
+                existente.JazigoVinculadoId = ossuario.JazigoVinculadoId;
+
+                DbContext.Ossuarios.Update(existente);
+            }
+            else
+            {
+                DbContext.Ossuarios.Add(ossuario);
+            }
+
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add(IsEdit ? "Ossuário atualizado com sucesso!" : "Ossuário cadastrado com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

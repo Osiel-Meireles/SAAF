@@ -7,6 +7,8 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IAuthService AuthService
 @inject AuthenticationStateProvider AuthState
 
 <PageTitle>Configuração Financeira — Sakrus</PageTitle>
@@ -362,7 +364,19 @@ else
         await _form.Validate();
         if (!_form.IsValid || _config is null) return;
 
+        // 2FA — Confirmação de senha antes de salvar configurações financeiras
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = "Salvar Configurações Financeiras",
+            ["MensagemConfirmacao"] = "Você está prestes a alterar as configurações financeiras do sistema. Confirme sua identidade."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
+
         _salvando = true;
+        StateHasChanged();
 
         try
         {
