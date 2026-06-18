@@ -37,7 +37,7 @@
                     Adornment="Adornment.End"
                     AdornmentIcon="@(_mostrarSenha ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
                     OnAdornmentClick="() => _mostrarSenha = !_mostrarSenha"
-                    HelperText="Mínimo 6 caracteres"
+                    HelperText="Mínimo 8 caracteres, ao menos 1 maiúscula e 1 número"
                     Class="mb-4" />
             }
             else
@@ -46,7 +46,7 @@
                     <MudAlert Severity="Severity.Info" Class="flex-grow-1 mr-2">
                         Senha protegida (hash Bcrypt).
                     </MudAlert>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="GerarNovaSenha">Redefinir Senha</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="GerarNovaSenha" Disabled="@_redefinindoSenha">Redefinir Senha</MudButton>
                 </div>
                 
                 @if (!string.IsNullOrEmpty(_novaSenhaGerada))
@@ -99,27 +99,37 @@
     private string _senha = "";
     private string _novaSenhaGerada = "";
     private bool _mostrarSenha = false;
-
-    // FEAT-11: Redefinir senha (Admin)
-    private async Task GerarNovaSenha()
-    {
-        // Gera uma senha aleatória de 8 caracteres alfanuméricos
-        const string chars = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#";
-        var random = new Random();
-        _novaSenhaGerada = new string(Enumerable.Repeat(chars, 8).Select(s => s[random.Next(s.Length)]).ToArray());
-        
-        var u = await DbContext.Usuarios.FindAsync(_usuario.Id);
-        if (u != null)
-        {
-            u.SenhaHash = BCrypt.Net.BCrypt.HashPassword(_novaSenhaGerada);
-            DbContext.Usuarios.Update(u);
-            await DbContext.SaveChangesAsync();
-            Snackbar.Add("Senha redefinida com sucesso!", Severity.Success);
-        }
-    }
+    private bool _redefinindoSenha = false;
     private bool _isValid = false;
     private bool _isNovo = true;
     private MudForm _form = null!;
+
+    // FEAT-11: Redefinir senha (Admin) — via AuthService com RandomNumberGenerator
+    private async Task GerarNovaSenha()
+    {
+        _redefinindoSenha = true;
+        try
+        {
+            var (sucesso, erro, senhaGerada) = await AuthService.RedefinirSenhaAsync(_usuario.Id);
+            if (sucesso)
+            {
+                _novaSenhaGerada = senhaGerada;
+                Snackbar.Add("Senha redefinida com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(erro, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao redefinir senha: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _redefinindoSenha = false;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -145,9 +155,9 @@
         {
             if (_isNovo)
             {
-                if (string.IsNullOrWhiteSpace(_senha) || _senha.Length < 6)
+                if (string.IsNullOrWhiteSpace(_senha) || _senha.Length < 8)
                 {
-                    Snackbar.Add("Senha deve ter no mínimo 6 caracteres", Severity.Error);
+                    Snackbar.Add("Senha deve ter no mínimo 8 caracteres", Severity.Error);
                     return;
                 }
 
@@ -160,8 +170,14 @@
             }
             else
             {
-                DbContext.Usuarios.Update(_usuario);
-                await DbContext.SaveChangesAsync();
+                // BUG-04: Usar AuthService em vez de DbContext direto
+                var (sucesso, erro) = await AuthService.AtualizarUsuarioAsync(
+                    _usuario.Id, _usuario.Nome, _usuario.Email, _usuario.NivelAcesso, _usuario.Ativo);
+                if (!sucesso)
+                {
+                    Snackbar.Add(erro, Severity.Error);
+                    return;
+                }
             }
 
             Snackbar.Add("Usuário salvo com sucesso!", Severity.Success);
@@ -175,4 +191,3 @@
 
     private void Cancelar() => MudDialog.Cancel();
 }
-

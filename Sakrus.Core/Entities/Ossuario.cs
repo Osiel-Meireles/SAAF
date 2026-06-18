@@ -19,7 +19,8 @@ public class Ossuario
 
     public int Capacidade { get; set; }
     
-    public bool Ocupado { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool Ocupado => Falecidos != null && Falecidos.Count >= Capacidade;
 
     public List<Falecido> Falecidos { get; set; } = new();
 }

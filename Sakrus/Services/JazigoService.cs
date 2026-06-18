@@ -11,10 +11,12 @@ namespace Sakrus.Services;
 public class JazigoService : IJazigoService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<JazigoService> _logger;
 
-    public JazigoService(ApplicationDbContext context)
+    public JazigoService(ApplicationDbContext context, ILogger<JazigoService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     // --- NOVO MÉTODO PARA O MAPA DE JAZIGOS ---
@@ -288,10 +290,11 @@ public class JazigoService : IJazigoService
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
         }
-        catch
+        catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            // Falha silenciosa — o desfazimento automático é melhor esforço
+            // ROB-01: Falha silenciosa para a UI, mas agora rastreável via log
+            _logger.LogWarning(ex, "Falha ao tentar desfazer divisão automática do jazigo pai {JazigoPaiId}.", jazigoPaiId);
         }
     }
 
@@ -306,8 +309,7 @@ public class JazigoService : IJazigoService
             {
                 Identificador = "Ossuário Geral Municipal",
                 Tipo = TipoOssuario.Geral,
-                Capacidade = 500,
-                Ocupado = false
+                Capacidade = 500
             };
             _context.Ossuarios.Add(ossuario);
             await _context.SaveChangesAsync();

@@ -9,10 +9,15 @@ namespace Sakrus.Services;
 
 public class RelatorioService
 {
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
+
+    public RelatorioService(IDbContextFactory<ApplicationDbContext> dbFactory)
+    {
+        _dbFactory = dbFactory;
+    }
     public byte[] GerarPdfOrdemServico(Atendimento atendimento)
     {
-        // Configuração obrigatória da licença para uso comunitário
-        QuestPDF.Settings.License = LicenseType.Community;
+        // Licença configurada globalmente no Program.cs
 
         var documento = Document.Create(container =>
         {
@@ -113,7 +118,7 @@ public class RelatorioService
 
     public byte[] GerarPdfGuiaSepultamento(Falecido falecido, Atendimento atendimento)
     {
-        QuestPDF.Settings.License = LicenseType.Community;
+        // Licença configurada globalmente no Program.cs
 
         var documento = Document.Create(container =>
         {
@@ -207,8 +212,9 @@ public class RelatorioService
         return documento.GeneratePdf();
     }
 
-    public async Task<Dictionary<string, int>> GetOcupacaoGeralAsync(ApplicationDbContext context)
+    public async Task<Dictionary<string, int>> GetOcupacaoGeralAsync()
     {
+        using var context = await _dbFactory.CreateDbContextAsync();
         var totalJazigos = await context.Jazigos.CountAsync();
         var ocupados = await context.Jazigos.CountAsync(j => j.Ocupado);
         var livres = totalJazigos - ocupados;
@@ -226,8 +232,9 @@ public class RelatorioService
         };
     }
 
-    public async Task<Dictionary<string, int>> GetCausasObitoPorPeriodoAsync(ApplicationDbContext context, DateTime start, DateTime end)
+    public async Task<Dictionary<string, int>> GetCausasObitoPorPeriodoAsync(DateTime start, DateTime end)
     {
+        using var context = await _dbFactory.CreateDbContextAsync();
         return await context.Falecidos
             .Where(f => f.DataFalecimento >= start && f.DataFalecimento <= end)
             .GroupBy(f => f.CausaMorte)
@@ -235,8 +242,9 @@ public class RelatorioService
             .ToDictionaryAsync(x => x.Causa, x => x.Count);
     }
 
-    public async Task<Dictionary<string, int>> GetSepultamentosPorFunerariaAsync(ApplicationDbContext context, DateTime start, DateTime end)
+    public async Task<Dictionary<string, int>> GetSepultamentosPorFunerariaAsync(DateTime start, DateTime end)
     {
+        using var context = await _dbFactory.CreateDbContextAsync();
         return await context.Atendimentos
             .Include(a => a.Funeraria)
             .Where(a => a.DataSepultamento >= start && a.DataSepultamento <= end && a.FunerariaId != null)

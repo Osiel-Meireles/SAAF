@@ -38,6 +38,12 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<GavetaPublica>().HasIndex(g => g.Ocupada);
         modelBuilder.Entity<GavetaPublica>().HasIndex(g => new { g.Setor, g.Quadra, g.Lote, g.NumeroGaveta }).IsUnique();
 
+        // ROB-03: Índices de Performance
+        modelBuilder.Entity<Atendimento>().HasIndex(a => a.DataSepultamento);
+        modelBuilder.Entity<Falecido>().HasIndex(f => f.JazigoId);
+        modelBuilder.Entity<ExumacaoRegistro>().HasIndex(e => e.FalecidoId);
+        modelBuilder.Entity<Usuario>().HasIndex(u => u.Email).IsUnique();
+
         // Precisão Financeira
         modelBuilder.Entity<ItemFaturado>().Property(i => i.ValorTotalCalculado).HasPrecision(10, 2);
         modelBuilder.Entity<ItemFaturado>().Property(i => i.QuantidadeOuKm).HasPrecision(10, 2);

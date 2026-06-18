@@ -80,7 +80,7 @@ else
     {
         DbContext = DbFactory.CreateDbContext();
         // 1. Ocupação Geral
-        ocupacaoGeral = await RelatorioService.GetOcupacaoGeralAsync(DbContext);
+        ocupacaoGeral = await RelatorioService.GetOcupacaoGeralAsync();
         ocupacaoLabels = ocupacaoGeral.Keys.ToArray();
         ocupacaoData = ocupacaoGeral.Values.Select(v => (double)v).ToArray();
 
@@ -88,7 +88,7 @@ else
         var start = DateTime.Today.AddMonths(-12);
         var end = DateTime.Today;
         
-        causasObito = await RelatorioService.GetCausasObitoPorPeriodoAsync(DbContext, start, end);
+        causasObito = await RelatorioService.GetCausasObitoPorPeriodoAsync(start, end);
         if (causasObito.Any())
         {
             causasLabels = causasObito.Keys.ToArray();
@@ -101,7 +101,7 @@ else
         }
 
         // 3. Funerárias (12 meses)
-        var funerariasData = await RelatorioService.GetSepultamentosPorFunerariaAsync(DbContext, start, end);
+        var funerariasData = await RelatorioService.GetSepultamentosPorFunerariaAsync(start, end);
         if (funerariasData.Any())
         {
             funerariasLabels = funerariasData.Keys.ToArray();

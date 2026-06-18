@@ -51,8 +51,8 @@ public static class AuthEndpoints
             return Results.Redirect(destino);
         }).AllowAnonymous(); // Antiforgery habilitado por padrão (SEC-02)
 
-        // SEC-05: Logout via GET (para simplificar no Blazor Server SSR interativo)
-        auth.MapGet("/logout", async (
+        // SEC-05: Logout via POST — protegido contra CSRF
+        auth.MapPost("/logout", async (
             HttpContext httpContext,
             IAuthService authService) =>
         {

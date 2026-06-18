@@ -34,6 +34,7 @@ else
             <MudTh>Ação</MudTh>
             <MudTh>Entidade</MudTh>
             <MudTh>ID</MudTh>
+            <MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Data/Hora">@context.DataHoraUtc.ToLocalTime().ToString("g")</MudTd>
@@ -45,7 +46,32 @@ else
             </MudTd>
             <MudTd DataLabel="Entidade">@context.NomeEntidade</MudTd>
             <MudTd DataLabel="ID">@context.EntidadeId</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@(_expanded.GetValueOrDefault(context.Id) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" 
+                               OnClick="() => ToggleExpand(context.Id)" />
+            </MudTd>
         </RowTemplate>
+        <ChildRowContent>
+            @if (_expanded.GetValueOrDefault(context.Id))
+            {
+                <MudTr>
+                    <td colspan="6">
+                        <MudCard Elevation="0" Class="ma-4 pa-4" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudGrid>
+                                <MudItem xs="12" sm="6">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Valores Antigos</MudText>
+                                    <pre style="white-space: pre-wrap; font-size: 0.85rem;">@(string.IsNullOrWhiteSpace(context.ValoresAntigos) ? "{}" : context.ValoresAntigos)</pre>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Valores Novos</MudText>
+                                    <pre style="white-space: pre-wrap; font-size: 0.85rem;">@(string.IsNullOrWhiteSpace(context.ValoresNovos) ? "{}" : context.ValoresNovos)</pre>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCard>
+                    </td>
+                </MudTr>
+            }
+        </ChildRowContent>
         <PagerContent>
             <MudTablePager />
         </PagerContent>
@@ -57,6 +83,15 @@ else
     private List<AuditLog> logs = new();
     private bool isLoading = true;
     private string searchString = "";
+    private Dictionary<int, bool> _expanded = new();
+
+    private void ToggleExpand(int id)
+    {
+        if (_expanded.ContainsKey(id))
+            _expanded[id] = !_expanded[id];
+        else
+            _expanded[id] = true;
+    }
 
     protected override async Task OnInitializedAsync()
     {

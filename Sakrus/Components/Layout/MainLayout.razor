@@ -54,6 +54,7 @@
             </Authorized>
         </AuthorizeView>
         <form id="logoutForm" action="/api/auth/logout" method="post" style="display:none;">
+            <AntiforgeryToken />
         </form>
     </MudAppBar>
 
@@ -99,10 +100,10 @@
         _drawerOpen = !_drawerOpen;
     }
 
-    // SEC-05: Logout via POST — submete um form oculto via JS para evitar CSRF
-    private void RealizarLogout()
+    // SEC-05: Logout via POST — submete um form oculto via JS para incluir antiforgery token
+    private async Task RealizarLogout()
     {
-        Navigation.NavigateTo("/api/auth/logout", forceLoad: true);
+        await JS.InvokeVoidAsync("eval", "document.getElementById('logoutForm').submit()");
     }
 
     private async Task AbrirDialogAlterarSenha()

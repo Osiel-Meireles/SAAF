@@ -207,10 +207,10 @@
                     novoAtendimento.Falecido.DataFalecimento = DateTime.UtcNow;
                 }
 
-                // BUG-07: Verificar se Responsável já existe pelo CPF (apenas números)
+                // ROB-04: Comparar CPF de forma limpa, garantindo que o índice seja usado e compatibilidade com PostgreSQL
                 var cpfLimpo = new string(novoAtendimento.Responsavel.CPF.Where(char.IsDigit).ToArray());
                 var responsavelExistente = await DbContext.Responsaveis
-                    .FirstOrDefaultAsync(r => r.CPF.Replace(".", "").Replace("-", "") == cpfLimpo);
+                    .FirstOrDefaultAsync(r => r.CPF == cpfLimpo);
 
                 if (responsavelExistente != null)
                 {
@@ -246,17 +246,25 @@
                 await transaction.CommitAsync();
                 
                 // FEAT-01: Auditoria
-                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-                var user = authState.User;
-                if (user.Identity?.IsAuthenticated == true)
+                try
                 {
-                    int userId = int.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
-                    string userName = user.Identity.Name ?? "Desconhecido";
-                    
-                    await AuditService.LogAcaoAsync(
-                        userId, userName, "CREATE", "Atendimento", novoAtendimento.Id.ToString(), null, 
-                        new { novoAtendimento.NumeroOsAuxilio, FalecidoId = novoAtendimento.FalecidoId, ResponsavelId = novoAtendimento.ResponsavelId }
-                    );
+                    var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                    var user = authState.User;
+                    if (user.Identity?.IsAuthenticated == true)
+                    {
+                        int userId = int.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
+                        string userName = user.Identity.Name ?? "Desconhecido";
+                        
+                        await AuditService.LogAcaoAsync(
+                            userId, userName, "CREATE", "Atendimento", novoAtendimento.Id.ToString(), null, 
+                            new { novoAtendimento.NumeroOsAuxilio, FalecidoId = novoAtendimento.FalecidoId, ResponsavelId = novoAtendimento.ResponsavelId }
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // ROB-02: Silenciar e registrar erro de auditoria para não quebrar o fluxo do operador
+                    Console.WriteLine($"Erro ao registrar auditoria: {ex.Message}");
                 }
                 
                 Snackbar.Add("Atendimento registrado com sucesso!", Severity.Success);

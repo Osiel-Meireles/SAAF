@@ -14,5 +14,19 @@
             </AuthorizeRouteView>
             <FocusOnNavigate RouteData="routeData" Selector="h1" />
         </Found>
+        <NotFound>
+            <LayoutView Layout="typeof(Layout.MainLayout)">
+                <div class="d-flex flex-column align-center justify-center" style="min-height: 60vh;">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Warning" Class="mb-4" Style="font-size: 4rem; opacity: 0.6;" />
+                    <MudText Typo="Typo.h4" Class="mb-2" Style="font-weight: 700;">Página não encontrada</MudText>
+                    <MudText Typo="Typo.body1" Style="color: var(--mud-palette-text-secondary);" Class="mb-4">
+                        O endereço que você acessou não existe no sistema.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" StartIcon="@Icons.Material.Filled.Home">
+                        Voltar ao Início
+                    </MudButton>
+                </div>
+            </LayoutView>
+        </NotFound>
     </Router>
 </CascadingAuthenticationState>

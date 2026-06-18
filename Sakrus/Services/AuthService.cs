@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using BCrypt.Net;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -36,21 +37,21 @@ public class AuthService : IAuthService
 
         if (usuario is null)
         {
-            _logger.LogWarning("Tentativa de login com e-mail não encontrado: {Email}", email);
+            _logger.LogWarning("Tentativa de login com e-mail não encontrado: {Email}", MascararEmail(email));
             return false;
         }
 
         // SEC-04: Verifica se o usuário está bloqueado por excesso de tentativas
         if (usuario.BloqueadoAte.HasValue && usuario.BloqueadoAte.Value > DateTime.UtcNow)
         {
-            _logger.LogWarning("Conta temporariamente bloqueada (brute-force): {Email}", email);
+            _logger.LogWarning("Conta temporariamente bloqueada (brute-force): {Email}", MascararEmail(email));
             return false;
         }
 
         // Verifica a senha contra o hash armazenado
         if (!BCrypt.Net.BCrypt.Verify(senha, usuario.SenhaHash))
         {
-            _logger.LogWarning("Senha incorreta para o usuário: {Email}", email);
+            _logger.LogWarning("Senha incorreta para o usuário: {Email}", MascararEmail(email));
             
             // Incrementa falhas e bloqueia se necessário
             usuario.TentativasLoginFalhas++;
@@ -119,8 +120,11 @@ public class AuthService : IAuthService
         if (await _context.Usuarios.AnyAsync(u => u.Email.ToLower() == usuario.Email.ToLower()))
             return (false, "Já existe um usuário cadastrado com este e-mail.");
 
-        if (string.IsNullOrWhiteSpace(senhaPlana) || senhaPlana.Length < 6)
-            return (false, "A senha deve ter no mínimo 6 caracteres.");
+        if (string.IsNullOrWhiteSpace(senhaPlana) || senhaPlana.Length < 8)
+            return (false, "A senha deve ter no mínimo 8 caracteres.");
+
+        if (!ValidarComplexidadeSenha(senhaPlana))
+            return (false, "A senha deve conter ao menos uma letra maiúscula e um número.");
 
         usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(senhaPlana);
         usuario.Ativo = true;
@@ -141,8 +145,11 @@ public class AuthService : IAuthService
         if (!BCrypt.Net.BCrypt.Verify(senhaAtual, usuario.SenhaHash))
             return (false, "Senha atual incorreta.");
 
-        if (novaSenha.Length < 6)
-            return (false, "A nova senha deve ter no mínimo 6 caracteres.");
+        if (novaSenha.Length < 8)
+            return (false, "A nova senha deve ter no mínimo 8 caracteres.");
+
+        if (!ValidarComplexidadeSenha(novaSenha))
+            return (false, "A nova senha deve conter ao menos uma letra maiúscula e um número.");
 
         usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(novaSenha);
         await _context.SaveChangesAsync();
@@ -169,5 +176,74 @@ public class AuthService : IAuthService
         if (usuario is null) return false;
 
         return BCrypt.Net.BCrypt.Verify(senha, usuario.SenhaHash);
+    }
+
+    public async Task<(bool Sucesso, string Erro)> AtualizarUsuarioAsync(int usuarioId, string nome, string email, int nivelAcesso, bool ativo)
+    {
+        var usuario = await _context.Usuarios.FindAsync(usuarioId);
+        if (usuario is null)
+            return (false, "Usuário não encontrado.");
+
+        // Verifica se o email já está em uso por outro usuário
+        var emailEmUso = await _context.Usuarios.AnyAsync(u => u.Email.ToLower() == email.ToLower() && u.Id != usuarioId);
+        if (emailEmUso)
+            return (false, "Já existe outro usuário com este e-mail.");
+
+        usuario.Nome = nome;
+        usuario.Email = email;
+        usuario.NivelAcesso = nivelAcesso;
+        usuario.Ativo = ativo;
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Usuário atualizado: ID {Id}, Email {Email}", usuarioId, MascararEmail(email));
+        return (true, string.Empty);
+    }
+
+    public async Task<(bool Sucesso, string Erro, string SenhaGerada)> RedefinirSenhaAsync(int usuarioId)
+    {
+        var usuario = await _context.Usuarios.FindAsync(usuarioId);
+        if (usuario is null)
+            return (false, "Usuário não encontrado.", string.Empty);
+
+        // SEC-02: Gerar senha aleatória criptograficamente segura
+        var novaSenha = GerarSenhaSegura(10);
+        usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(novaSenha);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Senha redefinida pelo admin para usuário ID: {Id}", usuarioId);
+        return (true, string.Empty, novaSenha);
+    }
+
+    /// <summary>
+    /// SEC-02: Gera uma senha aleatória usando RandomNumberGenerator (criptograficamente seguro).
+    /// </summary>
+    private static string GerarSenhaSegura(int tamanho)
+    {
+        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
+        var result = new char[tamanho];
+        var bytes = RandomNumberGenerator.GetBytes(tamanho);
+        for (int i = 0; i < tamanho; i++)
+        {
+            result[i] = chars[bytes[i] % chars.Length];
+        }
+        return new string(result);
+    }
+
+    /// <summary>
+    /// SEC-05: Mascara parcialmente o email para logs (LGPD-friendly).
+    /// </summary>
+    private static string MascararEmail(string email)
+    {
+        var idx = email.IndexOf('@');
+        if (idx <= 1) return "***@***";
+        return $"{email[0]}***@{email[(idx + 1)..]}";
+    }
+
+    /// <summary>
+    /// SEC-03: Valida complexidade da senha (ao menos 1 maiúscula + 1 número).
+    /// </summary>
+    private static bool ValidarComplexidadeSenha(string senha)
+    {
+        return senha.Any(char.IsUpper) && senha.Any(char.IsDigit);
     }
 }

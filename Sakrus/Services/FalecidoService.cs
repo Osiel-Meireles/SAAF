@@ -19,18 +19,31 @@ namespace Sakrus.Services
 
         public async Task<Falecido> RegistrarSepultamentoAsync(Falecido falecido)
         {
-            // 1. Adiciona o registro do falecido no banco
-            _context.Falecidos.Add(falecido);
-
-            // 2. Busca o jazigo associado para marcar como ocupado
-            var jazigo = await _context.Jazigos.FindAsync(falecido.JazigoId);
-            if (jazigo != null)
+            if (falecido.JazigoId.HasValue)
             {
-                jazigo.Ocupado = true; // Usando a sua propriedade booleana
+                var jazigo = await _context.Jazigos.FindAsync(falecido.JazigoId.Value);
+                
+                if (jazigo == null)
+                    throw new InvalidOperationException("Jazigo especificado não encontrado.");
+                    
+                if (jazigo.Ocupado)
+                    throw new InvalidOperationException("Este jazigo já está ocupado. Verifique a disponibilidade antes de registrar o sepultamento.");
+                    
+                // Verifica também se já não existe outro falecido ativo neste jazigo (para redundância)
+                var jaTemFalecido = await _context.Falecidos.AnyAsync(f => f.JazigoId == jazigo.Id);
+                if (jaTemFalecido && !jazigo.IsInfantil) // Jazigos infantis permitem múltiplos sepultamentos se divididos adequadamente
+                {
+                    throw new InvalidOperationException("Este jazigo já contém restos mortais vinculados.");
+                }
+
+                jazigo.Ocupado = true;
                 _context.Jazigos.Update(jazigo);
             }
 
-            // 3. Salva todas as alterações em uma única transação
+            // 1. Adiciona o registro do falecido no banco
+            _context.Falecidos.Add(falecido);
+
+            // 2. Salva todas as alterações em uma única transação
             await _context.SaveChangesAsync();
 
             return falecido;

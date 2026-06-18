@@ -53,7 +53,7 @@ public class CapelaService : ICapelaService
             .Include(r => r.Capela)
             .Include(r => r.Atendimento)
                 .ThenInclude(a => a.Falecido)
-            .Where(r => r.HoraSaida == null || r.HoraSaida > DateTime.UtcNow)
+            .Where(r => r.HoraSaida == null)
             .ToListAsync();
     }
 
@@ -65,7 +65,7 @@ public class CapelaService : ICapelaService
 
         // BUG-11: Verifica se há conflito de horários (se não tem data de saída, ou se a data de saída ainda está no futuro)
         var ocupada = await _context.RegistrosCapela
-            .AnyAsync(r => r.CapelaId == capelaId && (r.HoraSaida == null || r.HoraSaida > DateTime.UtcNow));
+            .AnyAsync(r => r.CapelaId == capelaId && r.HoraSaida == null);
 
         if (ocupada)
             throw new InvalidOperationException("Esta capela já encontra-se ocupada no momento.");

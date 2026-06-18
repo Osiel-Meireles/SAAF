@@ -52,7 +52,7 @@ public class DatabaseSeeder
         await _context.SaveChangesAsync();
 
         _logger.LogWarning(
-            "Usuário admin criado: admin@sakrus.local / Admin@123 — TROQUE ESTA SENHA IMEDIATAMENTE.");
+            "Usuário admin criado: admin@sakrus.local — TROQUE ESTA SENHA IMEDIATAMENTE após o primeiro login.");
     }
 
     private async Task SeedConfiguracaoFinanceiraAsync()
@@ -87,8 +87,8 @@ public class DatabaseSeeder
 
         _logger.LogInformation("Criando funerárias padrão...");
         _context.Funerarias.AddRange(
-            new Funeraria { Nome = "Funerária Paz Celestial", CNPJ = "00.000.000/0001-01", Telefone = "(11) 9999-9999", Endereco = "Rua das Flores, 123" },
-            new Funeraria { Nome = "Funerária Descanso Eterno", CNPJ = "11.111.111/0001-11", Telefone = "(11) 8888-8888", Endereco = "Av. Principal, 456" }
+            new Funeraria { Nome = "Funerária Paz Celestial", CNPJ = "11222333000181", Telefone = "(77) 9999-9999", Endereco = "Rua das Flores, 123" },
+            new Funeraria { Nome = "Funerária Descanso Eterno", CNPJ = "44555666000199", Telefone = "(77) 8888-8888", Endereco = "Av. Principal, 456" }
         );
         await _context.SaveChangesAsync();
     }
@@ -115,8 +115,8 @@ public class DatabaseSeeder
 
         _logger.LogInformation("Criando ossuários padrão...");
         _context.Ossuarios.AddRange(
-            new Ossuario { Identificador = "Ossuário Geral - Norte", Tipo = TipoOssuario.Geral, Capacidade = 500, Ocupado = false },
-            new Ossuario { Identificador = "Ossuário Geral - Sul", Tipo = TipoOssuario.Geral, Capacidade = 500, Ocupado = false }
+            new Ossuario { Identificador = "Ossuário Geral - Norte", Tipo = TipoOssuario.Geral, Capacidade = 500 },
+            new Ossuario { Identificador = "Ossuário Geral - Sul", Tipo = TipoOssuario.Geral, Capacidade = 500 }
         );
         await _context.SaveChangesAsync();
     }

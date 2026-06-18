@@ -33,4 +33,15 @@ public interface IAuthService
     /// Valida a senha do usuário atualmente logado (para confirmação de operações sensíveis).
     /// </summary>
     Task<bool> ValidarSenhaUsuarioAtualAsync(string senha);
+
+    /// <summary>
+    /// Atualiza os dados cadastrais de um usuário existente (sem alterar senha).
+    /// </summary>
+    Task<(bool Sucesso, string Erro)> AtualizarUsuarioAsync(int usuarioId, string nome, string email, int nivelAcesso, bool ativo);
+
+    /// <summary>
+    /// Redefine a senha de um usuário gerando uma nova senha aleatória segura.
+    /// Retorna a senha gerada para exibição única ao admin.
+    /// </summary>
+    Task<(bool Sucesso, string Erro, string SenhaGerada)> RedefinirSenhaAsync(int usuarioId);
 }
