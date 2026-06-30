@@ -29,18 +29,25 @@ public class RelatorioService
                 page.DefaultTextStyle(x => x.FontSize(10));
 
                 // CABEÇALHO
-                page.Header().Row(row =>
+                page.Header().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(10).Row(row =>
                 {
-                    row.RelativeItem().Column(col =>
+                    var logoPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "images", "logo1.svg");
+                    if (System.IO.File.Exists(logoPath))
                     {
-                        col.Item().Text("PREFEITURA MUNICIPAL DE LUÍS EDUARDO MAGALHÃES").FontSize(14).SemiBold().FontColor(Colors.Blue.Medium);
-                        col.Item().Text("SISTEMA SAKRUS - GESTÃO CEMITERIAL").FontSize(9);
-                    });
+                        var svgData = System.IO.File.ReadAllText(logoPath);
+                        row.ConstantItem(120).Height(60).Svg(svgData);
+                    }
+                    else
+                    {
+                        row.ConstantItem(120).Text("SAAF").FontSize(24).Bold().FontColor(Colors.Blue.Darken2);
+                    }
 
                     row.RelativeItem().AlignRight().Column(col =>
                     {
+                        col.Item().Text("ORDEM DE SERVIÇO").FontSize(16).Bold().FontColor(Colors.Blue.Darken2);
                         col.Item().Text($"OS Nº: {atendimento.NumeroOsAuxilio ?? "PENDENTE"}").FontSize(12).SemiBold();
-                        col.Item().Text($"Data: {DateTime.Now:dd/MM/yyyy HH:mm}");
+                        col.Item().Text("SAAF - Sistema de Acolhimento e Assistência Funerária").FontSize(10).FontColor(Colors.Grey.Medium);
+                        col.Item().Text($"Data: {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(9).FontColor(Colors.Grey.Medium);
                     });
                 });
 
@@ -106,7 +113,7 @@ public class RelatorioService
                     
                     footerCol.Item().PaddingTop(20).AlignCenter().Text(x =>
                     {
-                        x.Span("Documento gerado pelo sistema Sakrus - ");
+                        x.Span("Documento gerado pelo SAAF - ");
                         x.Span(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
                     });
                 });
@@ -130,18 +137,24 @@ public class RelatorioService
                 page.DefaultTextStyle(x => x.FontSize(11));
 
                 // CABEÇALHO
-                page.Header().Row(row =>
+                page.Header().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(10).Row(row =>
                 {
-                    row.RelativeItem().Column(col =>
+                    var logoPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "images", "logo1.svg");
+                    if (System.IO.File.Exists(logoPath))
                     {
-                        col.Item().Text("PREFEITURA MUNICIPAL DE LUÍS EDUARDO MAGALHÃES").FontSize(14).SemiBold().FontColor(Colors.Blue.Medium);
-                        col.Item().Text("SISTEMA SAKRUS - GESTÃO CEMITERIAL").FontSize(9);
-                    });
+                        var svgData = System.IO.File.ReadAllText(logoPath);
+                        row.ConstantItem(120).Height(60).Svg(svgData);
+                    }
+                    else
+                    {
+                        row.ConstantItem(120).Text("SAAF").FontSize(24).Bold().FontColor(Colors.Blue.Darken2);
+                    }
 
                     row.RelativeItem().AlignRight().Column(col =>
                     {
-                        col.Item().Text("GUIA DE SEPULTAMENTO").FontSize(14).SemiBold();
-                        col.Item().Text($"Data: {DateTime.Now:dd/MM/yyyy HH:mm}");
+                        col.Item().Text("GUIA DE SEPULTAMENTO").FontSize(16).Bold().FontColor(Colors.Blue.Darken2);
+                        col.Item().Text("SAAF - Sistema de Acolhimento e Assistência Funerária").FontSize(10).FontColor(Colors.Grey.Medium);
+                        col.Item().Text($"Data: {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(9).FontColor(Colors.Grey.Medium);
                     });
                 });
 
@@ -202,7 +215,7 @@ public class RelatorioService
                     
                     footerCol.Item().PaddingTop(20).AlignCenter().Text(x =>
                     {
-                        x.Span("Documento gerado pelo sistema Sakrus - ");
+                        x.Span("Documento gerado pelo SAAF - ");
                         x.Span(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
                     });
                 });

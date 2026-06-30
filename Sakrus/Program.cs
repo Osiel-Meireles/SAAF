@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using QuestPDF.Infrastructure;
+using Sakrus;
 using Sakrus.Components;
 using Sakrus.Endpoints;
 using Sakrus.Data;
@@ -133,6 +134,9 @@ using (var scope = app.Services.CreateScope())
             // Seed do usuário admin padrão
             var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
             await seeder.SeedAsync();
+
+            // Seed dos lotes baseados no PDF
+            await DataSeeder.SeedLotesAsync(db);
 
             logger.LogInformation("Banco de dados pronto.");
             break;

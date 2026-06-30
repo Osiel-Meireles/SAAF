@@ -3,12 +3,15 @@
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject Sakrus.Services.IAuditService AuditService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IWebHostEnvironment WebHostEnvironment
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Novo Atendimento - Sakrus</PageTitle>
 
@@ -92,7 +95,7 @@
             </MudItem>
             
             <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.NumeroDeclaracaoObito" Label="NÂº Declaração de Óbito" Required="true" />
+                <MudTextField @bind-Value="novoAtendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" Required="true" />
             </MudItem>
 
             <MudItem xs="12" sm="4">
@@ -142,10 +145,62 @@
                 </MudSelect>
             </MudItem>
 
-            @* --- BOTÃƒO DE AÇÃƒO --- *@
+            @* --- 4. DOCUMENTOS ANEXADOS --- *@
+            <MudItem xs="12" Class="mt-4">
+                <MudText Typo="Typo.h6" Color="Color.Primary">Documentos Anexados (PDF)</MudText>
+                <MudDivider Class="mb-3" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    Anexe documentos em formato <strong>PDF</strong> (máx. 10 MB por arquivo). 
+                    Os documentos ficarão vinculados exclusivamente ao falecido deste atendimento.
+                </MudAlert>
+
+                <InputFile id="fileInput" OnChange="OnFileSelected" multiple accept=".pdf" style="display:none" />
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.AttachFile"
+                           OnClick="@TriggerFileInput"
+                           Disabled="@isSaving">
+                    Selecionar PDF(s)
+                </MudButton>
+
+                @if (arquivosParaAnexar.Any())
+                {
+                    <MudList T="string" Dense="true" Class="mt-2">
+                        @foreach (var arq in arquivosParaAnexar)
+                        {
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">
+                                <div class="d-flex align-center justify-space-between" style="width:100%">
+                                    <MudText Typo="Typo.body2">@arq.Name <MudText Inline="true" Typo="Typo.caption" Color="Color.Secondary">(@FormatBytes(arq.Size))</MudText></MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoverArquivo(arq))" />
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+
+                @if (!string.IsNullOrEmpty(erroUpload))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@erroUpload</MudAlert>
+                }
+            </MudItem>
+
+            @* --- BOTÃO DE AÇÃO --- *@
             <MudItem xs="12" Class="d-flex justify-end mt-4">
-                <MudButton Variant="Variant.Text" Color="Color.Default" Class="mr-2" OnClick="@Cancelar">Cancelar</MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!sucesso)" OnClick="@SalvarAtendimento">Salvar Atendimento</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Default" Class="mr-2" OnClick="@Cancelar" Disabled="@isSaving">Cancelar</MudButton>
+                @if (isSaving)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="true">
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        Salvando...
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!sucesso)" OnClick="@SalvarAtendimento">Salvar Atendimento</MudButton>
+                }
             </MudItem>
         </MudGrid>
     </MudForm>
@@ -161,6 +216,7 @@
 
     private MudForm form = null!;
     private bool sucesso;
+    private bool isSaving;
     
     // Instancia o objeto já com as entidades filhas para evitar NullReferenceException no Bind do form
     private Atendimento novoAtendimento = new Atendimento
@@ -172,109 +228,206 @@
     private DateTime? dataFalecimento = DateTime.Today;
     private List<Funeraria> funerarias = new();
 
+    // Upload de documentos
+    private List<IBrowserFile> arquivosParaAnexar = new();
+    private string erroUpload = "";
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+
     protected override async Task OnInitializedAsync()
     {
         DbContext = DbFactory.CreateDbContext();
         funerarias = await DbContext.Funerarias.ToListAsync();
     }
 
+    private async Task TriggerFileInput()
+    {
+        await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('fileInput').click()");
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        erroUpload = "";
+        var arquivosInvalidos = new List<string>();
+
+        foreach (var file in e.GetMultipleFiles(20))
+        {
+            // Validação de tipo
+            if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
+                && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                arquivosInvalidos.Add($"{file.Name} (tipo inválido — apenas PDF)");
+                continue;
+            }
+
+            // Validação de tamanho
+            if (file.Size > MaxFileSizeBytes)
+            {
+                arquivosInvalidos.Add($"{file.Name} (excede 10 MB)");
+                continue;
+            }
+
+            // Evitar duplicatas pelo nome
+            if (arquivosParaAnexar.Any(a => a.Name == file.Name))
+                continue;
+
+            arquivosParaAnexar.Add(file);
+        }
+
+        if (arquivosInvalidos.Any())
+        {
+            erroUpload = $"Arquivo(s) rejeitado(s): {string.Join("; ", arquivosInvalidos)}";
+        }
+    }
+
+    private void RemoverArquivo(IBrowserFile arquivo)
+    {
+        arquivosParaAnexar.Remove(arquivo);
+        erroUpload = "";
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
+
     private async Task SalvarAtendimento()
     {
         await form.Validate();
-        if (form.IsValid)
+        if (!form.IsValid) return;
+
+        // FEAT-02: Validação matemática do CPF
+        if (!Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Responsavel.CPF))
         {
-            // FEAT-02: Validação matemática do CPF
-            if (!Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Responsavel.CPF))
+            Snackbar.Add("O CPF do Responsável é inválido.", Severity.Error);
+            return;
+        }
+        if (!string.IsNullOrWhiteSpace(novoAtendimento.Falecido.Cpf) && !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Falecido.Cpf))
+        {
+            Snackbar.Add("O CPF do Falecido é inválido.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+        StateHasChanged();
+
+        await using var transaction = await DbContext.Database.BeginTransactionAsync();
+        try
+        {
+            // Atribuir data de falecimento do DatePicker
+            if (dataFalecimento.HasValue)
             {
-                Snackbar.Add("O CPF do Responsável é inválido.", Severity.Error);
-                return;
+                novoAtendimento.Falecido.DataFalecimento = DateTime.SpecifyKind(dataFalecimento.Value, DateTimeKind.Utc);
             }
-            if (!string.IsNullOrWhiteSpace(novoAtendimento.Falecido.Cpf) && !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Falecido.Cpf))
+            else
             {
-                Snackbar.Add("O CPF do Falecido é inválido.", Severity.Error);
-                return;
+                novoAtendimento.Falecido.DataFalecimento = DateTime.UtcNow;
             }
-            await using var transaction = await DbContext.Database.BeginTransactionAsync();
+
+            // ROB-04: Comparar CPF de forma limpa, garantindo que o índice seja usado e compatibilidade com PostgreSQL
+            var cpfLimpo = new string(novoAtendimento.Responsavel.CPF.Where(char.IsDigit).ToArray());
+            var responsavelExistente = await DbContext.Responsaveis
+                .FirstOrDefaultAsync(r => r.CPF == cpfLimpo);
+
+            if (responsavelExistente != null)
+            {
+                novoAtendimento.Responsavel = responsavelExistente;
+                novoAtendimento.ResponsavelId = responsavelExistente.Id;
+            }
+            else
+            {
+                // Força o CPF sem máscara antes de salvar
+                novoAtendimento.Responsavel.CPF = cpfLimpo;
+                DbContext.Responsaveis.Add(novoAtendimento.Responsavel);
+                await DbContext.SaveChangesAsync();
+                novoAtendimento.ResponsavelId = novoAtendimento.Responsavel.Id;
+            }
+
+            // Salvar Falecido primeiro se for novo
+            if (novoAtendimento.FalecidoId == 0 || novoAtendimento.Falecido.Id == 0)
+            {
+                // Limpar CPF do falecido também
+                if (!string.IsNullOrEmpty(novoAtendimento.Falecido.Cpf))
+                {
+                    novoAtendimento.Falecido.Cpf = new string(novoAtendimento.Falecido.Cpf.Where(char.IsDigit).ToArray());
+                }
+                DbContext.Falecidos.Add(novoAtendimento.Falecido);
+                await DbContext.SaveChangesAsync();
+                novoAtendimento.FalecidoId = novoAtendimento.Falecido.Id;
+            }
+
+            // Agora salvar o Atendimento com as FK corrigidas
+            DbContext.Atendimentos.Add(novoAtendimento);
+            await DbContext.SaveChangesAsync();
+
+            // --- Salvar arquivos PDF em disco e criar registros no banco ---
+            if (arquivosParaAnexar.Any())
+            {
+                var pastaBase = Path.Combine(WebHostEnvironment.WebRootPath, "uploads", "atendimentos", novoAtendimento.FalecidoId.ToString());
+                Directory.CreateDirectory(pastaBase);
+
+                foreach (var arquivo in arquivosParaAnexar)
+                {
+                    // Nome único para evitar colisão
+                    var nomeUnico = $"{Guid.NewGuid():N}_{Path.GetFileName(arquivo.Name)}";
+                    var caminhoFisico = Path.Combine(pastaBase, nomeUnico);
+
+                    await using (var stream = new FileStream(caminhoFisico, FileMode.Create))
+                    await using (var uploadStream = arquivo.OpenReadStream(MaxFileSizeBytes))
+                    {
+                        await uploadStream.CopyToAsync(stream);
+                    }
+
+                    var doc = new DocumentoAnexo
+                    {
+                        AtendimentoId = novoAtendimento.Id,
+                        FalecidoId = novoAtendimento.FalecidoId,
+                        NomeArquivo = arquivo.Name,
+                        // Caminho relativo à pasta wwwroot para servir via HTTP se necessário
+                        CaminhoArquivo = Path.Combine("uploads", "atendimentos", novoAtendimento.FalecidoId.ToString(), nomeUnico),
+                        TamanhoBytes = arquivo.Size,
+                        DataAnexo = DateTime.UtcNow
+                    };
+                    DbContext.DocumentosAnexos.Add(doc);
+                }
+
+                await DbContext.SaveChangesAsync();
+            }
+
+            await transaction.CommitAsync();
+            
+            // FEAT-01: Auditoria
             try
             {
-                // Atribuir data de falecimento do DatePicker
-                if (dataFalecimento.HasValue)
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                if (user.Identity?.IsAuthenticated == true)
                 {
-                    novoAtendimento.Falecido.DataFalecimento = DateTime.SpecifyKind(dataFalecimento.Value, DateTimeKind.Utc);
+                    int userId = int.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
+                    string userName = user.Identity.Name ?? "Desconhecido";
+                    
+                    await AuditService.LogAcaoAsync(
+                        userId, userName, "CREATE", "Atendimento", novoAtendimento.Id.ToString(), null, 
+                        new { novoAtendimento.NumeroOsAuxilio, FalecidoId = novoAtendimento.FalecidoId, ResponsavelId = novoAtendimento.ResponsavelId, DocumentosAnexados = arquivosParaAnexar.Count }
+                    );
                 }
-                else
-                {
-                    novoAtendimento.Falecido.DataFalecimento = DateTime.UtcNow;
-                }
-
-                // ROB-04: Comparar CPF de forma limpa, garantindo que o índice seja usado e compatibilidade com PostgreSQL
-                var cpfLimpo = new string(novoAtendimento.Responsavel.CPF.Where(char.IsDigit).ToArray());
-                var responsavelExistente = await DbContext.Responsaveis
-                    .FirstOrDefaultAsync(r => r.CPF == cpfLimpo);
-
-                if (responsavelExistente != null)
-                {
-                    novoAtendimento.Responsavel = responsavelExistente;
-                    novoAtendimento.ResponsavelId = responsavelExistente.Id;
-                }
-                else
-                {
-                    // Força o CPF sem máscara antes de salvar
-                    novoAtendimento.Responsavel.CPF = cpfLimpo;
-                    DbContext.Responsaveis.Add(novoAtendimento.Responsavel);
-                    await DbContext.SaveChangesAsync();
-                    novoAtendimento.ResponsavelId = novoAtendimento.Responsavel.Id;
-                }
-
-                // Salvar Falecido primeiro se for novo
-                if (novoAtendimento.FalecidoId == 0 || novoAtendimento.Falecido.Id == 0)
-                {
-                    // Limpar CPF do falecido também
-                    if (!string.IsNullOrEmpty(novoAtendimento.Falecido.Cpf))
-                    {
-                        novoAtendimento.Falecido.Cpf = new string(novoAtendimento.Falecido.Cpf.Where(char.IsDigit).ToArray());
-                    }
-                    DbContext.Falecidos.Add(novoAtendimento.Falecido);
-                    await DbContext.SaveChangesAsync();
-                    novoAtendimento.FalecidoId = novoAtendimento.Falecido.Id;
-                }
-
-                // Agora salvar o Atendimento com as FK corrigidas
-                DbContext.Atendimentos.Add(novoAtendimento);
-                await DbContext.SaveChangesAsync();
-                
-                await transaction.CommitAsync();
-                
-                // FEAT-01: Auditoria
-                try
-                {
-                    var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-                    var user = authState.User;
-                    if (user.Identity?.IsAuthenticated == true)
-                    {
-                        int userId = int.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
-                        string userName = user.Identity.Name ?? "Desconhecido";
-                        
-                        await AuditService.LogAcaoAsync(
-                            userId, userName, "CREATE", "Atendimento", novoAtendimento.Id.ToString(), null, 
-                            new { novoAtendimento.NumeroOsAuxilio, FalecidoId = novoAtendimento.FalecidoId, ResponsavelId = novoAtendimento.ResponsavelId }
-                        );
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // ROB-02: Silenciar e registrar erro de auditoria para não quebrar o fluxo do operador
-                    Console.WriteLine($"Erro ao registrar auditoria: {ex.Message}");
-                }
-                
-                Snackbar.Add("Atendimento registrado com sucesso!", Severity.Success);
-                Navigation.NavigateTo("/obitos");
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
-                Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+                // ROB-02: Silenciar e registrar erro de auditoria para não quebrar o fluxo do operador
+                Console.WriteLine($"Erro ao registrar auditoria: {ex.Message}");
             }
+            
+            Snackbar.Add("Atendimento registrado com sucesso!", Severity.Success);
+            Navigation.NavigateTo("/obitos");
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+            isSaving = false;
+            StateHasChanged();
         }
     }
 

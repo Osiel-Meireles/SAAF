@@ -8,6 +8,7 @@
 @inject IDialogService DialogService
 @inject PdfGeneratorService PdfGeneratorService
 @inject IJSRuntime JS
+@inject IJazigoService JazigoService
 
 <MudDialog>
     <TitleContent>
@@ -56,6 +57,21 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancelar">Fechar</MudButton>
+        
+        @if (podeDesmembrar && !temSubLotes)
+        {
+            <MudButton Color="Color.Secondary" Variant="Variant.Outlined" OnClick="AbrirDesmembramento" StartIcon="@Icons.Material.Filled.AccountTree">Desmembrar</MudButton>
+        }
+        else if (temSubLotes)
+        {
+            <MudButton Color="Color.Warning" Variant="Variant.Outlined" OnClick="DesfazerDivisao" StartIcon="@Icons.Material.Filled.CallMerge">Desfazer Divisão</MudButton>
+        }
+        
+        @if (falecidos.Any())
+        {
+            <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="AbrirExumacao" StartIcon="@Icons.Material.Filled.ArrowUpward">Exumar</MudButton>
+        }
+
         @if (responsavelAtual != null)
         {
             <MudButton Color="Color.Info" Variant="Variant.Text" OnClick="GerarTermo" StartIcon="@Icons.Material.Filled.PictureAsPdf">Termo de Concessão</MudButton>
@@ -78,6 +94,8 @@
     private Jazigo? jazigo;
     private Responsavel? responsavelAtual;
     private List<Falecido> falecidos = new();
+    private bool podeDesmembrar = false;
+    private bool temSubLotes = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -116,6 +134,9 @@
 
                 if (hist != null) responsavelAtual = hist.ResponsavelNovo;
             }
+            
+            temSubLotes = await DbContext.Jazigos.AnyAsync(j => j.JazigoPaiId == JazigoId);
+            podeDesmembrar = jazigo.JazigoPaiId == null && !jazigo.Ocupado;
         }
     }
 
@@ -153,6 +174,65 @@
         if (result != null && !result.Canceled)
         {
             MudDialog.Close(DialogResult.Ok(true)); // Repassa o OK para o grid atualizar
+        }
+    }
+
+    private async Task AbrirDesmembramento()
+    {
+        if (jazigo == null) return;
+        
+        var parameters = new DialogParameters {
+            ["JazigoId"] = jazigo.Id,
+            ["CodigoIdentificadorPai"] = jazigo.CodigoIdentificador
+        };
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DesmembramentoDialog>("Desmembrar Lote", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+    }
+
+    private async Task DesfazerDivisao()
+    {
+        if (jazigo == null) return;
+        
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Desfazer Divisão",
+            $"Tem certeza que deseja desfazer a divisão do lote {jazigo.CodigoIdentificador}? Os sub-lotes associados serão excluídos permanentemente.",
+            yesText: "Confirmar", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await JazigoService.DesfazerDesmembramentoJazigoAsync(jazigo.Id);
+                Snackbar.Add($"Divisão do lote {jazigo.CodigoIdentificador} desfeita com sucesso.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
+        }
+    }
+
+    private async Task AbrirExumacao()
+    {
+        if (jazigo == null) return;
+        
+        var parameters = new DialogParameters { ["JazigoId"] = jazigo.Id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<ExumarJazigoDialog>($"Exumar — {jazigo.CodigoIdentificador}", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            MudDialog.Close(DialogResult.Ok(true));
         }
     }
 }

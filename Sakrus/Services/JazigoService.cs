@@ -98,6 +98,9 @@ public class JazigoService : IJazigoService
                 novosLotes.Add(new Jazigo
                 {
                     CodigoIdentificador = $"{jazigoPai.CodigoIdentificador}-{sufixo}",
+                    Quadra = jazigoPai.Quadra,
+                    Ala = jazigoPai.Ala,
+                    NumeroLote = $"{jazigoPai.NumeroLote}-{sufixo}",
                     ModeloJazigoId = jazigoPai.ModeloJazigoId, // Herda a parametrização do pai
                     IsInfantil = jazigoPai.IsInfantil,
                     Ocupado = false,
@@ -218,6 +221,8 @@ public class JazigoService : IJazigoService
             
             // Desvincula o falecido do jazigo (O corpo foi removido)
             falecido.JazigoId = null;
+            // BUGFIX: Marcar o falecido como Exumado para impedir re-sepultamento indevido
+            falecido.Status = StatusFalecido.Exumado;
             _context.Falecidos.Update(falecido);
 
             // Verifica via query direta ao banco se restam outros falecidos neste jazigo

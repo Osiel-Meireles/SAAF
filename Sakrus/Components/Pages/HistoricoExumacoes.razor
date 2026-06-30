@@ -1,0 +1,134 @@
+@page "/historico-exumacoes"
+@attribute [Authorize]
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject Sakrus.Services.PdfGeneratorService PdfGeneratorService
+
+<MudText Typo="Typo.h4" Class="mb-4">Histórico de Exumações</MudText>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    Listagem de todas as exumações realizadas no cemitério, incluindo remoções de jazigos e gavetas públicas.
+</MudAlert>
+
+<MudTable Items="@exumacoes" Hover="true" Elevation="2" Loading="@isLoading" Filter="new Func<ExumacaoRegistro,bool>(FilterFunc)">
+    <ToolBarContent>
+        <MudTextField @bind-Value="searchString" Placeholder="Buscar por nome do falecido..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Data</MudTh>
+        <MudTh>Falecido</MudTh>
+        <MudTh>Origem</MudTh>
+        <MudTh>Destino</MudTh>
+        <MudTh>Autorizador</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Data">@(context.DataExecucao?.ToString("dd/MM/yyyy") ?? context.DataAutorizacao.ToString("dd/MM/yyyy"))</MudTd>
+        <MudTd DataLabel="Falecido">
+            @if (context.Falecido != null)
+            {
+                <MudText Typo="Typo.body2"><strong>@context.Falecido.Nome</strong></MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">ID: @context.FalecidoId</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Origem">
+            @if (context.JazigoId.HasValue)
+            {
+                <span>Jazigo: @(context.Jazigo != null ? context.Jazigo.CodigoIdentificador : context.JazigoId.ToString())</span>
+            }
+            else if (context.GavetaPublicaId.HasValue)
+            {
+                <span>Gaveta: @(context.GavetaPublica != null ? context.GavetaPublica.NumeroGaveta : context.GavetaPublicaId.ToString())</span>
+            }
+            else
+            {
+                <span>Desconhecido</span>
+            }
+        </MudTd>
+        <MudTd DataLabel="Destino">
+            @if (context.OssuarioDestinoId.HasValue)
+            {
+                <span>Ossuário: @(context.OssuarioDestino != null ? context.OssuarioDestino.Identificador : context.OssuarioDestinoId.ToString())</span>
+            }
+            else
+            {
+                <span>Transferido ou Desconhecido</span>
+            }
+        </MudTd>
+        <MudTd DataLabel="Autorizador">@context.SetorAutorizador</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" 
+                           Color="Color.Primary" 
+                           ToolTip="Gerar Requerimento" 
+                           OnClick="@(() => GerarRequerimento(context))" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    private List<ExumacaoRegistro> exumacoes = new();
+    private bool isLoading = true;
+    private string searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        isLoading = true;
+        exumacoes = await DbContext.ExumacoesRegistros
+            .Include(e => e.Falecido)
+            .Include(e => e.Jazigo)
+            .Include(e => e.GavetaPublica)
+            .Include(e => e.OssuarioDestino)
+            .OrderByDescending(e => e.DataExecucao ?? e.DataAutorizacao)
+            .ToListAsync();
+        isLoading = false;
+    }
+
+    private bool FilterFunc(ExumacaoRegistro element)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (element.Falecido != null && element.Falecido.Nome.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+    private async Task GerarRequerimento(ExumacaoRegistro exumacao)
+    {
+        try
+        {
+            var pdfBytes = PdfGeneratorService.GerarRequerimentoExumacaoPdf(exumacao);
+            var base64 = Convert.ToBase64String(pdfBytes);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", $"Exumacao_{exumacao.Id}.pdf", base64);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao gerar PDF: {ex.Message}", Severity.Error);
+        }
+    }
+}

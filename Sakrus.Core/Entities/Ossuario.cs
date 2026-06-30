@@ -10,6 +10,15 @@ public class Ossuario
     [Required]
     [MaxLength(100)]
     public string Identificador { get; set; } = string.Empty;
+    
+    [MaxLength(50)]
+    public string Quadra { get; set; } = string.Empty;
+    
+    [MaxLength(50)]
+    public string Ala { get; set; } = string.Empty;
+    
+    [MaxLength(50)]
+    public string NumeroLote { get; set; } = string.Empty;
 
     public TipoOssuario Tipo { get; set; }
 

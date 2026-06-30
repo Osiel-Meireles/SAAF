@@ -23,6 +23,12 @@ namespace Sakrus.Core.Entities
         // Tipo dos restos mortais
         public TipoRestosMortais TipoRestosMortais { get; set; } = TipoRestosMortais.CorpoInteiro;
 
+        /// <summary>
+        /// Estado do ciclo de vida do falecido.
+        /// Evita que um falecido exumado seja indevidamente sepultado novamente.
+        /// </summary>
+        public StatusFalecido Status { get; set; } = StatusFalecido.NaoSepultado;
+
         // Relacionamento com o Jazigo (Anulável para permitir Exumação e manter histórico)
         public int? JazigoId { get; set; }
         public Jazigo? Jazigo { get; set; }
@@ -30,5 +36,8 @@ namespace Sakrus.Core.Entities
         // Destino pós-exumação
         public int? OssuarioId { get; set; }
         public Ossuario? Ossuario { get; set; }
+
+        // Documentos PDF anexados a este falecido
+        public List<DocumentoAnexo> Documentos { get; set; } = new();
     }
 }

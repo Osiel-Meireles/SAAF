@@ -9,15 +9,16 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-<MudText Typo="Typo.h4" Class="mb-4">Controle de Exumações</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">Gavetas Públicas Ocupadas</MudText>
 
 <MudAlert Severity="Severity.Warning" Class="mb-4">
-    Listagem de gavetas ocupadas. Verifique as datas de previsão para organizar as retiradas de restos mortais.
+    Listagem de gavetas públicas ocupadas. Verifique as datas de previsão para organizar as retiradas de restos mortais.
 </MudAlert>
 
 <MudTable Items="@gavetasOcupadas" Hover="true" Elevation="2" Loading="@isLoading">
     <HeaderContent>
         <MudTh>Gaveta</MudTh>
+        <MudTh>Falecido</MudTh>
         <MudTh>Data Ocupação</MudTh>
         <MudTh>Previsão Exumação</MudTh>
         <MudTh>Status Prazo</MudTh>
@@ -25,6 +26,16 @@
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="Gaveta">@context.NumeroGaveta</MudTd>
+        <MudTd DataLabel="Falecido">
+            @if (context.Falecido != null)
+            {
+                <MudText Typo="Typo.body2"><strong>@context.Falecido.Nome</strong></MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Não identificado</MudText>
+            }
+        </MudTd>
         <MudTd DataLabel="Data Ocupação">@context.DataOcupacao?.ToString("dd/MM/yyyy")</MudTd>
         <MudTd DataLabel="Previsão Exumação">@context.DataPrevisaoExumacao?.ToString("dd/MM/yyyy")</MudTd>
         <MudTd DataLabel="Status Prazo">
@@ -75,7 +86,9 @@
     {
         isLoading = true;
         // Filtra apenas as que estão ocupadas para gerenciar a exumação
+        // Inclui o Falecido para exibir o nome na listagem
         gavetasOcupadas = await DbContext.GavetasPublicas
+            .Include(g => g.Falecido)
             .Where(g => g.Ocupada)
             .OrderBy(g => g.DataPrevisaoExumacao)
             .ToListAsync();
@@ -92,6 +105,7 @@
 
         if (result != null && !result.Canceled)
         {
+            DbContext.ChangeTracker.Clear();
             await CarregarDados();
         }
     }
@@ -106,6 +120,7 @@
 
         if (result != null && !result.Canceled)
         {
+            DbContext.ChangeTracker.Clear();
             await CarregarDados();
         }
     }

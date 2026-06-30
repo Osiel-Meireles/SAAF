@@ -142,6 +142,9 @@
         {
             falecido.TipoRestosMortais = tipoRestosMortais;
 
+            // BUGFIX: Marcar o falecido como Exumado para impedir re-sepultamento indevido
+            falecido.Status = StatusFalecido.Exumado;
+
             // Se selecionou Ossuário Destino, vincular o falecido ao ossuário
             if (registro.OssuarioDestinoId.HasValue)
             {

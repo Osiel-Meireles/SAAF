@@ -26,8 +26,9 @@ public class EstoqueService
 
         if (produto == null)
         {
-            _logger.LogWarning("Produto {Nome} não encontrado no estoque para dar baixa.", nomeProduto);
-            throw new InvalidOperationException($"Produto '{nomeProduto}' não encontrado no estoque. Cadastre-o antes de faturar.");
+            // Se for um serviço (translado, pompa, etc), não existe no estoque físico, então só ignora.
+            _logger.LogInformation("Produto/Serviço {Nome} não é rastreado no estoque físico. Pulando baixa.", nomeProduto);
+            return;
         }
 
         if (produto.QuantidadeDisponivel < quantidade)

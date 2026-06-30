@@ -1,9 +1,9 @@
-﻿@using MudBlazor
+@using MudBlazor
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Sakrus.Services
 @using Microsoft.EntityFrameworkCore
-@inject AtendimentoFaturamentoService FaturamentoService
+@inject IAtendimentoFaturamentoService FaturamentoService
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject ISnackbar Snackbar
@@ -159,7 +159,7 @@
                 var fileName = $"OS_{atendimento.NumeroOsAuxilio}.pdf";
                 
                 // Dispara o download via JS
-                await JS.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(pdfBytes));
+                await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(pdfBytes));
             }
 
             Snackbar.Add("Ordem de Serviço gerada e enviada para impressão!", Severity.Success);

@@ -29,6 +29,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ProdutoEstoque> ProdutosEstoque { get; set; }
     public DbSet<MovimentacaoEstoque> MovimentacoesEstoque { get; set; }
     public DbSet<Ossuario> Ossuarios { get; set; }
+    public DbSet<DocumentoAnexo> DocumentosAnexos { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -86,5 +87,19 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Falecido>().Property(f => f.TipoRestosMortais).HasConversion<string>();
         modelBuilder.Entity<Ossuario>().Property(o => o.Tipo).HasConversion<string>();
         modelBuilder.Entity<MovimentacaoEstoque>().Property(m => m.TipoMovimentacao).HasConversion<string>();
+        modelBuilder.Entity<Falecido>().Property(f => f.Status).HasConversion<string>();
+
+        // DocumentoAnexo: cascade delete quando Falecido for removido; Atendimento restrito
+        modelBuilder.Entity<DocumentoAnexo>()
+            .HasOne(d => d.Falecido)
+            .WithMany(f => f.Documentos)
+            .HasForeignKey(d => d.FalecidoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DocumentoAnexo>()
+            .HasOne(d => d.Atendimento)
+            .WithMany()
+            .HasForeignKey(d => d.AtendimentoId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

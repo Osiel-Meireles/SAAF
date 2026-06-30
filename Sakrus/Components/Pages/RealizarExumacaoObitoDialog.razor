@@ -233,6 +233,9 @@
             // Atualizar tipo de restos mortais (selecionado pelo operador)
             falecido.TipoRestosMortais = tipoRestosMortaisSelecionado;
 
+            // BUGFIX: Marcar o falecido como Exumado para impedir re-sepultamento indevido
+            falecido.Status = StatusFalecido.Exumado;
+
             if (selectedOssuarioId.HasValue)
             {
                 falecido.OssuarioId = selectedOssuarioId;

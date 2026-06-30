@@ -218,6 +218,9 @@
             DbContext.Falecidos.Update(falecido);
             DbContext.Atendimentos.Update(atendimento);
 
+            // Atualizar status do ciclo de vida do falecido
+            falecido.Status = StatusFalecido.Sepultado;
+
             await DbContext.SaveChangesAsync();
             await transaction.CommitAsync();
 

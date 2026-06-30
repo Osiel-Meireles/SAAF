@@ -47,7 +47,8 @@
             }
         </MudTd>
         <MudTd DataLabel="Ações">
-            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenEditForm(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenEditForm(context))" Title="Editar produto" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeletarProduto(context))" Title="Excluir produto" />
         </MudTd>
     </RowTemplate>
 </MudTable>
@@ -188,5 +189,47 @@
             Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
         }
     }
-}
 
+    private async Task DeletarProduto(ProdutoEstoque produto)
+    {
+        // 2FA — Confirmação de senha antes de excluir
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = "Excluir Produto",
+            ["MensagemConfirmacao"] = $"Você está prestes a EXCLUIR o produto '{produto.Nome}' permanentemente. Confirme sua identidade."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
+
+        try
+        {
+            // Verificar integridade: impede deleção se houver movimentações de estoque vinculadas
+            var temMovimentacoes = await DbContext.MovimentacoesEstoque
+                .AnyAsync(m => m.ProdutoEstoqueId == produto.Id);
+
+            if (temMovimentacoes)
+            {
+                Snackbar.Add(
+                    $"Não é possível excluir '{produto.Nome}': existem movimentações de estoque vinculadas a este produto. " +
+                    "Zere a quantidade disponível para desativá-lo sem perder o histórico.",
+                    Severity.Warning);
+                return;
+            }
+
+            var p = await DbContext.ProdutosEstoque.FindAsync(produto.Id);
+            if (p != null)
+            {
+                DbContext.ProdutosEstoque.Remove(p);
+                await DbContext.SaveChangesAsync();
+                Snackbar.Add($"Produto '{produto.Nome}' excluído com sucesso.", Severity.Success);
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao excluir: {ex.Message}", Severity.Error);
+        }
+    }
+}

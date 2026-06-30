@@ -1,83 +1,304 @@
-@page "/mapa-cemiterio"
-@attribute [Authorize]
+@page "/mapa"
 @using Sakrus.Core.Entities
+@using Sakrus.Services
+@using MudBlazor
 @using Sakrus.Infrastructure.Data
-@using Microsoft.EntityFrameworkCore
-@inject IDbContextFactory<ApplicationDbContext> DbFactory
-@implements IDisposable
+@inject IJazigoService JazigoService
 @inject IDialogService DialogService
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
-<PageTitle>Mapa Espacial do Cemitério - Sakrus</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Mapa Gráfico do Cemitério</MudText>
 
-<MudText Typo="Typo.h4" Class="mb-4">Visão Espacial - Mapa de Jazigos</MudText>
-
-@if (jazigos == null)
-{
-    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-}
-else
-{
-    <MudPaper Class="pa-4 mb-4" Elevation="1">
-        <div class="d-flex gap-4">
-            <MudChip T="string" Size="Size.Small" Color="Color.Success">Livre (@livres)</MudChip>
-            <MudChip T="string" Size="Size.Small" Color="Color.Error">Ocupado (@ocupados)</MudChip>
-        </div>
-    </MudPaper>
-
-    <MudGrid>
-        @foreach (var jazigo in jazigos)
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+    
+    <!-- ABA: JAZIGOS -->
+    <MudTabPanel Text="Jazigos" Icon="@Icons.Material.Filled.AccountBalance">
+        @if (isLoading)
         {
-            <MudItem xs="6" sm="4" md="3" lg="2">
-                <MudCard Elevation="2" Style="@($"border-left: 6px solid {(jazigo.Ocupado ? "red" : "green")}; cursor: pointer;")" @onclick="() => AbrirDetalhes(jazigo)">
-                    <MudCardContent Class="py-3 px-3">
-                        <MudText Typo="Typo.subtitle1" Align="Align.Center"><b>Jazigo @jazigo.CodigoIdentificador</b></MudText>
-                        <MudText Typo="Typo.caption" Align="Align.Center" Style="display:block;">
-                            @(jazigo.Ocupado ? "OCUPADO" : "LIVRE")
-                        </MudText>
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
         }
-    </MudGrid>
-}
+        else
+        {
+            <MudTabs Elevation="1" Rounded="true" Outlined="true" Position="Position.Top">
+                @foreach (var quadra in quadrasJazigo)
+                {
+                    <MudTabPanel Text="@($"Quadra {quadra}")">
+                        <div class="d-flex flex-column gap-4 mt-4">
+                            @foreach (var alaGroup in jazigosAgrupados[quadra])
+                            {
+                                <MudCard Elevation="1" Class="pa-2">
+                                    <div class="d-flex align-center gap-2 mb-2">
+                                        <MudChip T="string" Color="Color.Dark" Size="Size.Small">Ala @alaGroup.Key</MudChip>
+                                        <MudDivider Class="flex-grow-1" />
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var lote in alaGroup.Value)
+                                        {
+                                            var cor = lote.Ocupado ? Color.Error : Color.Success;
+                                            var icone = lote.Ocupado ? Icons.Material.Filled.Person : Icons.Material.Filled.PersonOutline;
+                                            
+                                            // Tooltip logic
+                                            string tooltip = lote.Ocupado 
+                                                ? $"Lote {lote.NumeroLote} - Ocupado" 
+                                                : $"Lote {lote.NumeroLote} - Livre";
+                                            
+                                            <MudTooltip Text="@tooltip">
+                                                <MudPaper Class="d-flex flex-column align-center justify-center cursor-pointer map-box"
+                                                          Style="@($"background-color: {GetColor(cor)}; color: white;")"
+                                                          Elevation="2"
+                                                          @onclick="@(() => AbrirJazigo(lote))">
+                                                    <MudText Typo="Typo.caption" Class="font-weight-bold">@lote.NumeroLote</MudText>
+                                                </MudPaper>
+                                            </MudTooltip>
+                                        }
+                                    </div>
+                                </MudCard>
+                            }
+                        </div>
+                    </MudTabPanel>
+                }
+            </MudTabs>
+        }
+    </MudTabPanel>
+    
+    <!-- ABA: GAVETAS PÚBLICAS -->
+    <MudTabPanel Text="Gavetas Públicas" Icon="@Icons.Material.Filled.Inbox">
+        @if (isLoading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        }
+        else
+        {
+            <MudTabs Elevation="1" Rounded="true" Outlined="true" Position="Position.Top">
+                @foreach (var quadra in quadrasGaveta)
+                {
+                    <MudTabPanel Text="@($"Quadra {quadra}")">
+                        <div class="d-flex flex-column gap-4 mt-4">
+                            @foreach (var setorGroup in gavetasAgrupadas[quadra])
+                            {
+                                <MudCard Elevation="1" Class="pa-2">
+                                    <div class="d-flex align-center gap-2 mb-2">
+                                        <MudChip T="string" Color="Color.Dark" Size="Size.Small">Setor @setorGroup.Key</MudChip>
+                                        <MudDivider Class="flex-grow-1" />
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var gaveta in setorGroup.Value)
+                                        {
+                                            var cor = gaveta.Ocupada ? Color.Error : Color.Success;
+                                            string tooltip = gaveta.Ocupada 
+                                                ? $"Gaveta {gaveta.NumeroGaveta} - Ocupada" 
+                                                : $"Gaveta {gaveta.NumeroGaveta} - Livre";
+                                                
+                                            <MudTooltip Text="@tooltip">
+                                                <MudPaper Class="d-flex flex-column align-center justify-center cursor-pointer map-box"
+                                                          Style="@($"background-color: {GetColor(cor)}; color: white;")"
+                                                          Elevation="2"
+                                                          @onclick="@(() => AbrirGaveta(gaveta))">
+                                                    <MudText Typo="Typo.caption" Class="font-weight-bold">@gaveta.NumeroGaveta</MudText>
+                                                </MudPaper>
+                                            </MudTooltip>
+                                        }
+                                    </div>
+                                </MudCard>
+                            }
+                        </div>
+                    </MudTabPanel>
+                }
+            </MudTabs>
+        }
+    </MudTabPanel>
+    
+    <!-- ABA: OSSUÁRIOS -->
+    <MudTabPanel Text="Ossuários" Icon="@Icons.Material.Filled.Archive">
+        @if (isLoading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        }
+        else
+        {
+            <MudTabs Elevation="1" Rounded="true" Outlined="true" Position="Position.Top">
+                @foreach (var quadra in quadrasOssuario)
+                {
+                    <MudTabPanel Text="@($"Quadra {quadra}")">
+                        <div class="d-flex flex-column gap-4 mt-4">
+                            @foreach (var alaGroup in ossuariosAgrupados[quadra])
+                            {
+                                <MudCard Elevation="1" Class="pa-2">
+                                    <div class="d-flex align-center gap-2 mb-2">
+                                        <MudChip T="string" Color="Color.Dark" Size="Size.Small">Ala @alaGroup.Key</MudChip>
+                                        <MudDivider Class="flex-grow-1" />
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var ossuario in alaGroup.Value)
+                                        {
+                                            var cor = ossuario.Ocupado ? Color.Error : Color.Success;
+                                            string tooltip = $"Ossuário {ossuario.NumeroLote} - Ocupação: {ossuario.Falecidos.Count}/{ossuario.Capacidade}";
+                                                
+                                            <MudTooltip Text="@tooltip">
+                                                <MudPaper Class="d-flex flex-column align-center justify-center cursor-pointer map-box"
+                                                          Style="@($"background-color: {GetColor(cor)}; color: white;")"
+                                                          Elevation="2"
+                                                          @onclick="@(() => AbrirOssuario(ossuario))">
+                                                    <MudText Typo="Typo.caption" Class="font-weight-bold">@ossuario.NumeroLote</MudText>
+                                                </MudPaper>
+                                            </MudTooltip>
+                                        }
+                                    </div>
+                                </MudCard>
+                            }
+                        </div>
+                    </MudTabPanel>
+                }
+            </MudTabs>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+<style>
+    .map-box {
+        width: 36px;
+        height: 36px;
+        transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+    }
+    .map-box:hover {
+        transform: scale(1.15);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
+        z-index: 10;
+    }
+</style>
 
 @code {
-    private ApplicationDbContext DbContext = default!;
+    private bool isLoading = true;
 
-    public void Dispose()
-    {
-        DbContext?.Dispose();
-    }
+    // Jazigos Data
+    private List<string> quadrasJazigo = new();
+    private Dictionary<string, Dictionary<string, List<Jazigo>>> jazigosAgrupados = new();
 
-    private List<Jazigo> jazigos;
-    private int livres = 0;
-    private int ocupados = 0;
+    // Gavetas Data
+    private List<string> quadrasGaveta = new();
+    private Dictionary<string, Dictionary<string, List<GavetaPublica>>> gavetasAgrupadas = new();
+
+    // Ossuarios Data
+    private List<string> quadrasOssuario = new();
+    private Dictionary<string, Dictionary<string, List<Ossuario>>> ossuariosAgrupados = new();
 
     protected override async Task OnInitializedAsync()
     {
-        DbContext = DbFactory.CreateDbContext();
-        jazigos = await DbContext.Jazigos
-            .Include(j => j.ModeloJazigo)
-            .OrderBy(j => j.CodigoIdentificador)
-            .ToListAsync();
-            
-        ocupados = jazigos.Count(j => j.Ocupado);
-        livres = jazigos.Count - ocupados;
+        await CarregarMapaAsync();
     }
 
-    private async Task AbrirDetalhes(Jazigo jazigo)
+    private async Task CarregarMapaAsync()
+    {
+        isLoading = true;
+        using var DbContext = await DbFactory.CreateDbContextAsync();
+        
+        // Load Jazigos - Não exibir os pais que já foram desmembrados!
+        var todosJazigos = await DbContext.Jazigos
+            .Include(j => j.Falecidos)
+            .Where(j => !DbContext.Jazigos.Any(filho => filho.JazigoPaiId == j.Id))
+            .OrderBy(j => j.NumeroLote)
+            .ToListAsync();
+            
+        // Se quadra for nula/vazia, cai em "Sem Quadra"
+        var jazigosValidos = todosJazigos.Select(j => {
+            j.Quadra = string.IsNullOrWhiteSpace(j.Quadra) ? "S/Q" : j.Quadra;
+            j.Ala = string.IsNullOrWhiteSpace(j.Ala) ? "S/A" : j.Ala;
+            j.NumeroLote = string.IsNullOrWhiteSpace(j.NumeroLote) ? j.CodigoIdentificador : j.NumeroLote;
+            return j;
+        }).ToList();
+
+        quadrasJazigo = jazigosValidos.Select(j => j.Quadra).Distinct().OrderBy(q => q).ToList();
+        jazigosAgrupados = jazigosValidos
+            .GroupBy(j => j.Quadra)
+            .ToDictionary(
+                g => g.Key,
+                g => g.GroupBy(j => j.Ala).OrderBy(a => a.Key).ToDictionary(a => a.Key, a => a.ToList())
+            );
+
+        // Load Gavetas
+        var todasGavetas = await DbContext.GavetasPublicas
+            .OrderBy(g => g.NumeroGaveta)
+            .ToListAsync();
+            
+        var gavetasValidas = todasGavetas.Select(g => {
+            g.Quadra = string.IsNullOrWhiteSpace(g.Quadra) ? "S/Q" : g.Quadra;
+            g.Setor = string.IsNullOrWhiteSpace(g.Setor) ? "S/S" : g.Setor;
+            return g;
+        }).ToList();
+
+        quadrasGaveta = gavetasValidas.Select(g => g.Quadra).Distinct().OrderBy(q => q).ToList();
+        gavetasAgrupadas = gavetasValidas
+            .GroupBy(g => g.Quadra)
+            .ToDictionary(
+                g => g.Key,
+                g => g.GroupBy(g => g.Setor).OrderBy(s => s.Key).ToDictionary(s => s.Key, s => s.ToList())
+            );
+
+        // Load Ossuarios
+        var todosOssuarios = await DbContext.Ossuarios
+            .Include(o => o.Falecidos)
+            .OrderBy(o => o.NumeroLote)
+            .ToListAsync();
+            
+        var ossuariosValidos = todosOssuarios.Select(o => {
+            o.Quadra = string.IsNullOrWhiteSpace(o.Quadra) ? "S/Q" : o.Quadra;
+            o.Ala = string.IsNullOrWhiteSpace(o.Ala) ? "S/A" : o.Ala;
+            o.NumeroLote = string.IsNullOrWhiteSpace(o.NumeroLote) ? o.Identificador : o.NumeroLote;
+            return o;
+        }).ToList();
+
+        quadrasOssuario = ossuariosValidos.Select(o => o.Quadra).Distinct().OrderBy(q => q).ToList();
+        ossuariosAgrupados = ossuariosValidos
+            .GroupBy(o => o.Quadra)
+            .ToDictionary(
+                g => g.Key,
+                g => g.GroupBy(o => o.Ala).OrderBy(a => a.Key).ToDictionary(a => a.Key, a => a.ToList())
+            );
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private string GetColor(Color mudColor)
+    {
+        return mudColor switch
+        {
+            Color.Success => "#4caf50", // Green
+            Color.Error => "#f44336",   // Red
+            _ => "#9e9e9e"              // Grey
+        };
+    }
+
+    private async Task AbrirJazigo(Jazigo jazigo)
     {
         var parameters = new DialogParameters { ["JazigoId"] = jazigo.Id };
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<DetalhesJazigoDialog>("Detalhes do Jazigo", parameters, options);
         var result = await dialog.Result;
         
         if (!result.Canceled)
-        {
-            // Recarrega se houve transferência
-            await OnInitializedAsync();
-        }
+            await CarregarMapaAsync();
+    }
+
+    private async Task AbrirGaveta(GavetaPublica gaveta)
+    {
+        var parameters = new DialogParameters { ["GavetaId"] = gaveta.Id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<GerenciarGavetaDialog>($"Gerenciar Gaveta {gaveta.NumeroGaveta}", parameters, options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+            await CarregarMapaAsync();
+    }
+
+    private async Task AbrirOssuario(Ossuario ossuario)
+    {
+        var parameters = new DialogParameters { ["OssuarioId"] = ossuario.Id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<OssuarioDialog>($"Gerenciar Ossuário", parameters, options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+            await CarregarMapaAsync();
     }
 }
-

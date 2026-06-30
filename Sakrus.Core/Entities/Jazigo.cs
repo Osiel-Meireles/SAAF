@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Sakrus.Core.Enums;
 
@@ -11,6 +11,15 @@ public class Jazigo
     [Required]
     [MaxLength(50)]
     public string CodigoIdentificador { get; set; } = string.Empty;
+    
+    [MaxLength(50)]
+    public string Quadra { get; set; } = string.Empty;
+    
+    [MaxLength(50)]
+    public string Ala { get; set; } = string.Empty;
+    
+    [MaxLength(50)]
+    public string NumeroLote { get; set; } = string.Empty;
     
     public int ModeloJazigoId { get; set; }
     public ModeloJazigo ModeloJazigo { get; set; } = null!;
