@@ -21,9 +21,14 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
 
-// --- Banco de Dados (PostgreSQL) ---
-builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// --- Banco de Dados (PostgreSQL) com Auditoria ---
+builder.Services.AddScoped<Sakrus.Core.ICurrentUserService, Sakrus.Services.CurrentUserService>();
+builder.Services.AddScoped<AuditInterceptor>();
+builder.Services.AddDbContextFactory<ApplicationDbContext>((sp, options) =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
+}, ServiceLifetime.Scoped);
 
 // Serviços Scoped ainda podem usar o ApplicationDbContext
 builder.Services.AddScoped<ApplicationDbContext>(p => 

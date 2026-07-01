@@ -9,49 +9,195 @@
 
 <PageTitle>Dashboards Gerenciais - Sakrus</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Dashboards Gerenciais</MudText>
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h4">Dashboards Gerenciais</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">
+        Atualizado em @DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+    </MudText>
+</div>
 
-@if (ocupacaoGeral == null)
+@if (isLoading)
 {
-    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    <div class="d-flex justify-center align-center" style="height:400px">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    </div>
+}
+else if (!string.IsNullOrEmpty(erroMsg))
+{
+    <MudAlert Severity="Severity.Error" Icon="@Icons.Material.Filled.ErrorOutline">
+        <MudText Typo="Typo.subtitle2">Erro ao carregar os dados do dashboard</MudText>
+        <MudText Typo="Typo.body2">@erroMsg</MudText>
+    </MudAlert>
+}
+else if (kpis is null)
+{
+    <MudAlert Severity="Severity.Error">Erro inesperado ao carregar o dashboard.</MudAlert>
 }
 else
 {
+    @* ──────────────────────────────────────────────────────────────
+       ROW 1: KPI CARDS
+    ────────────────────────────────────────────────────────────── *@
+    <MudGrid Class="mb-4">
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 dashboard-card" Elevation="2"
+                      Style="border-top: 4px solid var(--mud-palette-primary);">
+                <div class="d-flex justify-space-between align-start">
+                    <div>
+                        <MudText Typo="Typo.h3" Class="font-weight-bold">@kpis.TotalAtendimentos</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Total de Atendimentos</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Assignment"
+                             Color="Color.Primary" Style="font-size:2.5rem; opacity:0.35" />
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 dashboard-card" Elevation="2"
+                      Style="border-top: 4px solid var(--mud-palette-warning);">
+                <div class="d-flex justify-space-between align-start">
+                    <div>
+                        <MudText Typo="Typo.h3" Class="font-weight-bold">@kpis.AguardandoSepultamento</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Aguardando Sepultamento</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty"
+                             Color="Color.Warning" Style="font-size:2.5rem; opacity:0.35" />
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 dashboard-card" Elevation="2"
+                      Style="border-top: 4px solid var(--mud-palette-success);">
+                <div class="d-flex justify-space-between align-start">
+                    <div>
+                        <MudText Typo="Typo.h3" Class="font-weight-bold">@kpis.TotalSepultados</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Sepultados</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowDownward"
+                             Color="Color.Success" Style="font-size:2.5rem; opacity:0.35" />
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 dashboard-card" Elevation="2"
+                      Style="border-top: 4px solid var(--mud-palette-secondary);">
+                <div class="d-flex justify-space-between align-start">
+                    <div>
+                        <MudText Typo="Typo.h3" Class="font-weight-bold">@kpis.TotalExumados</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Exumados</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowUpward"
+                             Color="Color.Secondary" Style="font-size:2.5rem; opacity:0.35" />
+                </div>
+            </MudPaper>
+        </MudItem>
+
+    </MudGrid>
+
+    @* ──────────────────────────────────────────────────────────────
+       ROW 2: OCUPAÇÃO + CAUSAS DE ÓBITO
+    ────────────────────────────────────────────────────────────── *@
+    <MudGrid Class="mb-4">
+
+        @* Ocupação do Cemitério *@
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4" Elevation="2" Style="height:100%">
+                <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-1">Ocupação do Cemitério</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-4 d-block">
+                    Jazigos e Gavetas Públicas
+                </MudText>
+
+                @* Sub-totais de ocupação *@
+                <MudGrid Class="mb-3">
+                    <MudItem xs="6">
+                        <MudPaper Class="pa-2 text-center" Outlined="true">
+                            <MudText Typo="Typo.h6">@kpis.JazigosOcupados / @kpis.TotalJazigos</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Jazigos Ocupados</MudText>
+                            <MudProgressLinear Color="Color.Primary" Rounded="true" Size="Size.Small"
+                                              Value="@JazigosPct" Class="mt-1" />
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudPaper Class="pa-2 text-center" Outlined="true">
+                            <MudText Typo="Typo.h6">@kpis.GavetasOcupadas / @kpis.TotalGavetas</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Gavetas Ocupadas</MudText>
+                            <MudProgressLinear Color="Color.Warning" Rounded="true" Size="Size.Small"
+                                              Value="@GavetasPct" Class="mt-1" />
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                @if (ocupacaoSeries.Any(s => s.Data.Sum() > 0))
+                {
+                    <div class="d-flex justify-center">
+                        <MudChart T="double"
+                                  ChartType="ChartType.Donut"
+                                  ChartSeries="@ocupacaoSeries"
+                                  ChartLabels="@ocupacaoLabels"
+                                  Width="260px" Height="260px" />
+                    </div>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">Nenhum jazigo ou gaveta cadastrado.</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Causas de Óbito *@
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-4" Elevation="2" Style="height:100%">
+                <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-1">Causas de Óbito</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-4 d-block">
+                    Últimos 12 meses
+                </MudText>
+                @if (causasSeries.Any() && causasSeries[0].Data.Any(v => v > 0))
+                {
+                    <MudChart T="double"
+                              ChartType="ChartType.Bar"
+                              ChartSeries="@causasSeries"
+                              ChartLabels="@causasLabels"
+                              Width="100%" Height="280px" />
+                }
+                else
+                {
+                    <div class="d-flex justify-center align-center" style="height:200px">
+                        <MudText Color="Color.Secondary">Nenhum óbito registrado no período.</MudText>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+    </MudGrid>
+
+    @* ──────────────────────────────────────────────────────────────
+       ROW 3: TENDÊNCIA MENSAL
+    ────────────────────────────────────────────────────────────── *@
     <MudGrid>
-        @* DASHBOARD 1: OCUPAÇÃO GERAL (PIE CHART) *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="3" Style="height: 100%;">
-                <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="mb-4">Ocupação do Cemitério</MudText>
-                <div class="d-flex justify-center">
-                    <MudChart T="double" ChartType="ChartType.Pie" InputData="@ocupacaoData" InputLabels="@ocupacaoLabels" Width="300px" Height="300px" />
-                </div>
-            </MudPaper>
-        </MudItem>
-
-        @* DASHBOARD 2: CAUSAS DE ÓBITO (DONUT CHART) *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="3" Style="height: 100%;">
-                <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Secondary" Class="mb-4">Causas de Óbito (Últimos 12 meses)</MudText>
-                <div class="d-flex justify-center">
-                    <MudChart T="double" ChartType="ChartType.Donut" InputData="@causasData" InputLabels="@causasLabels" Width="300px" Height="300px" />
-                </div>
-            </MudPaper>
-        </MudItem>
-
-        @* DASHBOARD 3: FUNERÁRIAS (BAR CHART) *@
         <MudItem xs="12">
-            <MudPaper Class="pa-4" Elevation="3">
-                <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Tertiary" Class="mb-4">Atendimentos por Funerária (Últimos 12 meses)</MudText>
-                <div class="d-flex justify-center">
-                    @if (funerariasSeries.Count > 0)
-                    {
-                        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@funerariasSeries" XAxisLabels="@funerariasLabels" Width="100%" Height="350px" />
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.body1" Align="Align.Center">Sem dados de funerárias para o período.</MudText>
-                    }
-                </div>
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Color="Color.Tertiary" Class="mb-1">Falecidos Registrados por Mês</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-4 d-block">
+                    Últimos 6 meses
+                </MudText>
+                @if (mensalSeries.Any())
+                {
+                    <MudChart T="double"
+                              ChartType="ChartType.Line"
+                              ChartSeries="@mensalSeries"
+                              ChartLabels="@mensalLabels"
+                              Width="100%" Height="300px" />
+                }
+                else
+                {
+                    <div class="d-flex justify-center align-center" style="height:200px">
+                        <MudText Color="Color.Secondary">Nenhum dado disponível.</MudText>
+                    </div>
+                }
             </MudPaper>
         </MudItem>
     </MudGrid>
@@ -65,55 +211,76 @@ else
         DbContext?.Dispose();
     }
 
-    private Dictionary<string, int> ocupacaoGeral = new();
-    private double[] ocupacaoData = Array.Empty<double>();
-    private string[] ocupacaoLabels = Array.Empty<string>();
+    private bool isLoading = true;
+    private DashboardKpis? kpis;
+    private string? erroMsg;
 
-    private Dictionary<string, int> causasObito = new();
-    private double[] causasData = Array.Empty<double>();
-    private string[] causasLabels = Array.Empty<string>();
+    // ── Ocupação ──
+    private List<ChartSeries<double>> ocupacaoSeries = new();
+    private string[] ocupacaoLabels = [];
 
-    private List<ChartSeries<double>> funerariasSeries = new();
-    private string[] funerariasLabels = Array.Empty<string>();
+    // ── Causas de Óbito ──
+    private List<ChartSeries<double>> causasSeries = new();
+    private string[] causasLabels = [];
+
+    // ── Mensal ──
+    private List<ChartSeries<double>> mensalSeries = new();
+    private string[] mensalLabels = [];
+
+    // ── Percentuais para ProgressLinear ──
+    private double JazigosPct =>
+        kpis is { TotalJazigos: > 0 } ? (double)kpis.JazigosOcupados / kpis.TotalJazigos * 100 : 0;
+    private double GavetasPct =>
+        kpis is { TotalGavetas: > 0 } ? (double)kpis.GavetasOcupadas / kpis.TotalGavetas * 100 : 0;
 
     protected override async Task OnInitializedAsync()
     {
         DbContext = DbFactory.CreateDbContext();
-        // 1. Ocupação Geral
-        ocupacaoGeral = await RelatorioService.GetOcupacaoGeralAsync();
-        ocupacaoLabels = ocupacaoGeral.Keys.ToArray();
-        ocupacaoData = ocupacaoGeral.Values.Select(v => (double)v).ToArray();
+        isLoading = true;
 
-        // 2. Causas Óbito (12 meses)
-        var start = DateTime.Today.AddMonths(-12);
-        var end = DateTime.Today;
-        
-        causasObito = await RelatorioService.GetCausasObitoPorPeriodoAsync(start, end);
-        if (causasObito.Any())
+        try
         {
-            causasLabels = causasObito.Keys.ToArray();
-            causasData = causasObito.Values.Select(v => (double)v).ToArray();
-        }
-        else
-        {
-            causasLabels = new[] { "Nenhum" };
-            causasData = new[] { 100.0 };
-        }
+            // 1. KPIs
+            kpis = await RelatorioService.GetKpisAsync();
 
-        // 3. Funerárias (12 meses)
-        var funerariasData = await RelatorioService.GetSepultamentosPorFunerariaAsync(start, end);
-        if (funerariasData.Any())
-        {
-            funerariasLabels = funerariasData.Keys.ToArray();
-            funerariasSeries.Add(new ChartSeries<double>() { 
-                Name = "Atendimentos", 
-                Data = funerariasData.Values.Select(v => (double)v).ToArray() 
-            });
+            // 2. Ocupação (Donut) — cada ChartSeries = um segmento
+            ocupacaoLabels = ["Jazigos Ocupados", "Jazigos Livres", "Gavetas Ocupadas", "Gavetas Livres"];
+            ocupacaoSeries = new List<ChartSeries<double>>
+            {
+                new() { Name = "Jazigos Ocupados",  Data = new double[] { (double)kpis.JazigosOcupados } },
+                new() { Name = "Jazigos Livres",    Data = new double[] { (double)(kpis.TotalJazigos - kpis.JazigosOcupados) } },
+                new() { Name = "Gavetas Ocupadas",  Data = new double[] { (double)kpis.GavetasOcupadas } },
+                new() { Name = "Gavetas Livres",    Data = new double[] { (double)(kpis.TotalGavetas - kpis.GavetasOcupadas) } }
+            };
+
+            // 3. Causas de Óbito (Bar) — série única com valores por causa
+            // FIX: usar DateTime.UtcNow — Npgsql rejeita DateTimeKind.Local/Unspecified em colunas timestamptz
+            var inicio12m = DateTime.UtcNow.AddMonths(-12);
+            var causasData = await RelatorioService.GetCausasObitoPorPeriodoAsync(inicio12m, DateTime.UtcNow);
+            causasLabels = causasData.Keys.ToArray();
+            causasSeries =
+            [
+                new() { Name = "Óbitos", Data = causasData.Values.Select(v => (double)v).ToArray() }
+            ];
+
+            // 4. Tendência mensal (Line)
+            var mensalData = await RelatorioService.GetAtendimentosPorMesAsync(6);
+            mensalLabels = mensalData.Keys.ToArray();
+            mensalSeries =
+            [
+                new() { Name = "Falecidos", Data = mensalData.Values.Select(v => (double)v).ToArray() }
+            ];
         }
-        else
+        catch (Exception ex)
         {
-            funerariasLabels = new string[0];
+            // Exibe o erro no lugar do spinner para facilitar diagnóstico
+            erroMsg = $"Erro ao carregar dashboard: {ex.Message}";
+            kpis = null;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged(); // Força re-render mesmo se exceção propagou
         }
     }
 }
-

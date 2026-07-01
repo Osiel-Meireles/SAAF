@@ -69,7 +69,19 @@
             <MudIconButton Icon="@Icons.Material.Filled.Receipt" Color="Color.Info" Size="Size.Small" OnClick="@(() => AbrirModalFaturamento(context.Id))" Title="Faturamento/OS" />
             
             <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Primary" Size="Size.Small" OnClick="@(() => BaixarGuiaSepultamento(context))" Title="Guia de Sepultamento" />
-            
+
+            @* Botão de documentos anexos com badge de contagem *@
+            <MudBadge Content="@context.Falecido.Documentos.Count"
+                      Color="Color.Secondary"
+                      Overlap="true"
+                      Visible="@(context.Falecido.Documentos.Count > 0)">
+                <MudIconButton Icon="@Icons.Material.Filled.Folder"
+                               Color="Color.Tertiary"
+                               Size="Size.Small"
+                               OnClick="@(() => AbrirDocumentos(context))"
+                               Title="Ver Documentos Anexos" />
+            </MudBadge>
+
             @if (context.Falecido.Status == StatusFalecido.Sepultado)
             {
                 <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Color="Color.Warning" Size="Size.Small" OnClick="@(() => AbrirRealizarExumacao(context))" Title="Realizar Exumação" />
@@ -134,6 +146,7 @@
             .Include(a => a.Responsavel)
             .Include(a => a.Falecido)
             .Include(a => a.Falecido.Jazigo)
+            .Include(a => a.Falecido.Documentos)
             .OrderByDescending(a => a.Id)
             .ToListAsync();
 
@@ -254,6 +267,26 @@
         var dialog = await DialogService.ShowAsync<RealizarExumacaoObitoDialog>("Realizar Exumação", parameters, options);
         var result = await dialog.Result;
 
+        if (result != null && !result.Canceled)
+        {
+            DbContext.ChangeTracker.Clear();
+            await CarregarDadosAsync();
+        }
+    }
+
+    private async Task AbrirDocumentos(Atendimento atendimento)
+    {
+        var parameters = new DialogParameters
+        {
+            ["FalecidoId"] = atendimento.FalecidoId,
+            ["AtendimentoId"] = atendimento.Id,
+            ["FalecidoNome"] = atendimento.Falecido?.Nome ?? ""
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DocumentosDialog>("Documentos Anexos", parameters, options);
+        var result = await dialog.Result;
+
+        // Recarrega a tabela para atualizar o badge de contagem após novos uploads
         if (result != null && !result.Canceled)
         {
             DbContext.ChangeTracker.Clear();

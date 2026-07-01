@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Sakrus.Services;
 
-public class RelatorioService
+public partial class RelatorioService
 {
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
@@ -228,12 +228,12 @@ public class RelatorioService
     public async Task<Dictionary<string, int>> GetOcupacaoGeralAsync()
     {
         using var context = await _dbFactory.CreateDbContextAsync();
-        var totalJazigos = await context.Jazigos.CountAsync();
-        var ocupados = await context.Jazigos.CountAsync(j => j.Ocupado);
+        var totalJazigos = await context.Jazigos.AsNoTracking().CountAsync();
+        var ocupados = await context.Jazigos.AsNoTracking().CountAsync(j => j.Ocupado);
         var livres = totalJazigos - ocupados;
 
-        var totalGavetas = await context.GavetasPublicas.CountAsync();
-        var gavetasOcupadas = await context.GavetasPublicas.CountAsync(g => g.Ocupada);
+        var totalGavetas = await context.GavetasPublicas.AsNoTracking().CountAsync();
+        var gavetasOcupadas = await context.GavetasPublicas.AsNoTracking().CountAsync(g => g.Ocupada);
         var gavetasLivres = totalGavetas - gavetasOcupadas;
 
         return new Dictionary<string, int>
@@ -248,21 +248,99 @@ public class RelatorioService
     public async Task<Dictionary<string, int>> GetCausasObitoPorPeriodoAsync(DateTime start, DateTime end)
     {
         using var context = await _dbFactory.CreateDbContextAsync();
-        return await context.Falecidos
+        
+        // Faz o grouping no banco pela chave enum, então traz os resultados para a memória
+        var results = await context.Falecidos.AsNoTracking()
             .Where(f => f.DataFalecimento >= start && f.DataFalecimento <= end)
             .GroupBy(f => f.CausaMorte)
-            .Select(g => new { Causa = g.Key.ToString(), Count = g.Count() })
-            .ToDictionaryAsync(x => x.Causa, x => x.Count);
+            .Select(g => new { Causa = g.Key, Count = g.Count() })
+            .ToListAsync();
+            
+        // Converte o enum para string do lado do cliente
+        return results.ToDictionary(x => x.Causa.ToString(), x => x.Count);
     }
 
     public async Task<Dictionary<string, int>> GetSepultamentosPorFunerariaAsync(DateTime start, DateTime end)
     {
         using var context = await _dbFactory.CreateDbContextAsync();
-        return await context.Atendimentos
+        return await context.Atendimentos.AsNoTracking()
             .Include(a => a.Funeraria)
             .Where(a => a.DataSepultamento >= start && a.DataSepultamento <= end && a.FunerariaId != null)
             .GroupBy(a => a.Funeraria!.Nome)
             .Select(g => new { Funeraria = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Funeraria, x => x.Count);
     }
+
+    // ── Dashboard KPIs ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Agrega os contadores principais do dashboard em uma única passagem ao banco.
+    /// </summary>
+    public async Task<DashboardKpis> GetKpisAsync()
+    {
+        using var context = await _dbFactory.CreateDbContextAsync();
+
+        var totalAtendimentos   = await context.Atendimentos.AsNoTracking().CountAsync();
+        var aguardando          = await context.Falecidos.AsNoTracking().CountAsync(f => f.Status == StatusFalecido.NaoSepultado);
+        var sepultados          = await context.Falecidos.AsNoTracking().CountAsync(f => f.Status == StatusFalecido.Sepultado);
+        var exumados            = await context.Falecidos.AsNoTracking().CountAsync(f => f.Status == StatusFalecido.Exumado);
+        var totalJazigos        = await context.Jazigos.AsNoTracking().CountAsync();
+        var jazigosOcupados     = await context.Jazigos.AsNoTracking().CountAsync(j => j.Ocupado);
+        var totalGavetas        = await context.GavetasPublicas.AsNoTracking().CountAsync();
+        var gavetasOcupadas     = await context.GavetasPublicas.AsNoTracking().CountAsync(g => g.Ocupada);
+
+        return new DashboardKpis(
+            totalAtendimentos, aguardando, sepultados, exumados,
+            totalJazigos, jazigosOcupados, totalGavetas, gavetasOcupadas);
+    }
+
+    /// <summary>
+    /// Retorna a contagem de falecidos registrados por mês nos últimos <paramref name="meses"/> meses.
+    /// Usa DataFalecimento como referência temporal (sempre preenchida).
+    /// </summary>
+    public async Task<Dictionary<string, int>> GetAtendimentosPorMesAsync(int meses = 6)
+    {
+        using var context = await _dbFactory.CreateDbContextAsync();
+
+        var hoje     = DateTime.UtcNow;
+        var referencia = new DateTime(hoje.Year, hoje.Month, 1, 0, 0, 0, DateTimeKind.Utc)
+                             .AddMonths(-(meses - 1));
+
+        // Pré-popula todos os meses com zero para garantir continuidade no gráfico
+        var resultado = new Dictionary<string, int>();
+        for (int i = 0; i < meses; i++)
+        {
+            var mes = referencia.AddMonths(i);
+            resultado[mes.ToString("MMM/yy")] = 0;
+        }
+
+        var agrupados = await context.Falecidos.AsNoTracking()
+            .Where(f => f.DataFalecimento >= referencia)
+            .GroupBy(f => new { f.DataFalecimento.Year, f.DataFalecimento.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+            .ToListAsync();
+
+        foreach (var item in agrupados)
+        {
+            var chave = new DateTime(item.Year, item.Month, 1).ToString("MMM/yy");
+            if (resultado.ContainsKey(chave))
+                resultado[chave] = item.Count;
+        }
+
+        return resultado;
+    }
 }
+
+/// <summary>
+/// Snapshot dos KPIs principais para o dashboard gerencial.
+/// </summary>
+public record DashboardKpis(
+    int TotalAtendimentos,
+    int AguardandoSepultamento,
+    int TotalSepultados,
+    int TotalExumados,
+    int TotalJazigos,
+    int JazigosOcupados,
+    int TotalGavetas,
+    int GavetasOcupadas
+);

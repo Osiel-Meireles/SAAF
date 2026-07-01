@@ -12,20 +12,46 @@
 
 <PageTitle>Relatórios - SAAF</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-6">Relatórios e Extratos</MudText>
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h4">Relatórios e Extratos</MudText>
+</div>
+
+<MudPaper Class="pa-4 mb-6 d-flex flex-wrap align-center gap-4" Elevation="2">
+    <MudText Typo="Typo.subtitle1" Class="mr-2">Filtro de Período:</MudText>
+    
+    <div style="max-width: 300px;">
+        <MudDateRangePicker @bind-DateRange="dateRange"
+                            Label="Período"
+                            Editable="true"
+                            Color="Color.Primary"
+                            Rounded="true"
+                            Variant="Variant.Outlined"
+                            Margin="Margin.Dense" />
+    </div>
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SetUltimos30Dias" Size="Size.Small">
+        Últimos 30 Dias
+    </MudButton>
+    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="SetEsteAno" Size="Size.Small">
+        Este Ano
+    </MudButton>
+</MudPaper>
 
 <MudGrid>
     @* Card 1: Relatório de Atendimentos *@
     <MudItem xs="12" sm="6" md="4">
-        <MudCard Elevation="2" Class="h-100">
+        <MudCard Elevation="2" Class="h-100 d-flex flex-column">
             <MudCardContent>
                 <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
                 <MudText Typo="Typo.h6">Atendimentos</MudText>
                 <MudText Typo="Typo.body2">Listagem de óbitos e atendimentos registrados</MudText>
             </MudCardContent>
-            <MudCardActions>
-                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="() => GerarRelatorioAtendimentos()">
-                    Gerar
+            <MudCardActions Class="mt-auto">
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" OnClick='() => Gerar("Atendimentos", "PDF")'>
+                    PDF
+                </MudButton>
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FileDocument" Color="Color.Info" OnClick='() => Gerar("Atendimentos", "TXT")'>
+                    TXT
                 </MudButton>
             </MudCardActions>
         </MudCard>
@@ -33,15 +59,18 @@
 
     @* Card 2: Relatório de Jazigos *@
     <MudItem xs="12" sm="6" md="4">
-        <MudCard Elevation="2" Class="h-100">
+        <MudCard Elevation="2" Class="h-100 d-flex flex-column">
             <MudCardContent>
                 <MudIcon Icon="@Icons.Material.Filled.GridOn" Size="Size.Large" Color="Color.Warning" Class="mb-3" />
                 <MudText Typo="Typo.h6">Lotação de Jazigos</MudText>
-                <MudText Typo="Typo.body2">Status de ocupação do cemitério</MudText>
+                <MudText Typo="Typo.body2">Status de ocupação do cemitério (Não usa filtro de data)</MudText>
             </MudCardContent>
-            <MudCardActions>
-                <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="() => GerarRelatorioJazigos()">
-                    Gerar
+            <MudCardActions Class="mt-auto">
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" OnClick='() => Gerar("Jazigos", "PDF")'>
+                    PDF
+                </MudButton>
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FileDocument" Color="Color.Info" OnClick='() => Gerar("Jazigos", "TXT")'>
+                    TXT
                 </MudButton>
             </MudCardActions>
         </MudCard>
@@ -49,15 +78,18 @@
 
     @* Card 3: Relatório Financeiro *@
     <MudItem xs="12" sm="6" md="4">
-        <MudCard Elevation="2" Class="h-100">
+        <MudCard Elevation="2" Class="h-100 d-flex flex-column">
             <MudCardContent>
                 <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Success" Class="mb-3" />
                 <MudText Typo="Typo.h6">Faturamento Mensal</MudText>
                 <MudText Typo="Typo.body2">Ordens de Serviço geradas</MudText>
             </MudCardContent>
-            <MudCardActions>
-                <MudButton Variant="Variant.Text" Color="Color.Success" OnClick="() => GerarRelatorioFinanceiro()">
-                    Gerar
+            <MudCardActions Class="mt-auto">
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" OnClick='() => Gerar("Financeiro", "PDF")'>
+                    PDF
+                </MudButton>
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FileDocument" Color="Color.Info" OnClick='() => Gerar("Financeiro", "TXT")'>
+                    TXT
                 </MudButton>
             </MudCardActions>
         </MudCard>
@@ -65,15 +97,18 @@
 
     @* Card 4: Relatório de Exumações *@
     <MudItem xs="12" sm="6" md="4">
-        <MudCard Elevation="2" Class="h-100">
+        <MudCard Elevation="2" Class="h-100 d-flex flex-column">
             <MudCardContent>
-                <MudIcon Icon="@Icons.Material.Filled.Sync" Size="Size.Large" Color="Color.Error" Class="mb-3" />
+                <MudIcon Icon="@Icons.Material.Filled.Sync" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
                 <MudText Typo="Typo.h6">Exumações</MudText>
-                <MudText Typo="Typo.body2">Histórico de libração de jazigos</MudText>
+                <MudText Typo="Typo.body2">Histórico de liberação de jazigos</MudText>
             </MudCardContent>
-            <MudCardActions>
-                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="() => GerarRelatorioExumacoes()">
-                    Gerar
+            <MudCardActions Class="mt-auto">
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" OnClick='() => Gerar("Exumacoes", "PDF")'>
+                    PDF
+                </MudButton>
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FileDocument" Color="Color.Info" OnClick='() => Gerar("Exumacoes", "TXT")'>
+                    TXT
                 </MudButton>
             </MudCardActions>
         </MudCard>
@@ -81,23 +116,36 @@
 
     @* Card 5: Estatísticas de Óbitos *@
     <MudItem xs="12" sm="6" md="4">
-        <MudCard Elevation="2" Class="h-100">
+        <MudCard Elevation="2" Class="h-100 d-flex flex-column">
             <MudCardContent>
-                <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Color="Color.Info" Class="mb-3" />
-                <MudText Typo="Typo.h6">Estatísticas</MudText>
-                <MudText Typo="Typo.body2">Causas de morte e ocupação</MudText>
+                <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Color="Color.Tertiary" Class="mb-3" />
+                <MudText Typo="Typo.h6">Estatísticas de Óbito</MudText>
+                <MudText Typo="Typo.body2">Agrupamento por Causas de morte</MudText>
             </MudCardContent>
-            <MudCardActions>
-                <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="() => GerarEstatisticas()">
-                    Visualizar
+            <MudCardActions Class="mt-auto">
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" OnClick='() => Gerar("Estatisticas", "PDF")'>
+                    PDF
+                </MudButton>
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FileDocument" Color="Color.Info" OnClick='() => Gerar("Estatisticas", "TXT")'>
+                    TXT
                 </MudButton>
             </MudCardActions>
         </MudCard>
     </MudItem>
 </MudGrid>
 
+<MudOverlay Visible="isGenerating" DarkBackground="true" ZIndex="9999">
+    <div class="d-flex flex-column align-center justify-center">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <MudText Typo="Typo.h6" Class="mt-4" Color="Color.Primary">Gerando arquivo, aguarde...</MudText>
+    </div>
+</MudOverlay>
+
 @code {
     private ApplicationDbContext DbContext = default!;
+    private DateRange dateRange = new DateRange(DateTime.Today.AddDays(-30), DateTime.Today);
+    private bool isGenerating = false;
+
     protected override void OnInitialized()
     {
         DbContext = DbFactory.CreateDbContext();
@@ -108,106 +156,140 @@
         DbContext?.Dispose();
     }
 
-    private async Task GerarRelatorioAtendimentos()
+    private void SetUltimos30Dias()
     {
-        try
-        {
-            var atendimentos = await DbContext.Atendimentos
-                .Include(a => a.Responsavel)
-                .Include(a => a.Falecido)
-                .OrderByDescending(a => a.Id)
-                .ToListAsync();
-
-            Snackbar.Add($"Relatório com {atendimentos.Count} atendimentos gerado!", Severity.Success);
-            // Aqui você poderia gerar um PDF ou CSV
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
-        }
+        dateRange = new DateRange(DateTime.Today.AddDays(-30), DateTime.Today);
     }
 
-    private async Task GerarRelatorioJazigos()
+    private void SetEsteAno()
     {
-        try
-        {
-            var jazigos = await DbContext.Jazigos
-                .Include(j => j.ModeloJazigo)
-                .ToListAsync();
-
-            var total = jazigos.Count;
-            var ocupados = jazigos.Count(j => j.Ocupado);
-            var disponiveis = total - ocupados;
-            var infantis = jazigos.Count(j => j.IsInfantil);
-
-            var msg = $"Total: {total} | Ocupados: {ocupados} | Disponíveis: {disponiveis} | Infantis: {infantis}";
-            Snackbar.Add(msg, Severity.Info);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
-        }
+        dateRange = new DateRange(new DateTime(DateTime.Today.Year, 1, 1), DateTime.Today);
     }
 
-    private async Task GerarRelatorioFinanceiro()
+    private string GetPeriodoString()
     {
-        try
+        if (dateRange?.Start != null && dateRange?.End != null)
         {
-            var atendimentos = await DbContext.Atendimentos
-                .Include(a => a.ItensFaturados)
-                .Where(a => !string.IsNullOrEmpty(a.NumeroOsAuxilio))
-                .ToListAsync();
-
-            var totalFaturado = atendimentos
-                .SelectMany(a => a.ItensFaturados)
-                .Sum(i => i.ValorTotalCalculado);
-
-            Snackbar.Add($"Total Faturado: R$ {totalFaturado:N2} em {atendimentos.Count} OS geradas", Severity.Success);
+            return $"{dateRange.Start.Value:dd/MM/yyyy} a {dateRange.End.Value:dd/MM/yyyy}";
         }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
-        }
+        return "Todo o período";
     }
 
-    private async Task GerarRelatorioExumacoes()
+    private async Task Gerar(string tipoRelatorio, string formato)
     {
+        if (isGenerating) return;
+
         try
         {
-            var exumacoes = await DbContext.ExumacoesRegistros
-                .Include(e => e.Falecido)
-                .OrderByDescending(e => e.DataExecucao)
-                .ToListAsync();
+            isGenerating = true;
+            StateHasChanged();
+            await Task.Delay(50); // Dá tempo pra UI renderizar o spinner
 
-            Snackbar.Add($"Total de exumações registradas: {exumacoes.Count}", Severity.Success);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
-        }
-    }
+            var inicioLocal = dateRange.Start;
+            // Para incluir o dia todo até o último segundo
+            var fimLocal = dateRange.End?.AddDays(1).AddSeconds(-1); 
 
-    private async Task GerarEstatisticas()
-    {
-        try
-        {
-            var falecidos = await DbContext.Falecidos.ToListAsync();
-            var causas = falecidos
-                .GroupBy(f => f.CausaMorte)
-                .Select(g => new { Causa = g.Key, Quantidade = g.Count() })
-                .ToList();
+            // Npgsql requer UTC para colunas timestamptz
+            DateTime? inicio = inicioLocal.HasValue ? DateTime.SpecifyKind(inicioLocal.Value, DateTimeKind.Utc) : null;
+            DateTime? fim = fimLocal.HasValue ? DateTime.SpecifyKind(fimLocal.Value, DateTimeKind.Utc) : null; 
+            var periodoStr = GetPeriodoString();
+            byte[] fileBytes = [];
+            string fileName = $"{tipoRelatorio}_{DateTime.Now:yyyyMMddHHmmss}.{formato.ToLower()}";
+            string contentType = formato == "PDF" ? "application/pdf" : "text/plain";
 
-            var msg = "Causas de Morte: ";
-            foreach (var c in causas)
+            switch (tipoRelatorio)
             {
-                msg += $"{c.Causa} ({c.Quantidade}), ";
+                case "Atendimentos":
+                    var queryAtend = DbContext.Atendimentos
+                        .Include(a => a.Responsavel)
+                        .Include(a => a.Falecido)
+                        .AsNoTracking()
+                        .AsQueryable();
+
+                    if (inicio.HasValue) queryAtend = queryAtend.Where(a => a.DataSepultamento >= inicio.Value);
+                    if (fim.HasValue) queryAtend = queryAtend.Where(a => a.DataSepultamento <= fim.Value);
+                    
+                    var atendimentos = await queryAtend.OrderByDescending(a => a.DataSepultamento).ToListAsync();
+                    
+                    if (formato == "PDF") fileBytes = RelatorioService.GerarPdfAtendimentos(atendimentos, periodoStr);
+                    else fileBytes = RelatorioService.GerarTxtAtendimentos(atendimentos, periodoStr);
+                    break;
+
+                case "Jazigos":
+                    // Lotação é pontual (não usa data)
+                    var jazigos = await DbContext.Jazigos.AsNoTracking().Include(j => j.ModeloJazigo).ToListAsync();
+                    if (formato == "PDF") fileBytes = RelatorioService.GerarPdfJazigos(jazigos);
+                    else fileBytes = RelatorioService.GerarTxtJazigos(jazigos);
+                    break;
+
+                case "Financeiro":
+                    var queryFin = DbContext.Atendimentos
+                        .Include(a => a.ItensFaturados)
+                        .Include(a => a.Responsavel)
+                        .AsNoTracking()
+                        .Where(a => !string.IsNullOrEmpty(a.NumeroOsAuxilio));
+
+                    if (inicio.HasValue) queryFin = queryFin.Where(a => a.DataSepultamento >= inicio.Value);
+                    if (fim.HasValue) queryFin = queryFin.Where(a => a.DataSepultamento <= fim.Value);
+                    
+                    var financeiro = await queryFin.OrderByDescending(a => a.DataSepultamento).ToListAsync();
+                    
+                    if (formato == "PDF") fileBytes = RelatorioService.GerarPdfFinanceiro(financeiro, periodoStr);
+                    else fileBytes = RelatorioService.GerarTxtFinanceiro(financeiro, periodoStr);
+                    break;
+
+                case "Exumacoes":
+                    var queryExum = DbContext.ExumacoesRegistros
+                        .Include(e => e.Falecido)
+                        .AsNoTracking()
+                        .AsQueryable();
+
+                    if (inicio.HasValue) queryExum = queryExum.Where(e => e.DataExecucao >= inicio.Value);
+                    if (fim.HasValue) queryExum = queryExum.Where(e => e.DataExecucao <= fim.Value);
+                    
+                    var exumacoes = await queryExum.OrderByDescending(e => e.DataExecucao).ToListAsync();
+                    
+                    if (formato == "PDF") fileBytes = RelatorioService.GerarPdfExumacoes(exumacoes, periodoStr);
+                    else fileBytes = RelatorioService.GerarTxtExumacoes(exumacoes, periodoStr);
+                    break;
+
+                case "Estatisticas":
+                    // Para evitar o bug do Enum SQL translation
+                    var queryEst = DbContext.Falecidos.AsNoTracking().AsQueryable();
+                    if (inicio.HasValue) queryEst = queryEst.Where(f => f.DataFalecimento >= inicio.Value);
+                    if (fim.HasValue) queryEst = queryEst.Where(f => f.DataFalecimento <= fim.Value);
+
+                    var resultEst = await queryEst
+                        .GroupBy(f => f.CausaMorte)
+                        .Select(g => new { Causa = g.Key, Quantidade = g.Count() })
+                        .ToListAsync();
+                        
+                    var causas = resultEst.ToDictionary(x => x.Causa.ToString(), x => x.Quantidade);
+                    
+                    if (formato == "PDF") fileBytes = RelatorioService.GerarPdfEstatisticas(causas, periodoStr);
+                    else fileBytes = RelatorioService.GerarTxtEstatisticas(causas, periodoStr);
+                    break;
             }
-            Snackbar.Add(msg, Severity.Info);
+
+            if (fileBytes.Length > 0)
+            {
+                var base64 = Convert.ToBase64String(fileBytes);
+                await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64, contentType);
+                Snackbar.Add("Relatório gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Nenhum dado encontrado para o relatório.", Severity.Warning);
+            }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao gerar {formato}: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
         }
     }
 }
-

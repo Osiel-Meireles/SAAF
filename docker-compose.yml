@@ -33,7 +33,9 @@ services:
       - "8085:8080"
     volumes:
       - sakrus_dataprotection:/app/dataprotection-keys
+      - sakrus_uploads:/app/wwwroot/uploads
 
 volumes:
   sakrus_pgdata:
   sakrus_dataprotection:
+  sakrus_uploads:

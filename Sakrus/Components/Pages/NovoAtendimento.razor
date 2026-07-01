@@ -229,7 +229,10 @@
     private List<Funeraria> funerarias = new();
 
     // Upload de documentos
-    private List<IBrowserFile> arquivosParaAnexar = new();
+    // FIX: IBrowserFile torna-se inválido após re-render do componente.
+    // Os bytes são lidos de forma eagerly no OnFileSelected e armazenados em ArquivoBuffer.
+    private sealed record ArquivoBuffer(string Name, long Size, byte[] Bytes);
+    private List<ArquivoBuffer> arquivosParaAnexar = new();
     private string erroUpload = "";
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
@@ -244,7 +247,9 @@
         await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('fileInput').click()");
     }
 
-    private void OnFileSelected(InputFileChangeEventArgs e)
+    // FIX: Tornado async para ler os bytes imediatamente, antes que o IBrowserFile expire.
+    // Referência: https://aka.ms/aspnet/blazor-input-file-multiple-selections
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
         erroUpload = "";
         var arquivosInvalidos = new List<string>();
@@ -270,7 +275,18 @@
             if (arquivosParaAnexar.Any(a => a.Name == file.Name))
                 continue;
 
-            arquivosParaAnexar.Add(file);
+            // Ler os bytes agora enquanto o IBrowserFile ainda é válido
+            try
+            {
+                using var ms = new MemoryStream();
+                await using var readStream = file.OpenReadStream(MaxFileSizeBytes);
+                await readStream.CopyToAsync(ms);
+                arquivosParaAnexar.Add(new ArquivoBuffer(file.Name, file.Size, ms.ToArray()));
+            }
+            catch (Exception ex)
+            {
+                arquivosInvalidos.Add($"{file.Name} (erro ao ler: {ex.Message})");
+            }
         }
 
         if (arquivosInvalidos.Any())
@@ -279,7 +295,7 @@
         }
     }
 
-    private void RemoverArquivo(IBrowserFile arquivo)
+    private void RemoverArquivo(ArquivoBuffer arquivo)
     {
         arquivosParaAnexar.Remove(arquivo);
         erroUpload = "";
@@ -373,20 +389,17 @@
                     var nomeUnico = $"{Guid.NewGuid():N}_{Path.GetFileName(arquivo.Name)}";
                     var caminhoFisico = Path.Combine(pastaBase, nomeUnico);
 
-                    await using (var stream = new FileStream(caminhoFisico, FileMode.Create))
-                    await using (var uploadStream = arquivo.OpenReadStream(MaxFileSizeBytes))
-                    {
-                        await uploadStream.CopyToAsync(stream);
-                    }
+                    // Escrever os bytes já lidos na seleção (ArquivoBuffer.Bytes)
+                    await File.WriteAllBytesAsync(caminhoFisico, arquivo.Bytes);
 
                     var doc = new DocumentoAnexo
                     {
                         AtendimentoId = novoAtendimento.Id,
                         FalecidoId = novoAtendimento.FalecidoId,
                         NomeArquivo = arquivo.Name,
-                        // Caminho relativo à pasta wwwroot para servir via HTTP se necessário
-                        CaminhoArquivo = Path.Combine("uploads", "atendimentos", novoAtendimento.FalecidoId.ToString(), nomeUnico),
-                        TamanhoBytes = arquivo.Size,
+                        // Sempre usa '/' como separador para compatibilidade Windows ↔ Linux/Docker
+                        CaminhoArquivo = $"uploads/atendimentos/{novoAtendimento.FalecidoId}/{nomeUnico}",
+                        TamanhoBytes = arquivo.Bytes.LongLength,
                         DataAnexo = DateTime.UtcNow
                     };
                     DbContext.DocumentosAnexos.Add(doc);
