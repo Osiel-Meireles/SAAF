@@ -377,6 +377,11 @@
             DbContext.Atendimentos.Add(novoAtendimento);
             await DbContext.SaveChangesAsync();
 
+            // Gerar número de protocolo automaticamente com base no ID gerado pelo banco
+            // Formato: PROT-{ANO}-{ID com 6 dígitos} — garante unicidade e rastreabilidade
+            novoAtendimento.NumeroOsAuxilio = $"PROT-{DateTime.UtcNow.Year}-{novoAtendimento.Id:D6}";
+            await DbContext.SaveChangesAsync();
+
             // --- Salvar arquivos PDF em disco e criar registros no banco ---
             if (arquivosParaAnexar.Any())
             {
@@ -432,7 +437,16 @@
                 Console.WriteLine($"Erro ao registrar auditoria: {ex.Message}");
             }
             
-            Snackbar.Add("Atendimento registrado com sucesso!", Severity.Success);
+            var numeroProtocolo = novoAtendimento.NumeroOsAuxilio;
+            Snackbar.Add(
+                $"✅ Atendimento registrado com sucesso! Protocolo gerado: {numeroProtocolo}",
+                Severity.Success,
+                config =>
+                {
+                    config.VisibleStateDuration = 8000;
+                    config.ShowCloseIcon = true;
+                }
+            );
             Navigation.NavigateTo("/obitos");
         }
         catch (Exception ex)

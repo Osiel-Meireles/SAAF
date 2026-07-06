@@ -30,7 +30,7 @@
         <MudTh>Falecido</MudTh>
         <MudTh>Causa da Morte</MudTh>
         <MudTh>Status</MudTh>
-        <MudTh>Nº OS / Auxílio</MudTh>
+        <MudTh>Protocolo</MudTh>
         <MudTh>Ações</MudTh>
     </HeaderContent>
     <RowTemplate>
@@ -52,23 +52,24 @@
                     break;
             }
         </MudTd>
-        <MudTd DataLabel="Nº OS / Auxílio">
+        <MudTd DataLabel="Protocolo">
             @if (string.IsNullOrEmpty(context.NumeroOsAuxilio))
             {
-                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Pendente</MudChip>
+                <MudChip T="string" Color="Color.Default" Size="Size.Small" Icon="@Icons.Material.Filled.HourglassEmpty">Pendente</MudChip>
             }
             else
             {
-                <MudChip T="string" Color="Color.Success" Size="Size.Small">@context.NumeroOsAuxilio</MudChip>
+                <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.Tag">@context.NumeroOsAuxilio</MudChip>
             }
         </MudTd>
         <MudTd DataLabel="Ações">
+            <MudIconButton Icon="@Icons.Material.Filled.Assignment" Color="Color.Secondary" Size="Size.Small" OnClick="@(() => AbrirFichaFalecido(context))" Title="Ficha do Falecido" />
             <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small" OnClick="@(() => EditarAtendimento(context))" Title="Editar" />
             
             @* Botão que abre o nosso novo Modal *@
             <MudIconButton Icon="@Icons.Material.Filled.Receipt" Color="Color.Info" Size="Size.Small" OnClick="@(() => AbrirModalFaturamento(context.Id))" Title="Faturamento/OS" />
             
-            <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Primary" Size="Size.Small" OnClick="@(() => BaixarGuiaSepultamento(context))" Title="Guia de Sepultamento" />
+            <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Primary" Size="Size.Small" OnClick="@(() => BaixarGuiaSepultamento(context))" Title="Guia de Sepultamento" Disabled="@(context.Falecido.Status == StatusFalecido.NaoSepultado)" />
 
             @* Botão de documentos anexos com badge de contagem *@
             <MudBadge Content="@context.Falecido.Documentos.Count"
@@ -292,5 +293,21 @@
             DbContext.ChangeTracker.Clear();
             await CarregarDadosAsync();
         }
+    }
+
+    private async Task AbrirFichaFalecido(Atendimento atendimento)
+    {
+        var parameters = new DialogParameters
+        {
+            ["AtendimentoId"] = atendimento.Id
+        };
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true, 
+            MaxWidth = MaxWidth.Medium, 
+            FullWidth = true,
+            CloseButton = true
+        };
+        await DialogService.ShowAsync<FichaFalecidoDialog>("Ficha do Falecido", parameters, options);
     }
 }

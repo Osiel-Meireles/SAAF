@@ -20,18 +20,21 @@
         {
             <MudText Typo="Typo.subtitle1" Class="mb-4">
                 <strong>Responsável:</strong> @atendimento.Responsavel?.Nome <br />
-                <strong>Status da OS:</strong> 
-                @if (string.IsNullOrEmpty(atendimento.NumeroOsAuxilio))
+                <strong>Protocolo:</strong>
+                <MudChip T="string" Color="Color.Info" Size="Size.Small" Icon="@Icons.Material.Filled.Tag">@atendimento.NumeroOsAuxilio</MudChip>
+                <br />
+                <strong>Status da OS:</strong>
+                @if (!atendimento.OsFinalizada)
                 {
-                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Pendente</MudChip>
+                    <MudChip T="string" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.HourglassEmpty">Pendente de Faturamento</MudChip>
                 }
                 else
                 {
-                    <MudChip T="string" Color="Color.Success" Size="Size.Small">@atendimento.NumeroOsAuxilio</MudChip>
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.CheckCircle">OS Finalizada</MudChip>
                 }
             </MudText>
 
-            @if (string.IsNullOrEmpty(atendimento.NumeroOsAuxilio))
+            @if (!atendimento.OsFinalizada)
             {
                 <MudGrid Class="mb-4 align-end">
                     <MudItem xs="12" sm="6">
@@ -69,7 +72,7 @@
                 </FooterContent>
             </MudTable>
 
-            @if (string.IsNullOrEmpty(atendimento.NumeroOsAuxilio))
+            @if (!atendimento.OsFinalizada)
             {
                 <MudGrid Class="mt-4">
                     <MudItem xs="12">
@@ -81,7 +84,7 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Fechar">Cancelar</MudButton>
-        @if (atendimento != null && string.IsNullOrEmpty(atendimento.NumeroOsAuxilio))
+        @if (atendimento != null && !atendimento.OsFinalizada)
         {
             <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="GerarOS" Disabled="@(atendimento.ItensFaturados.Count == 0)">
                 Gerar OS e Finalizar
@@ -120,6 +123,11 @@
 
     private async Task CarregarAtendimento()
     {
+        // Descartar e recriar o DbContext para garantir que os dados salvos
+        // pelo FaturamentoService (contexto diferente) sejam visíveis — sem cache do EF.
+        DbContext?.Dispose();
+        DbContext = DbFactory.CreateDbContext();
+
         atendimento = await DbContext.Atendimentos
             .Include(a => a.Responsavel)
             .Include(a => a.Falecido)

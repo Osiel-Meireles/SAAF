@@ -28,10 +28,13 @@
 
             <MudForm @ref="form" @bind-IsValid="sucesso">
                 <MudGrid>
-                    <MudItem xs="12" sm="6">
+                    <MudItem xs="12" sm="4">
                         <MudDatePicker Label="Data da Execução" @bind-Date="dataExecucao" Required="true" RequiredError="Data é obrigatória" Editable="true" />
                     </MudItem>
-                    <MudItem xs="12" sm="6">
+                    <MudItem xs="12" sm="4">
+                        <MudTimePicker Label="Horário da Execução" @bind-Time="horarioExecucao" Required="true" RequiredError="Horário é obrigatório" Editable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
                         <MudDatePicker Label="Data Autorização" @bind-Date="dataAutorizacao" Required="true" Editable="true" />
                     </MudItem>
                     
@@ -81,6 +84,8 @@
                     </MudItem>
                 </MudGrid>
             </MudForm>
+
+            <AgendaDoDia DataSelecionada="@dataExecucao" />
         }
     </DialogContent>
     <DialogActions>
@@ -111,6 +116,7 @@
     private GavetaPublica? currentGaveta;
 
     private DateTime? dataExecucao = DateTime.Today;
+    private TimeSpan? horarioExecucao = DateTime.Now.TimeOfDay;
     private DateTime? dataAutorizacao = DateTime.Today;
     private string setorAutorizador = "CAAF";
     private ExecutorExumacao executor = ExecutorExumacao.CemiterioMunicipal;
@@ -195,6 +201,7 @@
             {
                 FalecidoId = FalecidoId,
                 DataExecucao = dateExec,
+                HorarioExecucao = horarioExecucao,
                 DataAutorizacao = dateAut,
                 SetorAutorizador = setorAutorizador,
                 Executor = executor,

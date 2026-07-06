@@ -74,19 +74,14 @@ public class AtendimentoFaturamentoService : IAtendimentoFaturamentoService
         // Se der erro (estoque negativo), vai dar um throw e não finaliza a OS.
         await _estoqueService.ProcessarFaturamentoAtendimentoAsync(atendimentoId);
 
-        // Regra DRY: A Ordem de Serviço e o Auxílio Funeral devem ter obrigatoriamente a mesma numeração.
-        // Se já tiver uma numeração, não gera novamente. Se não tiver, usa o número da Guia ou cria um sequencial.
-        if (string.IsNullOrWhiteSpace(atendimento.NumeroOsAuxilio))
-        {
-            // Padrão de numeração: ANO-MÊS-NUMERO_GUIA
-            atendimento.NumeroOsAuxilio = $"{DateTime.UtcNow.Year}{DateTime.UtcNow.Month:D2}-{numeroGuia}";
-        }
+        // Marcar a OS como finalizada — separado do NumeroOsAuxilio (protocolo de criação)
+        atendimento.OsFinalizada = true;
 
         // Simulação da geração de PDF ou extrato (Aqui você faria a chamada para sua biblioteca de PDF)
         var totalFaturado = atendimento.ItensFaturados.Sum(i => i.ValorTotalCalculado);
         
         // Em um cenário real, você dispararia um evento (ex: RabbitMQ/MediatR) ou chamaria o serviço de PDF
-        _logger.LogInformation($"OS/Auxílio Gerada: {atendimento.NumeroOsAuxilio} | Total a pagar à Funerária: R$ {totalFaturado:N2}");
+        _logger.LogInformation($"OS/Auxílio Finalizada: {atendimento.NumeroOsAuxilio} | Total a pagar à Funerária: R$ {totalFaturado:N2}");
 
         _context.Atendimentos.Update(atendimento);
         await _context.SaveChangesAsync();

@@ -24,6 +24,7 @@ public class ExumacaoRegistro
     public string SetorAutorizador { get; set; } = "CAAF";
     
     public DateTime? DataExecucao { get; set; }
+    public TimeSpan? HorarioExecucao { get; set; }
     public ExecutorExumacao Executor { get; set; }
     
     [MaxLength(500)]

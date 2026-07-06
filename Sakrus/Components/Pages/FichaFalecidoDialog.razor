@@ -1,0 +1,144 @@
+﻿@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Assignment" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6">Ficha do Falecido</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (atendimento == null)
+        {
+            <div class="d-flex justify-center align-center pa-8">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            </div>
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+
+                @* PROTOCOLO *@
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4" Style="background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-primary-darken) 100%); border-radius: 10px;">
+                        <div class="d-flex align-center gap-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Badge" Style="color:white; font-size:2.2rem;" />
+                            <div>
+                                <MudText Typo="Typo.overline" Style="color:rgba(255,255,255,0.75); letter-spacing:2px;">NUMERO DE PROTOCOLO</MudText>
+                                <MudText Typo="Typo.h5" Style="color:white; font-weight:700; letter-spacing:1px;">
+                                    @(string.IsNullOrEmpty(atendimento.NumeroOsAuxilio) ? "Nao gerado" : atendimento.NumeroOsAuxilio)
+                                </MudText>
+                            </div>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+
+                @* DADOS DO FALECIDO *@
+                <MudItem xs="12" Class="mt-2">
+                    <div class="d-flex align-center gap-2 mb-1">
+                        <MudIcon Icon="@Icons.Material.Filled.PersonOff" Color="Color.Error" Size="Size.Small" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600; color: var(--mud-palette-error);">Dados do Falecido</MudText>
+                    </div>
+                    <MudDivider Class="mb-3" />
+                </MudItem>
+
+                <MudItem xs="12" sm="7">@InfoRow("Nome Completo", atendimento.Falecido.Nome)</MudItem>
+                <MudItem xs="12" sm="5">@InfoRow("CPF", FormatCpf(atendimento.Falecido.Cpf))</MudItem>
+                <MudItem xs="12" sm="4">@InfoRow("Data de Falecimento", atendimento.Falecido.DataFalecimento.ToLocalTime().ToString("dd/MM/yyyy"))</MudItem>
+                <MudItem xs="12" sm="4">@InfoRow("Causa da Morte", atendimento.Falecido.CausaMorte.ToString())</MudItem>
+                <MudItem xs="12" sm="4">@InfoRow("Tipo de Restos Mortais", atendimento.Falecido.TipoRestosMortais.ToString())</MudItem>
+                <MudItem xs="12" sm="6">@InfoRow("Local de Falecimento", string.IsNullOrEmpty(atendimento.LocalFalecimento) ? "-" : atendimento.LocalFalecimento)</MudItem>
+                <MudItem xs="12" sm="6">@InfoRow("No Declaracao de Obito", string.IsNullOrEmpty(atendimento.NumeroDeclaracaoObito) ? "-" : atendimento.NumeroDeclaracaoObito)</MudItem>
+
+                @if (atendimento.Falecido.TipoRestosMortais == TipoRestosMortais.PecaAnatomica)
+                {
+                    <MudItem xs="12" sm="6">@InfoRow("Hospital / CRM Medico", atendimento.PecaAnatomicaHospital ?? "-")</MudItem>
+                    <MudItem xs="12" sm="6">@InfoRow("Identificacao da Peca", atendimento.PecaAnatomicaIdentificacao ?? "-")</MudItem>
+                }
+
+                @* CLASSIFICACAO DO ATENDIMENTO *@
+                <MudItem xs="12" Class="mt-2">
+                    <div class="d-flex align-center gap-2 mb-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Assignment" Color="Color.Primary" Size="Size.Small" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600; color: var(--mud-palette-primary);">Classificacao do Atendimento</MudText>
+                    </div>
+                    <MudDivider Class="mb-3" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">@InfoRow("Perfil", atendimento.Perfil.ToString())</MudItem>
+                <MudItem xs="12" sm="4">@InfoRow("Origem", atendimento.Origem.ToString())</MudItem>
+                <MudItem xs="12" sm="4">@InfoRow("Procedimento", atendimento.Procedimento.ToString())</MudItem>
+
+                @if (atendimento.Funeraria != null)
+                {
+                    <MudItem xs="12">@InfoRow("Funeraria Credenciada", atendimento.Funeraria.Nome)</MudItem>
+                }
+
+                @* DADOS DO RESPONSAVEL *@
+                <MudItem xs="12" Class="mt-2">
+                    <div class="d-flex align-center gap-2 mb-1">
+                        <MudIcon Icon="@Icons.Material.Filled.SupervisedUserCircle" Color="Color.Tertiary" Size="Size.Small" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600; color: var(--mud-palette-tertiary);">Dados do Responsavel</MudText>
+                    </div>
+                    <MudDivider Class="mb-3" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">@InfoRow("Nome Completo", atendimento.Responsavel.Nome)</MudItem>
+                <MudItem xs="12" sm="3">@InfoRow("CPF", FormatCpf(atendimento.Responsavel.CPF))</MudItem>
+                <MudItem xs="12" sm="3">@InfoRow("Telefone", atendimento.Responsavel.Telefone)</MudItem>
+                <MudItem xs="12" sm="3">@InfoRow("RG", atendimento.Responsavel.RG)</MudItem>
+                <MudItem xs="12" sm="3">@InfoRow("Orgao Emissor", atendimento.Responsavel.OrgaoEmissor)</MudItem>
+                <MudItem xs="12" sm="3">@InfoRow("Profissao", atendimento.Responsavel.Profissao)</MudItem>
+                <MudItem xs="12" sm="9">@InfoRow("Endereco", atendimento.Responsavel.Endereco)</MudItem>
+
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Fechar" Variant="Variant.Filled" Color="Color.Default">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private RenderFragment InfoRow(string label, string? value) =>
+        @<div class="mb-1">
+            <MudText Typo="Typo.caption" Color="Color.Secondary"
+                     Style="display:block; text-transform:uppercase; letter-spacing:0.5px; font-size:0.68rem;">@label</MudText>
+            <MudText Typo="Typo.body2" Style="font-weight:500;">@(string.IsNullOrWhiteSpace(value) ? "-" : value)</MudText>
+        </div>;
+
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int AtendimentoId { get; set; }
+
+    private Atendimento? atendimento;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        atendimento = await DbContext.Atendimentos
+            .Include(a => a.Falecido)
+            .Include(a => a.Responsavel)
+            .Include(a => a.Funeraria)
+            .FirstOrDefaultAsync(a => a.Id == AtendimentoId);
+    }
+
+    private void Fechar() => MudDialog.Cancel();
+
+    private static string FormatCpf(string cpf)
+    {
+        if (string.IsNullOrEmpty(cpf) || cpf.Length != 11)
+            return cpf ?? "-";
+        return $"{cpf[..3]}.{cpf[3..6]}.{cpf[6..9]}-{cpf[9..]}";
+    }
+}

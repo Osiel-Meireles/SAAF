@@ -1,0 +1,88 @@
+﻿@using Sakrus.Core.Models
+@using Sakrus.Services
+@inject AgendaService AgendaService
+
+<MudPaper Class="pa-4 mt-4" Elevation="0" Outlined="true" Style="background-color: var(--mud-palette-background-grey);">
+    <div class="d-flex align-center gap-2 mb-3">
+        <MudIcon Icon="@Icons.Material.Filled.EventNote" Color="Color.Primary" />
+        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Agenda para o dia @(DataSelecionada?.ToString("dd/MM/yyyy") ?? "-")</MudText>
+    </div>
+
+    @if (DataSelecionada == null)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Selecione uma data para visualizar os horários ocupados.</MudText>
+    }
+    else if (isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (eventos.Count == 0)
+    {
+        <MudAlert Severity="Severity.Success" Variant="Variant.Text">
+            Nenhum sepultamento ou exumação agendado para este dia. Horários livres!
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="eventos" Dense="true" Hover="true" Elevation="0" Style="background: transparent;">
+            <HeaderContent>
+                <MudTh>Horário</MudTh>
+                <MudTh>Evento</MudTh>
+                <MudTh>Falecido</MudTh>
+                <MudTh>Local</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Horário">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">@context.Horario.ToString(@"hh\:mm")</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Evento">
+                    @if (context.TipoEvento == "Sepultamento")
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Sepultamento</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">Exumação</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Falecido">@context.FalecidoNome</MudTd>
+                <MudTd DataLabel="Local">@context.Local</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    [Parameter]
+    public DateTime? DataSelecionada { get; set; }
+
+    private List<AgendaEvento> eventos = new();
+    private bool isLoading = false;
+    private DateTime? lastDataFetched;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DataSelecionada != lastDataFetched)
+        {
+            lastDataFetched = DataSelecionada;
+            await CarregarAgendaAsync();
+        }
+    }
+
+    private async Task CarregarAgendaAsync()
+    {
+        if (DataSelecionada == null)
+        {
+            eventos.Clear();
+            return;
+        }
+
+        isLoading = true;
+        StateHasChanged();
+        
+        eventos = await AgendaService.ObterEventosPorDataAsync(DataSelecionada.Value);
+        
+        isLoading = false;
+        StateHasChanged();
+    }
+}

@@ -179,13 +179,19 @@ public partial class RelatorioService
                     
                     x.Item().Text("DADOS DO SEPULTAMENTO").SemiBold().FontSize(12);
                     
-                    if (falecido.Jazigo != null)
+                    if (atendimento != null && atendimento.DataSepultamento.HasValue)
                     {
-                        x.Item().Text($"Local: Jazigo {falecido.Jazigo.CodigoIdentificador}");
+                        var data = atendimento.DataSepultamento.Value.ToLocalTime().ToString("dd/MM/yyyy");
+                        var hora = atendimento.HorarioSepultamento.HasValue 
+                            ? atendimento.HorarioSepultamento.Value.ToString(@"hh\:mm") 
+                            : "Não informado";
+                            
+                        x.Item().Text($"Data: {data} às {hora}");
+                        x.Item().Text($"Local: {atendimento.LocalSepultamento}");
                     }
                     else
                     {
-                        x.Item().Text("Local: Gaveta Pública / Não Identificado");
+                        x.Item().Text("Status: Sepultamento pendente / não realizado.");
                     }
 
                     if (atendimento != null && atendimento.Responsavel != null)

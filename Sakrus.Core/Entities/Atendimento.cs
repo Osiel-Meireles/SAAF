@@ -23,6 +23,13 @@ public class Atendimento
 
     [MaxLength(50)]
     public string NumeroOsAuxilio { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Indica se o fluxo de Faturamento/OS foi concluído (botão "Gerar OS e Finalizar").
+    /// Separado de NumeroOsAuxilio que contém o protocolo gerado na criação do atendimento.
+    /// </summary>
+    public bool OsFinalizada { get; set; } = false;
+
     
     [MaxLength(50)]
     public string NumeroDeclaracaoObito { get; set; } = string.Empty;

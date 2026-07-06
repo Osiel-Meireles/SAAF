@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +11,7 @@ using Sakrus.Data;
 using Sakrus.Infrastructure.Data;
 using Sakrus.Services;
 
-// Configuração global do QuestPDF (feita uma única vez, aqui, não dentro dos métodos)
+// ConfiguraÃ§Ã£o global do QuestPDF (feita uma Ãºnica vez, aqui, nÃ£o dentro dos mÃ©todos)
 QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,11 +30,11 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((sp, options) =>
     options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
 }, ServiceLifetime.Scoped);
 
-// Serviços Scoped ainda podem usar o ApplicationDbContext
+// ServiÃ§os Scoped ainda podem usar o ApplicationDbContext
 builder.Services.AddScoped<ApplicationDbContext>(p => 
     p.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 
-// --- Autenticação com Cookie ---
+// --- AutenticaÃ§Ã£o com Cookie ---
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -44,7 +44,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
         options.Cookie.HttpOnly = true;
-        // SEC-01: Em produção, cookies só são enviados via HTTPS
+        // SEC-01: Em produÃ§Ã£o, cookies sÃ³ sÃ£o enviados via HTTPS
         options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
             ? CookieSecurePolicy.SameAsRequest
             : CookieSecurePolicy.Always;
@@ -53,7 +53,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization(options =>
 {
-    // SEC-06: Política padrão: todas as páginas exigem autenticação
+    // SEC-06: PolÃ­tica padrÃ£o: todas as pÃ¡ginas exigem autenticaÃ§Ã£o
     options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
@@ -63,7 +63,7 @@ builder.Services.AddHttpContextAccessor();
 // --- AuthenticationStateProvider para Blazor Server ---
 builder.Services.AddScoped<AuthenticationStateProvider, PersistingAuthenticationStateProvider>();
 
-// --- Data Protection: persiste chaves entre reinicializações do container ---
+// --- Data Protection: persiste chaves entre reinicializaÃ§Ãµes do container ---
 // ARQ-06: Path condicional para funcionar tanto em Docker (Linux) quanto em dev (Windows)
 var keysPathStr = builder.Environment.IsProduction()
     ? "/app/dataprotection-keys"
@@ -74,7 +74,7 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(keysPath)
     .SetApplicationName("Sakrus");
 
-// --- Serviços de Negócio ---
+// --- ServiÃ§os de NegÃ³cio ---
 builder.Services.AddScoped<IGavetaPublicaService, GavetaPublicaService>();
 builder.Services.AddScoped<IAtendimentoFaturamentoService, AtendimentoFaturamentoService>();
 builder.Services.AddScoped<IJazigoService, JazigoService>();
@@ -86,6 +86,7 @@ builder.Services.AddScoped<PdfGeneratorService>();
 builder.Services.AddScoped<EstoqueService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<DatabaseSeeder>();
+builder.Services.AddScoped<Sakrus.Services.AgendaService>();
 
 var app = builder.Build();
 
@@ -93,11 +94,11 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // HSTS é desativado em containers sem HTTPS configurado
+    // HSTS Ã© desativado em containers sem HTTPS configurado
     // Se ativar HTTPS no futuro, descomentar: app.UseHsts();
 }
 
-// SEC-04: Headers de segurança HTTP
+// SEC-04: Headers de seguranÃ§a HTTP
 app.Use(async (context, next) =>
 {
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
@@ -109,7 +110,7 @@ app.Use(async (context, next) =>
 
 app.UseStaticFiles();
 
-// A ORDEM IMPORTA: Authentication → Authorization → Antiforgery
+// A ORDEM IMPORTA: Authentication â†’ Authorization â†’ Antiforgery
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
@@ -120,7 +121,7 @@ app.MapAuthEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-// --- Inicialização do Banco: Migrations + Seed (com retry) ---
+// --- InicializaÃ§Ã£o do Banco: Migrations + Seed (com retry) ---
 using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
@@ -131,12 +132,12 @@ using (var scope = app.Services.CreateScope())
     {
         try
         {
-            logger.LogInformation("Tentativa {Attempt}/{Max} de conexão com o banco de dados...", attempt, maxRetries);
+            logger.LogInformation("Tentativa {Attempt}/{Max} de conexÃ£o com o banco de dados...", attempt, maxRetries);
 
-            // Aplica migrations pendentes automaticamente (cria o schema se não existir)
+            // Aplica migrations pendentes automaticamente (cria o schema se nÃ£o existir)
             await db.Database.MigrateAsync();
 
-            // Seed do usuário admin padrão
+            // Seed do usuÃ¡rio admin padrÃ£o
             var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
             await seeder.SeedAsync();
 
@@ -149,7 +150,7 @@ using (var scope = app.Services.CreateScope())
         catch (Exception ex) when (attempt < maxRetries)
         {
             var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt)); // backoff: 2s, 4s, 8s...
-            logger.LogWarning("Banco ainda não disponível. Aguardando {Delay}s antes de tentar novamente. Erro: {Message}",
+            logger.LogWarning("Banco ainda nÃ£o disponÃ­vel. Aguardando {Delay}s antes de tentar novamente. Erro: {Message}",
                 delay.TotalSeconds, ex.Message);
             await Task.Delay(delay);
         }
