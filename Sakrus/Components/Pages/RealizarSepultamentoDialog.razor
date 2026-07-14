@@ -5,12 +5,17 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudDialog>
     <TitleContent>
         <div class="d-flex align-center gap-2">
             <MudIcon Icon="@Icons.Material.Filled.ArrowDownward" Color="Color.Success" />
             <MudText Typo="Typo.h6">Realizar Sepultamento - @FalecidoNome</MudText>
+            @if (falecidoIsInfantil)
+            {
+                <MudChip T="string" Color="Color.Info" Size="Size.Small" Icon="@Icons.Material.Filled.ChildCare">Infantil (≤ 12 anos)</MudChip>
+            }
         </div>
     </TitleContent>
     <DialogContent>
@@ -36,34 +41,57 @@
                         </MudRadioGroup>
                     </MudItem>
 
-                    @if (tipoLocal == "Jazigo")
+                    @* ── Seleção pelo Mapa ─────────────────────────────────────────── *@
+                    @if (tipoLocal == "Jazigo" || tipoLocal == "Gaveta")
                     {
                         <MudItem xs="12">
-                            <MudSelect T="int?" Label="Selecione o Jazigo" @bind-Value="selectedJazigoId" Required="true" RequiredError="Jazigo é obrigatório">
-                                @foreach (var j in jazigosList)
+                            @if (localSelecionado == null)
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.Map"
+                                           FullWidth="true"
+                                           OnClick="AbrirMapaSelecao">
+                                    Selecionar @(tipoLocal == "Jazigo" ? "Jazigo" : "Gaveta") no Mapa
+                                </MudButton>
+                                @if (tipoLocalAlterado)
                                 {
-                                    <MudSelectItem T="int?" Value="@j.Id">
-                                        @j.CodigoIdentificador @(j.Ocupado ? "(Ocupado)" : "(Livre)")
-                                    </MudSelectItem>
+                                    <MudText Typo="Typo.caption" Color="Color.Warning" Class="mt-1">
+                                        Tipo alterado — selecione novamente no mapa.
+                                    </MudText>
                                 }
-                            </MudSelect>
+                            }
+                            else
+                            {
+                                @* Card com o local selecionado *@
+                                <MudPaper Class="pa-3 d-flex align-center gap-3"
+                                          Style="border:2px solid #4caf50; border-radius:8px; background:rgba(76,175,80,0.07);">
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                                    <div class="flex-grow-1">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Local selecionado:</MudText>
+                                        <MudText Typo="Typo.body1" Style="font-weight:600;">@localSelecionado.Descricao</MudText>
+                                    </div>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   OnClick="AbrirMapaSelecao"
+                                                   Title="Alterar seleção" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="LimparLocal"
+                                                   Title="Remover seleção" />
+                                </MudPaper>
+                            }
                         </MudItem>
-                    }
-                    else if (tipoLocal == "Gaveta")
-                    {
-                        <MudItem xs="12" sm="8">
-                            <MudSelect T="int?" Label="Selecione a Gaveta Pública Livre" @bind-Value="selectedGavetaId" Required="true" RequiredError="Gaveta é obrigatória">
-                                @foreach (var g in gavetasLivresList)
-                                {
-                                    <MudSelectItem T="int?" Value="@g.Id">
-                                        Gaveta @g.NumeroGaveta (Setor: @g.Setor, Quadra: @g.Quadra)
-                                    </MudSelectItem>
-                                }
-                            </MudSelect>
-                        </MudItem>
-                        <MudItem xs="12" sm="4">
-                            <MudNumericField T="int" Label="Anos Permanência" @bind-Value="anosPermanencia" Min="1" Max="10" Required="true" />
-                        </MudItem>
+
+                        @* Anos de permanência — apenas para Gaveta Pública *@
+                        @if (tipoLocal == "Gaveta")
+                        {
+                            <MudItem xs="12" sm="4">
+                                <MudNumericField T="int" Label="Anos Permanência" @bind-Value="anosPermanencia" Min="1" Max="10" Required="true" />
+                            </MudItem>
+                        }
                     }
                 </MudGrid>
             </MudForm>
@@ -73,7 +101,12 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancelar">Cancelar</MudButton>
-        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="Confirmar" Disabled="@(!sucesso || isLoading)">Confirmar Sepultamento</MudButton>
+        <MudButton Color="Color.Success"
+                   Variant="Variant.Filled"
+                   OnClick="Confirmar"
+                   Disabled="@(!sucesso || isLoading || localSelecionado == null)">
+            Confirmar Sepultamento
+        </MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -90,40 +123,103 @@
     [Parameter] public int FalecidoId { get; set; }
     [Parameter] public string FalecidoNome { get; set; } = "";
 
+    /// <summary>Data de nascimento do falecido — usada para determinar se é infantil (≤ 12 anos).</summary>
+    [Parameter] public DateTime? FalecidoDataNascimento { get; set; }
+
+    /// <summary>Data de falecimento do falecido — referência para calcular a idade.</summary>
+    [Parameter] public DateTime FalecidoDataFalecimento { get; set; }
+
     private MudForm form = null!;
     private bool sucesso;
-    private bool isLoading = true;
+    private bool isLoading = false;
 
     private DateTime? dataSepultamento = DateTime.Today;
     private TimeSpan? horarioSepultamento = DateTime.Now.TimeOfDay;
     private string tipoLocal = "Jazigo";
-    private int? selectedJazigoId;
-    private int? selectedGavetaId;
     private int anosPermanencia = 3;
+    private bool tipoLocalAlterado = false;
 
-    private List<Jazigo> jazigosList = new();
-    private List<GavetaPublica> gavetasLivresList = new();
+    /// <summary>Resultado retornado pelo dialog do mapa.</summary>
+    private SelecionarLocalSepultamentoDialog.ResultadoSelecaoLocal? localSelecionado;
 
-    protected override async Task OnInitializedAsync()
+    /// <summary>True se o falecido tinha 12 anos ou menos ao falecer.</summary>
+    private bool falecidoIsInfantil;
+
+    private string _ultimoTipoLocal = "Jazigo";
+
+    protected override Task OnInitializedAsync()
     {
         DbContext = DbFactory.CreateDbContext();
-        await CarregarLocaisAsync();
+        CalcularIsInfantil();
+        _ultimoTipoLocal = tipoLocal;
+        return Task.CompletedTask;
     }
 
-    private async Task CarregarLocaisAsync()
+    protected override void OnParametersSet()
     {
-        isLoading = true;
-        
-        jazigosList = await DbContext.Jazigos
-            .OrderBy(j => j.CodigoIdentificador)
-            .ToListAsync();
-            
-        gavetasLivresList = await DbContext.GavetasPublicas
-            .Where(g => !g.Ocupada)
-            .OrderBy(g => g.NumeroGaveta)
-            .ToListAsync();
+        // Se o usuário mudar o radio de tipo, limpa a seleção anterior (tipo incompatível)
+        if (tipoLocal != _ultimoTipoLocal)
+        {
+            localSelecionado  = null;
+            tipoLocalAlterado = true;
+            _ultimoTipoLocal  = tipoLocal;
+        }
+    }
 
-        isLoading = false;
+    /// <summary>Calcula se o falecido é infantil com base na DataNascimento vs DataFalecimento.</summary>
+    private void CalcularIsInfantil()
+    {
+        if (!FalecidoDataNascimento.HasValue)
+        {
+            falecidoIsInfantil = false;
+            return;
+        }
+
+        var nascimento  = FalecidoDataNascimento.Value.ToLocalTime();
+        var falecimento = FalecidoDataFalecimento.ToLocalTime();
+
+        // Cálculo preciso de anos completos
+        int idade = falecimento.Year - nascimento.Year;
+        if (falecimento < nascimento.AddYears(idade)) idade--;
+
+        falecidoIsInfantil = idade <= 12;
+    }
+
+    private async Task AbrirMapaSelecao()
+    {
+        tipoLocalAlterado = false;
+
+        var parameters = new DialogParameters
+        {
+            ["FalecidoIsInfantil"] = falecidoIsInfantil,
+            ["TipoLocal"]          = tipoLocal
+        };
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth         = MaxWidth.Large,
+            FullWidth        = true,
+            CloseButton      = true
+        };
+
+        var dialog = await DialogService.ShowAsync<SelecionarLocalSepultamentoDialog>(
+            "Selecionar Local de Sepultamento", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled &&
+            result.Data is SelecionarLocalSepultamentoDialog.ResultadoSelecaoLocal selecionado)
+        {
+            localSelecionado = selecionado;
+            tipoLocal        = selecionado.TipoLocal;
+            _ultimoTipoLocal = tipoLocal;
+            StateHasChanged();
+        }
+    }
+
+    private void LimparLocal()
+    {
+        localSelecionado  = null;
+        tipoLocalAlterado = false;
         StateHasChanged();
     }
 
@@ -131,6 +227,12 @@
     {
         await form.Validate();
         if (!form.IsValid) return;
+
+        if (localSelecionado == null)
+        {
+            Snackbar.Add("Selecione um local de sepultamento no mapa.", Severity.Warning);
+            return;
+        }
 
         isLoading = true;
         StateHasChanged();
@@ -151,77 +253,67 @@
             }
 
             var falecido = atendimento.Falecido;
-            
-            // Garantir que a data seja salva como UTC se aplicável
-            var dataSep = dataSepultamento.HasValue 
+
+            // Garantir que a data seja salva como UTC
+            var dataSep = dataSepultamento.HasValue
                 ? DateTime.SpecifyKind(dataSepultamento.Value, DateTimeKind.Utc)
                 : DateTime.UtcNow;
 
-            atendimento.DataSepultamento = dataSep;
+            atendimento.DataSepultamento    = dataSep;
             atendimento.HorarioSepultamento = horarioSepultamento;
 
-            if (tipoLocal == "Jazigo")
+            // ── Jazigo ────────────────────────────────────────────────────────
+            if (localSelecionado.TipoLocal == "Jazigo")
             {
-                if (!selectedJazigoId.HasValue)
+                if (!localSelecionado.JazigoId.HasValue)
                 {
-                    Snackbar.Add("Selecione um Jazigo.", Severity.Error);
-                    isLoading = false;
-                    StateHasChanged();
-                    return;
+                    Snackbar.Add("Nenhum jazigo selecionado.", Severity.Error);
+                    isLoading = false; StateHasChanged(); return;
                 }
 
-                var jazigo = await DbContext.Jazigos.FindAsync(selectedJazigoId.Value);
+                var jazigo = await DbContext.Jazigos.FindAsync(localSelecionado.JazigoId.Value);
                 if (jazigo == null)
                 {
                     Snackbar.Add("Jazigo não encontrado.", Severity.Error);
-                    isLoading = false;
-                    StateHasChanged();
-                    return;
+                    isLoading = false; StateHasChanged(); return;
                 }
 
-                // Vincula o falecido ao jazigo
                 falecido.JazigoId = jazigo.Id;
-                jazigo.Ocupado = true;
-
+                jazigo.Ocupado    = true;
                 atendimento.LocalSepultamento = $"Jazigo {jazigo.CodigoIdentificador}";
-                
+
                 DbContext.Jazigos.Update(jazigo);
             }
-            else if (tipoLocal == "Gaveta")
+            // ── Gaveta Pública ────────────────────────────────────────────────
+            else if (localSelecionado.TipoLocal == "Gaveta")
             {
-                if (!selectedGavetaId.HasValue)
+                if (!localSelecionado.GavetaId.HasValue)
                 {
-                    Snackbar.Add("Selecione uma Gaveta Pública.", Severity.Error);
-                    isLoading = false;
-                    StateHasChanged();
-                    return;
+                    Snackbar.Add("Nenhuma gaveta selecionada.", Severity.Error);
+                    isLoading = false; StateHasChanged(); return;
                 }
 
-                var gaveta = await DbContext.GavetasPublicas.FindAsync(selectedGavetaId.Value);
+                var gaveta = await DbContext.GavetasPublicas.FindAsync(localSelecionado.GavetaId.Value);
                 if (gaveta == null || gaveta.Ocupada)
                 {
                     Snackbar.Add("Gaveta não disponível.", Severity.Error);
-                    isLoading = false;
-                    StateHasChanged();
-                    return;
+                    isLoading = false; StateHasChanged(); return;
                 }
 
-                // Ocupa a gaveta
-                gaveta.Ocupada = true;
-                gaveta.FalecidoId = falecido.Id;
-                gaveta.DataOcupacao = dataSep;
+                gaveta.Ocupada              = true;
+                gaveta.FalecidoId           = falecido.Id;
+                gaveta.DataOcupacao         = dataSep;
                 gaveta.DataPrevisaoExumacao = dataSep.AddYears(anosPermanencia);
-
                 atendimento.LocalSepultamento = $"Gaveta Pública {gaveta.NumeroGaveta}";
 
                 DbContext.GavetasPublicas.Update(gaveta);
             }
 
-            DbContext.Falecidos.Update(falecido);
-            DbContext.Atendimentos.Update(atendimento);
-
             // Atualizar status do ciclo de vida do falecido
             falecido.Status = StatusFalecido.Sepultado;
+
+            DbContext.Falecidos.Update(falecido);
+            DbContext.Atendimentos.Update(atendimento);
 
             await DbContext.SaveChangesAsync();
             await transaction.CommitAsync();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace Sakrus.Core.Entities;
@@ -23,6 +23,7 @@ public class GavetaPublica
     [MaxLength(50)]
     public string NumeroGaveta { get; set; } = string.Empty;
     
+    public bool IsInfantil { get; set; }
     public bool Ocupada { get; set; }
     public int? FalecidoId { get; set; }
     public Falecido? Falecido { get; set; }

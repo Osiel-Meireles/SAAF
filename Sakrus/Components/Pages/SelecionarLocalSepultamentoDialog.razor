@@ -1,0 +1,401 @@
+@using MudBlazor
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<MudDialog Style="max-height: 90vh; overflow: hidden;">
+    <TitleContent>
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudIcon Icon="@Icons.Material.Filled.Map" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Selecionar Local de Sepultamento</MudText>
+            @if (FalecidoIsInfantil)
+            {
+                <MudChip T="string" Color="Color.Info" Size="Size.Small" Icon="@Icons.Material.Filled.ChildCare">Somente Infantis (0–12 anos)</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Icon="@Icons.Material.Filled.Person">Somente Adultos (acima de 12 anos)</MudChip>
+            }
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center align-center pa-8">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            </div>
+        }
+        else
+        {
+            <!-- Legenda de cores -->
+            <div class="d-flex align-center gap-4 mb-3 flex-wrap">
+                <div class="d-flex align-center gap-1">
+                    <div class="legend-box" style="background-color:#4caf50;"></div>
+                    <MudText Typo="Typo.caption">Livre</MudText>
+                </div>
+                <div class="d-flex align-center gap-1">
+                    <div class="legend-box" style="background-color:#f44336;"></div>
+                    <MudText Typo="Typo.caption">Ocupado</MudText>
+                </div>
+                <div class="d-flex align-center gap-1">
+                    <div class="legend-box" style="background-color:#1976d2;"></div>
+                    <MudText Typo="Typo.caption">Selecionado</MudText>
+                </div>
+            </div>
+
+            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-3">
+
+                @* ── ABA: JAZIGOS ─────────────────────────────────── *@
+                @if (TipoLocal == "Jazigo")
+                {
+                    <MudTabPanel Text="Jazigos" Icon="@Icons.Material.Filled.AccountBalance">
+                        @if (!quadrasJazigo.Any())
+                        {
+                            <MudAlert Severity="Severity.Info" Class="mt-2">
+                                Nenhum jazigo @(FalecidoIsInfantil ? "infantil" : "adulto/padrão") encontrado.
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudTabs Elevation="0" Rounded="true" Outlined="true" Position="Position.Top">
+                                @foreach (var quadra in quadrasJazigo)
+                                {
+                                    <MudTabPanel Text="@($"Quadra {quadra}")">
+                                        <div class="d-flex flex-column gap-3 mt-3">
+                                            @foreach (var alaGroup in jazigosAgrupados[quadra])
+                                            {
+                                                <MudCard Elevation="1" Class="pa-2">
+                                                    <div class="d-flex align-center gap-2 mb-2">
+                                                        <MudChip T="string" Color="Color.Dark" Size="Size.Small">Ala @alaGroup.Key</MudChip>
+                                                        <MudDivider Class="flex-grow-1" />
+                                                    </div>
+                                                    <div class="d-flex flex-wrap gap-1">
+                                                        @foreach (var jazigo in alaGroup.Value)
+                                                        {
+                                                            var jIsSelected = selectedJazigoId == jazigo.Id;
+                                                            var jCorFundo  = jIsSelected    ? "#1976d2"
+                                                                           : jazigo.Ocupado ? "#f44336"
+                                                                           : "#4caf50";
+                                                            var jTooltip = jazigo.Ocupado
+                                                                ? $"Lote {jazigo.NumeroLote} — Ocupado"
+                                                                : jIsSelected
+                                                                    ? $"Lote {jazigo.NumeroLote} — SELECIONADO ✓"
+                                                                    : $"Lote {jazigo.NumeroLote} — Livre (clique para selecionar)";
+
+                                                            <MudTooltip Text="@jTooltip">
+                                                                <MudPaper Class="@($"d-flex flex-column align-center justify-center map-box-sel {(!jazigo.Ocupado ? "cursor-pointer" : "")}")"
+                                                                          Style="@($"background-color:{jCorFundo}; color:white; opacity:{(!jazigo.Ocupado || jIsSelected ? "1" : "0.5")};")"
+                                                                          Elevation="2"
+                                                                          @onclick="@(() => SelecionarJazigo(jazigo))">
+                                                                    <MudText Typo="Typo.caption" Class="font-weight-bold sel-label">@jazigo.NumeroLote</MudText>
+                                                                    @if (jIsSelected)
+                                                                    {
+                                                                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Style="font-size:0.75rem;" />
+                                                                    }
+                                                                </MudPaper>
+                                                            </MudTooltip>
+                                                        }
+                                                    </div>
+                                                </MudCard>
+                                            }
+                                        </div>
+                                    </MudTabPanel>
+                                }
+                            </MudTabs>
+                        }
+                    </MudTabPanel>
+                }
+
+                @* ── ABA: GAVETAS PÚBLICAS ────────────────────────── *@
+                @if (TipoLocal == "Gaveta")
+                {
+                    <MudTabPanel Text="Gavetas Públicas" Icon="@Icons.Material.Filled.Inbox">
+                        @if (!quadrasGaveta.Any())
+                        {
+                            <MudAlert Severity="Severity.Info" Class="mt-2">
+                                Nenhuma gaveta @(FalecidoIsInfantil ? "infantil" : "adulta/pública") encontrada.
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudTabs Elevation="0" Rounded="true" Outlined="true" Position="Position.Top">
+                                @foreach (var quadra in quadrasGaveta)
+                                {
+                                    <MudTabPanel Text="@($"Quadra {quadra}")">
+                                        <div class="d-flex flex-column gap-3 mt-3">
+                                            @foreach (var setorGroup in gavetasAgrupadas[quadra])
+                                            {
+                                                <MudCard Elevation="1" Class="pa-2">
+                                                    <div class="d-flex align-center gap-2 mb-2">
+                                                        <MudChip T="string" Color="Color.Dark" Size="Size.Small">Setor @setorGroup.Key</MudChip>
+                                                        <MudDivider Class="flex-grow-1" />
+                                                    </div>
+                                                    <div class="d-flex flex-wrap gap-1">
+                                                        @foreach (var gaveta in setorGroup.Value)
+                                                        {
+                                                            var gIsSelected = selectedGavetaId == gaveta.Id;
+                                                            var gCorFundo   = gIsSelected    ? "#1976d2"
+                                                                            : gaveta.Ocupada ? "#f44336"
+                                                                            : "#4caf50";
+                                                            var gTooltip = gaveta.Ocupada
+                                                                ? $"Gaveta {gaveta.NumeroGaveta} — Ocupada"
+                                                                : gIsSelected
+                                                                    ? $"Gaveta {gaveta.NumeroGaveta} — SELECIONADA ✓"
+                                                                    : $"Gaveta {gaveta.NumeroGaveta} — Livre (clique para selecionar)";
+
+                                                            <MudTooltip Text="@gTooltip">
+                                                                <MudPaper Class="@($"d-flex flex-column align-center justify-center map-box-sel {(!gaveta.Ocupada ? "cursor-pointer" : "")}")"
+                                                                          Style="@($"background-color:{gCorFundo}; color:white; opacity:{(!gaveta.Ocupada || gIsSelected ? "1" : "0.5")};")"
+                                                                          Elevation="2"
+                                                                          @onclick="@(() => SelecionarGaveta(gaveta))">
+                                                                    <MudText Typo="Typo.caption" Class="font-weight-bold sel-label">@gaveta.NumeroGaveta</MudText>
+                                                                    @if (gIsSelected)
+                                                                    {
+                                                                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Style="font-size:0.75rem;" />
+                                                                    }
+                                                                </MudPaper>
+                                                            </MudTooltip>
+                                                        }
+                                                    </div>
+                                                </MudCard>
+                                            }
+                                        </div>
+                                    </MudTabPanel>
+                                }
+                            </MudTabs>
+                        }
+                    </MudTabPanel>
+                }
+
+            </MudTabs>
+
+            @* ── Painel de confirmação da seleção ──────────────────── *@
+            @if (selectedJazigoId.HasValue || selectedGavetaId.HasValue)
+            {
+                <MudPaper Class="pa-3 mt-3 d-flex align-center gap-3"
+                          Style="border:2px solid #1976d2; border-radius:8px; background:rgba(25,118,210,0.07);">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary" />
+                    <div class="flex-grow-1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Selecionado:</MudText>
+                        <MudText Typo="Typo.body1" Style="font-weight:600;">@descricaoSelecionado</MudText>
+                    </div>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                   Size="Size.Small"
+                                   OnClick="LimparSelecao"
+                                   Title="Remover seleção" />
+                </MudPaper>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.CheckCircle"
+                   OnClick="Confirmar"
+                   Disabled="@(!selectedJazigoId.HasValue && !selectedGavetaId.HasValue)">
+            Confirmar Seleção
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .map-box-sel {
+        width: 44px;
+        height: 44px;
+        border-radius: 4px;
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .map-box-sel.cursor-pointer:hover {
+        transform: scale(1.2);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.35) !important;
+        z-index: 10;
+    }
+    .legend-box {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        display: inline-block;
+    }
+    .sel-label {
+        font-size: 0.6rem !important;
+        line-height: 1.2;
+        text-align: center;
+        word-break: break-all;
+    }
+</style>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>Se true, exibe somente jazigos/gavetas infantis (falecido com idade ≤ 12 anos).</summary>
+    [Parameter] public bool FalecidoIsInfantil { get; set; }
+
+    /// <summary>"Jazigo" ou "Gaveta" — define qual aba mostrar.</summary>
+    [Parameter] public string TipoLocal { get; set; } = "Jazigo";
+
+    private bool isLoading = true;
+
+    // Jazigos
+    private List<string> quadrasJazigo = new();
+    private Dictionary<string, Dictionary<string, List<Jazigo>>> jazigosAgrupados = new();
+
+    // Gavetas
+    private List<string> quadrasGaveta = new();
+    private Dictionary<string, Dictionary<string, List<GavetaPublica>>> gavetasAgrupadas = new();
+
+    // Seleção corrente
+    private int? selectedJazigoId;
+    private int? selectedGavetaId;
+    private string descricaoSelecionado = "";
+    private Jazigo?     _jazigoSelecionado;
+    private GavetaPublica? _gavetaSelecionada;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarMapaAsync();
+    }
+
+    private async Task CarregarMapaAsync()
+    {
+        isLoading = true;
+        using var db = await DbFactory.CreateDbContextAsync();
+
+        // ── JAZIGOS ───────────────────────────────────────────────────────────
+        if (TipoLocal == "Jazigo")
+        {
+            var todosJazigos = await db.Jazigos
+                .Include(j => j.Falecidos)
+                .Where(j => !db.Jazigos.Any(filho => filho.JazigoPaiId == j.Id))
+                .Where(j => j.IsInfantil == FalecidoIsInfantil)          // Regra de negócio
+                .OrderBy(j => j.NumeroLote)
+                .ToListAsync();
+
+            var jazigosValidos = todosJazigos.Select(j =>
+            {
+                j.Quadra     = string.IsNullOrWhiteSpace(j.Quadra)     ? "S/Q" : j.Quadra;
+                j.Ala        = string.IsNullOrWhiteSpace(j.Ala)        ? "S/A" : j.Ala;
+                j.NumeroLote = string.IsNullOrWhiteSpace(j.NumeroLote) ? j.CodigoIdentificador : j.NumeroLote;
+                return j;
+            }).ToList();
+
+            quadrasJazigo = jazigosValidos.Select(j => j.Quadra).Distinct().OrderBy(q => q).ToList();
+            jazigosAgrupados = jazigosValidos
+                .GroupBy(j => j.Quadra)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.GroupBy(j => j.Ala)
+                           .OrderBy(a => a.Key)
+                           .ToDictionary(a => a.Key, a => a.ToList())
+                );
+        }
+
+        // ── GAVETAS ───────────────────────────────────────────────────────────
+        if (TipoLocal == "Gaveta")
+        {
+            var todasGavetas = await db.GavetasPublicas
+                .Where(g => g.IsInfantil == FalecidoIsInfantil)          // Regra de negócio
+                .OrderBy(g => g.NumeroGaveta)
+                .ToListAsync();
+
+            var gavetasValidas = todasGavetas.Select(g =>
+            {
+                g.Quadra = string.IsNullOrWhiteSpace(g.Quadra) ? "S/Q" : g.Quadra;
+                g.Setor  = string.IsNullOrWhiteSpace(g.Setor)  ? "S/S" : g.Setor;
+                return g;
+            }).ToList();
+
+            quadrasGaveta = gavetasValidas.Select(g => g.Quadra).Distinct().OrderBy(q => q).ToList();
+            gavetasAgrupadas = gavetasValidas
+                .GroupBy(g => g.Quadra)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.GroupBy(x => x.Setor)
+                           .OrderBy(s => s.Key)
+                           .ToDictionary(s => s.Key, s => s.ToList())
+                );
+        }
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    // ── Handlers de clique ──────────────────────────────────────────────────
+
+    private void SelecionarJazigo(Jazigo jazigo)
+    {
+        if (jazigo.Ocupado) return;
+
+        selectedJazigoId   = jazigo.Id;
+        selectedGavetaId   = null;
+        _jazigoSelecionado = jazigo;
+        _gavetaSelecionada = null;
+        descricaoSelecionado = $"Jazigo {jazigo.CodigoIdentificador}  |  Quadra {jazigo.Quadra}  ·  Ala {jazigo.Ala}  ·  Lote {jazigo.NumeroLote}";
+        StateHasChanged();
+    }
+
+    private void SelecionarGaveta(GavetaPublica gaveta)
+    {
+        if (gaveta.Ocupada) return;
+
+        selectedGavetaId   = gaveta.Id;
+        selectedJazigoId   = null;
+        _gavetaSelecionada = gaveta;
+        _jazigoSelecionado = null;
+        descricaoSelecionado = $"Gaveta {gaveta.NumeroGaveta}  |  Setor {gaveta.Setor}  ·  Quadra {gaveta.Quadra}";
+        StateHasChanged();
+    }
+
+    private void LimparSelecao()
+    {
+        selectedJazigoId   = null;
+        selectedGavetaId   = null;
+        _jazigoSelecionado = null;
+        _gavetaSelecionada = null;
+        descricaoSelecionado = "";
+        StateHasChanged();
+    }
+
+    // ── Confirmação / Cancelamento ──────────────────────────────────────────
+
+    private void Confirmar()
+    {
+        ResultadoSelecaoLocal resultado;
+
+        if (selectedJazigoId.HasValue && _jazigoSelecionado != null)
+        {
+            resultado = new ResultadoSelecaoLocal
+            {
+                TipoLocal = "Jazigo",
+                JazigoId  = _jazigoSelecionado.Id,
+                Descricao = descricaoSelecionado
+            };
+        }
+        else if (selectedGavetaId.HasValue && _gavetaSelecionada != null)
+        {
+            resultado = new ResultadoSelecaoLocal
+            {
+                TipoLocal = "Gaveta",
+                GavetaId  = _gavetaSelecionada.Id,
+                Descricao = descricaoSelecionado
+            };
+        }
+        else return;
+
+        MudDialog.Close(DialogResult.Ok(resultado));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    // ── DTO de resultado ────────────────────────────────────────────────────
+
+    /// <summary>Retornado ao dialog pai com os dados do local selecionado.</summary>
+    public class ResultadoSelecaoLocal
+    {
+        public string TipoLocal { get; set; } = "";   // "Jazigo" ou "Gaveta"
+        public int?   JazigoId  { get; set; }
+        public int?   GavetaId  { get; set; }
+        public string Descricao { get; set; } = "";
+    }
+}

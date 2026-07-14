@@ -61,6 +61,9 @@
                 <MudTextField @bind-Value="novoAtendimento.Falecido.Cpf" Label="CPF do Falecido (somente números)" Required="true" RequiredError="CPF é obrigatório" HelperText="11 dígitos, sem pontuação" />
             </MudItem>
             <MudItem xs="12" sm="3">
+                <MudDatePicker Label="Data de Nascimento" @bind-Date="dataNascimento" Editable="true" HelperText="Opcional — usado para regra de jazigo infantil" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
                 <MudDatePicker Label="Data de Falecimento" @bind-Date="dataFalecimento" Required="true" RequiredError="Data obrigatória" />
             </MudItem>
             
@@ -226,6 +229,7 @@
     };
     
     private DateTime? dataFalecimento = DateTime.Today;
+    private DateTime? dataNascimento;
     private List<Funeraria> funerarias = new();
 
     // Upload de documentos
@@ -339,6 +343,12 @@
             else
             {
                 novoAtendimento.Falecido.DataFalecimento = DateTime.UtcNow;
+            }
+
+            // Atribuir data de nascimento (para regra de jazigo infantil ≤ 12 anos)
+            if (dataNascimento.HasValue)
+            {
+                novoAtendimento.Falecido.DataNascimento = DateTime.SpecifyKind(dataNascimento.Value, DateTimeKind.Utc);
             }
 
             // ROB-04: Comparar CPF de forma limpa, garantindo que o índice seja usado e compatibilidade com PostgreSQL

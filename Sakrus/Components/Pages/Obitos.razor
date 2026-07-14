@@ -239,9 +239,11 @@
     {
         var parameters = new DialogParameters 
         { 
-            ["AtendimentoId"] = atendimento.Id,
-            ["FalecidoId"] = atendimento.FalecidoId,
-            ["FalecidoNome"] = atendimento.Falecido?.Nome ?? ""
+            ["AtendimentoId"]           = atendimento.Id,
+            ["FalecidoId"]              = atendimento.FalecidoId,
+            ["FalecidoNome"]            = atendimento.Falecido?.Nome ?? "",
+            ["FalecidoDataNascimento"]  = atendimento.Falecido?.DataNascimento,
+            ["FalecidoDataFalecimento"] = atendimento.Falecido?.DataFalecimento ?? DateTime.UtcNow
         };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
         
@@ -257,6 +259,22 @@
 
     private async Task AbrirRealizarExumacao(Atendimento atendimento)
     {
+        // Regra de negócio: exumação só é permitida após 3 anos do sepultamento
+        if (atendimento.DataSepultamento.HasValue)
+        {
+            var dataMinimaExumacao = atendimento.DataSepultamento.Value.ToLocalTime().AddYears(3);
+            if (DateTime.Now < dataMinimaExumacao)
+            {
+                Snackbar.Add(
+                    $"Exumação não permitida. O prazo mínimo de 3 anos ainda não foi atingido. " +
+                    $"Data mínima: {dataMinimaExumacao:dd/MM/yyyy}.",
+                    Severity.Warning,
+                    config => { config.VisibleStateDuration = 6000; config.ShowCloseIcon = true; }
+                );
+                return;
+            }
+        }
+
         var parameters = new DialogParameters 
         { 
             ["AtendimentoId"] = atendimento.Id,
@@ -274,6 +292,7 @@
             await CarregarDadosAsync();
         }
     }
+
 
     private async Task AbrirDocumentos(Atendimento atendimento)
     {

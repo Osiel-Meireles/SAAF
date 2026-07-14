@@ -15,6 +15,8 @@ namespace Sakrus.Core.Entities
         [RegularExpression(@"^\d{11}$", ErrorMessage = "CPF deve conter 11 dígitos")]
         public string Cpf { get; set; } = string.Empty;
         
+        public DateTime? DataNascimento { get; set; }
+        
         public DateTime DataFalecimento { get; set; }
         
         // Propriedade padronizada usando o seu tipo CausaMorte

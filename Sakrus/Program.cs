@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -89,6 +89,15 @@ builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<Sakrus.Services.AgendaService>();
 
 var app = builder.Build();
+
+// --- Configuração de Localização (pt-BR) ---
+var supportedCultures = new[] { "pt-BR" };
+var localizationOptions = new RequestLocalizationOptions()
+    .SetDefaultCulture(supportedCultures[0])
+    .AddSupportedCultures(supportedCultures)
+    .AddSupportedUICultures(supportedCultures);
+
+app.UseRequestLocalization(localizationOptions);
 
 // --- Pipeline HTTP ---
 if (!app.Environment.IsDevelopment())
