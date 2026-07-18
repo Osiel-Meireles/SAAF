@@ -444,7 +444,23 @@
     private async Task AbrirExecucaoExumacao()
     {
         if (gaveta == null) return;
-        
+
+        // Regra de negócio: exumação só é permitida após 3 anos da data de sepultamento
+        if (gaveta.DataOcupacao.HasValue)
+        {
+            var dataMinimaExumacao = gaveta.DataOcupacao.Value.ToLocalTime().AddYears(3);
+            if (DateTime.Now < dataMinimaExumacao)
+            {
+                Snackbar.Add(
+                    $"Exumação não permitida. O prazo mínimo de 3 anos ainda não foi atingido. " +
+                    $"Data mínima: {dataMinimaExumacao:dd/MM/yyyy}.",
+                    Severity.Warning,
+                    config => { config.VisibleStateDuration = 6000; config.ShowCloseIcon = true; }
+                );
+                return;
+            }
+        }
+
         var parameters = new DialogParameters { ["GavetaId"] = gaveta.Id, ["GavetaNumero"] = gaveta.NumeroGaveta };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         
