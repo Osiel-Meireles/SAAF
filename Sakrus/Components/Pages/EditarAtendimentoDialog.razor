@@ -36,8 +36,55 @@
 
                     @* --- DADOS DO FALECIDO --- *@
                     <MudItem xs="12" Class="mt-4">
-                        <MudText Typo="Typo.h6" Color="Color.Primary">Dados do Falecido</MudText>
-                        <MudDivider Class="mb-3" />
+                        <div class="d-flex align-center justify-space-between">
+                            <MudText Typo="Typo.h6" Color="Color.Primary">Dados do Falecido</MudText>
+                            @if (!string.IsNullOrEmpty(atendimento.Falecido.CodigoIndigente))
+                            {
+                                <MudChip T="string" Color="@(atendimento.Falecido.EhIndigente ? Color.Warning : Color.Success)" Size="Size.Small" Icon="@(atendimento.Falecido.EhIndigente ? Icons.Material.Filled.PersonOff : Icons.Material.Filled.HowToReg)">
+                                    @(atendimento.Falecido.EhIndigente ? "Indigente" : "Reconhecido") — @atendimento.Falecido.CodigoIndigente
+                                </MudChip>
+                            }
+                        </div>
+                        @if (atendimento.Falecido.EhIndigente)
+                        {
+                            <MudPaper Elevation="0" Class="pa-3 mt-2 mb-2" Style="border: 1px solid var(--mud-palette-warning); border-radius: 8px; background: rgba(var(--mud-palette-warning-rgb), 0.05);">
+                                <div class="d-flex align-center justify-space-between gap-3">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
+                                        <div>
+                                            <MudText Typo="Typo.subtitle2" Color="Color.Warning">Registro de Pessoa Indigente / Não Identificada</MudText>
+                                            <MudText Typo="Typo.caption">Desmarque ao lado para concluir o reconhecimento civil e atualizar o status do registro.</MudText>
+                                        </div>
+                                    </div>
+                                    <MudSwitch @bind-Value="atendimento.Falecido.EhIndigente" 
+                                               Color="Color.Warning" 
+                                               Label="@(atendimento.Falecido.EhIndigente ? "Status: Indigente" : "Reconhecido")" />
+                                </div>
+                            </MudPaper>
+                        }
+                        else if (!string.IsNullOrEmpty(atendimento.Falecido.CodigoIndigente))
+                        {
+                            <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2 mb-2" Icon="@Icons.Material.Filled.HowToReg">
+                                <div class="d-flex align-center justify-space-between">
+                                    <span><strong>Reconhecimento Civil Realizado:</strong> Este registro iniciou como indigente (@atendimento.Falecido.CodigoIndigente), mas seu status civil foi formalmente atualizado.</span>
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Success" OnClick="@(() => atendimento.Falecido.EhIndigente = true)">Reverter para Indigente</MudButton>
+                                </div>
+                            </MudAlert>
+                        }
+                        <MudDivider Class="mb-3 mt-1" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="atendimento.Falecido.Nome"
+                                      Label="Nome do Falecido"
+                                      Required="@(!atendimento.Falecido.EhIndigente)"
+                                      RequiredError="Nome é obrigatório"
+                                      HelperText="@(atendimento.Falecido.EhIndigente ? "Opcional para indigentes" : null)" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="atendimento.Falecido.Cpf"
+                                      Label="CPF do Falecido"
+                                      HelperText="@(atendimento.Falecido.EhIndigente ? "Opcional — preencha quando identificado" : "11 dígitos, sem pontuação")" />
                     </MudItem>
 
                     <MudItem xs="12" sm="6">
@@ -85,8 +132,18 @@
                         </MudSelect>
                     </MudItem>
 
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="int?" Label="Funerária Credenciada" @bind-Value="atendimento.FunerariaId" Clearable="true">
+                            <MudSelectItem T="int?" Value="null">Nenhuma / Próprio Município</MudSelectItem>
+                            @foreach (var f in funerarias)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)f.Id)">@f.Nome</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
                     <MudItem xs="12">
-                        <MudTextField @bind-Value="atendimento.NumeroDeclaracaoObito" Label="NÂº Declaração de Óbito" />
+                        <MudTextField @bind-Value="atendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" />
                     </MudItem>
                 </MudGrid>
             </MudForm>
@@ -113,10 +170,12 @@
     private DateTime? dataFalecimento;
     private MudForm form = null!;
     private bool sucesso;
+    private List<Funeraria> funerarias = new();
 
     protected override async Task OnInitializedAsync()
     {
         DbContext = DbFactory.CreateDbContext();
+        funerarias = await DbContext.Funerarias.OrderBy(f => f.Nome).ToListAsync();
         await CarregarAtendimento();
     }
 
@@ -138,8 +197,41 @@
         await form.Validate();
         if (!form.IsValid || atendimento == null) return;
 
+        if (!atendimento.Falecido.EhIndigente)
+        {
+            if (!string.IsNullOrWhiteSpace(atendimento.Responsavel.CPF) &&
+                !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(atendimento.Responsavel.CPF))
+            {
+                Snackbar.Add("O CPF do Responsável é inválido.", Severity.Error);
+                return;
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(atendimento.Falecido.Cpf) &&
+            !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(atendimento.Falecido.Cpf))
+        {
+            Snackbar.Add("O CPF do Falecido é inválido.", Severity.Error);
+            return;
+        }
+
+        if (!atendimento.Falecido.EhIndigente && 
+            !string.IsNullOrEmpty(atendimento.Falecido.CodigoIndigente) && 
+            atendimento.Falecido.Nome.StartsWith("INDIGENTE", StringComparison.OrdinalIgnoreCase))
+        {
+            Snackbar.Add("Por favor, atualize o nome do falecido com a identificação civil correta antes de desmarcar o modo indigente.", Severity.Warning);
+            return;
+        }
+
         try
         {
+            if (!string.IsNullOrEmpty(atendimento.Responsavel?.CPF))
+            {
+                atendimento.Responsavel.CPF = new string(atendimento.Responsavel.CPF.Where(char.IsDigit).ToArray());
+            }
+            if (!string.IsNullOrEmpty(atendimento.Falecido?.Cpf))
+            {
+                atendimento.Falecido.Cpf = new string(atendimento.Falecido.Cpf.Where(char.IsDigit).ToArray());
+            }
+
             if (dataFalecimento.HasValue)
             {
                 atendimento.Falecido.DataFalecimento = dataFalecimento.Value;

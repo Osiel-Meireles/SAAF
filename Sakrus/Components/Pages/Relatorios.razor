@@ -132,6 +132,44 @@
             </MudCardActions>
         </MudCard>
     </MudItem>
+
+    @* Card 6: Relatório por Funerária *@
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="h-100 d-flex flex-column">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Large" Color="Color.Info" Class="mb-3" />
+                <MudText Typo="Typo.h6">Por Funerária</MudText>
+                <MudText Typo="Typo.body2">Atendimentos agrupados por funerária atuante</MudText>
+            </MudCardContent>
+            <MudCardActions Class="mt-auto">
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" OnClick='() => Gerar("PorFuneraria", "PDF")'>
+                    PDF
+                </MudButton>
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FileDocument" Color="Color.Info" OnClick='() => Gerar("PorFuneraria", "TXT")'>
+                    TXT
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    @* Card 7: Relatório por Convênio *@
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="h-100 d-flex flex-column">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.CardMembership" Size="Size.Large" Color="Color.Success" Class="mb-3" />
+                <MudText Typo="Typo.h6">Por Tipo de Convênio</MudText>
+                <MudText Typo="Typo.body2">Atendimentos agrupados por origem (AuxilioFuneral, Particular, etc.)</MudText>
+            </MudCardContent>
+            <MudCardActions Class="mt-auto">
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FilePdf" Color="Color.Error" OnClick='() => Gerar("PorConvenio", "PDF")'>
+                    PDF
+                </MudButton>
+                <MudButton StartIcon="@Icons.Custom.FileFormats.FileDocument" Color="Color.Info" OnClick='() => Gerar("PorConvenio", "TXT")'>
+                    TXT
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
 </MudGrid>
 
 <MudOverlay Visible="isGenerating" DarkBackground="true" ZIndex="9999">
@@ -206,10 +244,10 @@
                         .AsNoTracking()
                         .AsQueryable();
 
-                    if (inicio.HasValue) queryAtend = queryAtend.Where(a => a.DataSepultamento >= inicio.Value);
-                    if (fim.HasValue) queryAtend = queryAtend.Where(a => a.DataSepultamento <= fim.Value);
+                    if (inicio.HasValue) queryAtend = queryAtend.Where(a => (a.DataSepultamento ?? a.Falecido.DataFalecimento) >= inicio.Value);
+                    if (fim.HasValue) queryAtend = queryAtend.Where(a => (a.DataSepultamento ?? a.Falecido.DataFalecimento) <= fim.Value);
                     
-                    var atendimentos = await queryAtend.OrderByDescending(a => a.DataSepultamento).ToListAsync();
+                    var atendimentos = await queryAtend.OrderByDescending(a => a.DataSepultamento ?? a.Falecido.DataFalecimento).ToListAsync();
                     
                     if (formato == "PDF") fileBytes = RelatorioService.GerarPdfAtendimentos(atendimentos, periodoStr);
                     else fileBytes = RelatorioService.GerarTxtAtendimentos(atendimentos, periodoStr);
@@ -226,13 +264,14 @@
                     var queryFin = DbContext.Atendimentos
                         .Include(a => a.ItensFaturados)
                         .Include(a => a.Responsavel)
+                        .Include(a => a.Falecido)
                         .AsNoTracking()
                         .Where(a => !string.IsNullOrEmpty(a.NumeroOsAuxilio));
 
-                    if (inicio.HasValue) queryFin = queryFin.Where(a => a.DataSepultamento >= inicio.Value);
-                    if (fim.HasValue) queryFin = queryFin.Where(a => a.DataSepultamento <= fim.Value);
+                    if (inicio.HasValue) queryFin = queryFin.Where(a => (a.DataSepultamento ?? a.Falecido.DataFalecimento) >= inicio.Value);
+                    if (fim.HasValue) queryFin = queryFin.Where(a => (a.DataSepultamento ?? a.Falecido.DataFalecimento) <= fim.Value);
                     
-                    var financeiro = await queryFin.OrderByDescending(a => a.DataSepultamento).ToListAsync();
+                    var financeiro = await queryFin.OrderByDescending(a => a.DataSepultamento ?? a.Falecido.DataFalecimento).ToListAsync();
                     
                     if (formato == "PDF") fileBytes = RelatorioService.GerarPdfFinanceiro(financeiro, periodoStr);
                     else fileBytes = RelatorioService.GerarTxtFinanceiro(financeiro, periodoStr);
@@ -268,6 +307,40 @@
                     
                     if (formato == "PDF") fileBytes = RelatorioService.GerarPdfEstatisticas(causas, periodoStr);
                     else fileBytes = RelatorioService.GerarTxtEstatisticas(causas, periodoStr);
+                    break;
+
+                case "PorFuneraria":
+                    var queryFun = DbContext.Atendimentos
+                        .Include(a => a.Responsavel)
+                        .Include(a => a.Falecido)
+                        .Include(a => a.Funeraria)
+                        .AsNoTracking()
+                        .AsQueryable();
+
+                    if (inicio.HasValue) queryFun = queryFun.Where(a => (a.DataSepultamento ?? a.Falecido.DataFalecimento) >= inicio.Value);
+                    if (fim.HasValue) queryFun = queryFun.Where(a => (a.DataSepultamento ?? a.Falecido.DataFalecimento) <= fim.Value);
+
+                    var atendFun = await queryFun.OrderByDescending(a => a.DataSepultamento ?? a.Falecido.DataFalecimento).ToListAsync();
+
+                    if (formato == "PDF") fileBytes = RelatorioService.GerarPdfPorFuneraria(atendFun, periodoStr);
+                    else fileBytes = RelatorioService.GerarTxtPorFuneraria(atendFun, periodoStr);
+                    break;
+
+                case "PorConvenio":
+                    var queryConv = DbContext.Atendimentos
+                        .Include(a => a.Responsavel)
+                        .Include(a => a.Falecido)
+                        .Include(a => a.Funeraria)
+                        .AsNoTracking()
+                        .AsQueryable();
+
+                    if (inicio.HasValue) queryConv = queryConv.Where(a => (a.DataSepultamento ?? a.Falecido.DataFalecimento) >= inicio.Value);
+                    if (fim.HasValue) queryConv = queryConv.Where(a => (a.DataSepultamento ?? a.Falecido.DataFalecimento) <= fim.Value);
+
+                    var atendConv = await queryConv.OrderByDescending(a => a.DataSepultamento ?? a.Falecido.DataFalecimento).ToListAsync();
+
+                    if (formato == "PDF") fileBytes = RelatorioService.GerarPdfPorConvenio(atendConv, periodoStr);
+                    else fileBytes = RelatorioService.GerarTxtPorConvenio(atendConv, periodoStr);
                     break;
             }
 

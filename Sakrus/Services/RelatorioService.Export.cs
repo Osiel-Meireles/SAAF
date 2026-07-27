@@ -80,7 +80,7 @@ public partial class RelatorioService
                             table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Id.ToString());
                             table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Falecido?.Nome ?? "N/A");
                             table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Responsavel?.Nome ?? "N/A");
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.DataSepultamento?.ToString("dd/MM/yyyy") ?? "-");
+                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text((a.DataSepultamento ?? a.Falecido?.DataFalecimento)?.ToString("dd/MM/yyyy") ?? "-");
                         }
                     });
                     col.Item().PaddingTop(10).AlignRight().Text($"Total de registros: {atendimentos.Count}").SemiBold();
@@ -105,7 +105,7 @@ public partial class RelatorioService
             if (falecido.Length > 30) falecido = falecido.Substring(0, 30);
             var resp = (a.Responsavel?.Nome ?? "N/A").PadRight(25);
             if (resp.Length > 25) resp = resp.Substring(0, 25);
-            var data = (a.DataSepultamento?.ToString("dd/MM/yyyy") ?? "-").PadRight(10);
+            var data = ((a.DataSepultamento ?? a.Falecido?.DataFalecimento)?.ToString("dd/MM/yyyy") ?? "-").PadRight(10);
             sb.AppendLine($"{a.Id,-5} | {falecido} | {resp} | {data}");
         }
         sb.AppendLine(new string('-', 80));
@@ -233,7 +233,7 @@ public partial class RelatorioService
                         {
                             var valorOs = a.ItensFaturados.Sum(i => i.ValorTotalCalculado);
                             table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.NumeroOsAuxilio);
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.DataSepultamento?.ToString("dd/MM/yy") ?? "-");
+                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text((a.DataSepultamento ?? a.Falecido?.DataFalecimento)?.ToString("dd/MM/yy") ?? "-");
                             table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Responsavel?.Nome ?? "N/A");
                             table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).AlignRight().Text($"R$ {valorOs:N2}");
                         }
@@ -262,7 +262,7 @@ public partial class RelatorioService
             var valorOs = a.ItensFaturados.Sum(i => i.ValorTotalCalculado);
             var resp = (a.Responsavel?.Nome ?? "N/A").PadRight(35);
             if (resp.Length > 35) resp = resp.Substring(0, 35);
-            var data = (a.DataSepultamento?.ToString("dd/MM/yyyy") ?? "-").PadRight(10);
+            var data = ((a.DataSepultamento ?? a.Falecido?.DataFalecimento)?.ToString("dd/MM/yyyy") ?? "-").PadRight(10);
             sb.AppendLine($"{a.NumeroOsAuxilio,-15} | {data} | {resp} | R$ {valorOs,9:N2}");
         }
         sb.AppendLine(new string('-', 80));
@@ -393,6 +393,225 @@ public partial class RelatorioService
         }
         sb.AppendLine(new string('-', 60));
         sb.AppendLine($"Total de Óbitos: {total}");
+        return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    // --- POR FUNERÁRIA ---
+    public byte[] GerarPdfPorFuneraria(List<Atendimento> atendimentos, string periodo)
+    {
+        // Agrupar por funerária (null = sem funerária)
+        var grupos = atendimentos
+            .GroupBy(a => a.Funeraria?.Nome ?? "Sem Funerária / Próprio Município")
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        var doc = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                ConfigurarPaginaPadrao(page, "RELATÓRIO POR FUNERÁRIA", periodo);
+                page.Content().PaddingVertical(10).Column(col =>
+                {
+                    col.Spacing(10);
+                    col.Item().Text($"Total de atendimentos: {atendimentos.Count}").SemiBold();
+
+                    foreach (var grupo in grupos)
+                    {
+                        col.Item().PaddingTop(8).Text(grupo.Key).FontSize(12).SemiBold().FontColor(Colors.Blue.Darken2);
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(c =>
+                            {
+                                c.ConstantColumn(45); // ID
+                                c.RelativeColumn();   // Falecido
+                                c.RelativeColumn();   // Responsável
+                                c.ConstantColumn(85); // Data
+                                c.RelativeColumn();   // Origem
+                            });
+                            table.Header(h =>
+                            {
+                                h.Cell().BorderBottom(1).Text("ID").SemiBold();
+                                h.Cell().BorderBottom(1).Text("Falecido").SemiBold();
+                                h.Cell().BorderBottom(1).Text("Responsável").SemiBold();
+                                h.Cell().BorderBottom(1).Text("Sepultamento").SemiBold();
+                                h.Cell().BorderBottom(1).Text("Convênio").SemiBold();
+                            });
+                            foreach (var a in grupo.OrderByDescending(x => x.DataSepultamento ?? x.Falecido?.DataFalecimento))
+                            {
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Id.ToString());
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Falecido?.Nome ?? "N/A");
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Responsavel?.Nome ?? "N/A");
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text((a.DataSepultamento ?? a.Falecido?.DataFalecimento)?.ToString("dd/MM/yyyy") ?? "-");
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Origem.ToString());
+                            }
+                        });
+                        col.Item().AlignRight().Text($"Subtotal: {grupo.Count()} atendimento(s)").FontSize(9).Italic();
+                    }
+                });
+            });
+        });
+        return doc.GeneratePdf();
+    }
+
+    public byte[] GerarTxtPorFuneraria(List<Atendimento> atendimentos, string periodo)
+    {
+        var grupos = atendimentos
+            .GroupBy(a => a.Funeraria?.Nome ?? "Sem Funerária / Próprio Município")
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("SAAF - RELATÓRIO POR FUNERÁRIA");
+        sb.AppendLine($"Período: {periodo}");
+        sb.AppendLine($"Gerado em: {DateTime.Now:dd/MM/yyyy HH:mm}");
+        sb.AppendLine($"Total de atendimentos: {atendimentos.Count}");
+        sb.AppendLine(new string('=', 90));
+
+        foreach (var grupo in grupos)
+        {
+            sb.AppendLine();
+            sb.AppendLine($">>> {grupo.Key} ({grupo.Count()} atendimento(s))");
+            sb.AppendLine(new string('-', 90));
+            sb.AppendLine($"{"ID",-5} | {"Falecido",-28} | {"Responsável",-24} | {"Data",-10} | {"Convênio",-18}");
+            sb.AppendLine(new string('-', 90));
+            foreach (var a in grupo.OrderByDescending(x => x.DataSepultamento ?? x.Falecido?.DataFalecimento))
+            {
+                var fal = (a.Falecido?.Nome ?? "N/A").PadRight(28); if (fal.Length > 28) fal = fal[..28];
+                var resp = (a.Responsavel?.Nome ?? "N/A").PadRight(24); if (resp.Length > 24) resp = resp[..24];
+                var data = ((a.DataSepultamento ?? a.Falecido?.DataFalecimento)?.ToString("dd/MM/yyyy") ?? "-").PadRight(10);
+                var orig = a.Origem.ToString().PadRight(18);
+                sb.AppendLine($"{a.Id,-5} | {fal} | {resp} | {data} | {orig}");
+            }
+        }
+        sb.AppendLine(new string('=', 90));
+        return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    // --- POR CONVÊNIO (OrigemAtendimento) ---
+    public byte[] GerarPdfPorConvenio(List<Atendimento> atendimentos, string periodo)
+    {
+        var grupos = atendimentos
+            .GroupBy(a => a.Origem.ToString())
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        var doc = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                ConfigurarPaginaPadrao(page, "RELATÓRIO POR TIPO DE CONVÊNIO", periodo);
+                page.Content().PaddingVertical(10).Column(col =>
+                {
+                    col.Spacing(10);
+
+                    // Tabela-resumo
+                    col.Item().Text("Resumo por Convênio").FontSize(12).SemiBold();
+                    col.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(c =>
+                        {
+                            c.RelativeColumn(3);
+                            c.ConstantColumn(70);
+                            c.ConstantColumn(60);
+                        });
+                        table.Header(h =>
+                        {
+                            h.Cell().BorderBottom(1).Text("Tipo de Convênio").SemiBold();
+                            h.Cell().BorderBottom(1).AlignRight().Text("Quantidade").SemiBold();
+                            h.Cell().BorderBottom(1).AlignRight().Text("%").SemiBold();
+                        });
+                        int total = atendimentos.Count;
+                        foreach (var g in grupos.OrderByDescending(x => x.Count()))
+                        {
+                            var pct = total > 0 ? g.Count() / (double)total * 100 : 0;
+                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(g.Key);
+                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).AlignRight().Text(g.Count().ToString());
+                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).AlignRight().Text($"{pct:F1}%");
+                        }
+                    });
+
+                    col.Item().PaddingTop(10).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+
+                    // Detalhe por convênio
+                    foreach (var grupo in grupos)
+                    {
+                        col.Item().PaddingTop(8).Text(grupo.Key).FontSize(12).SemiBold().FontColor(Colors.Blue.Darken2);
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(c =>
+                            {
+                                c.ConstantColumn(45);
+                                c.RelativeColumn();
+                                c.RelativeColumn();
+                                c.ConstantColumn(85);
+                                c.RelativeColumn();
+                            });
+                            table.Header(h =>
+                            {
+                                h.Cell().BorderBottom(1).Text("ID").SemiBold();
+                                h.Cell().BorderBottom(1).Text("Falecido").SemiBold();
+                                h.Cell().BorderBottom(1).Text("Responsável").SemiBold();
+                                h.Cell().BorderBottom(1).Text("Sepultamento").SemiBold();
+                                h.Cell().BorderBottom(1).Text("Funerária").SemiBold();
+                            });
+                            foreach (var a in grupo.OrderByDescending(x => x.DataSepultamento ?? x.Falecido?.DataFalecimento))
+                            {
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Id.ToString());
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Falecido?.Nome ?? "N/A");
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Responsavel?.Nome ?? "N/A");
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text((a.DataSepultamento ?? a.Falecido?.DataFalecimento)?.ToString("dd/MM/yyyy") ?? "-");
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten4).PaddingVertical(2).Text(a.Funeraria?.Nome ?? "-");
+                            }
+                        });
+                        col.Item().AlignRight().Text($"Subtotal: {grupo.Count()} atendimento(s)").FontSize(9).Italic();
+                    }
+                });
+            });
+        });
+        return doc.GeneratePdf();
+    }
+
+    public byte[] GerarTxtPorConvenio(List<Atendimento> atendimentos, string periodo)
+    {
+        var grupos = atendimentos
+            .GroupBy(a => a.Origem.ToString())
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        int total = atendimentos.Count;
+        var sb = new StringBuilder();
+        sb.AppendLine("SAAF - RELATÓRIO POR TIPO DE CONVÊNIO");
+        sb.AppendLine($"Período: {periodo}");
+        sb.AppendLine($"Gerado em: {DateTime.Now:dd/MM/yyyy HH:mm}");
+        sb.AppendLine($"Total de atendimentos: {total}");
+        sb.AppendLine(new string('=', 90));
+        sb.AppendLine("RESUMO:");
+        sb.AppendLine($"{"Tipo de Convênio",-30} | {"Quantidade",-10} | {"%",-8}");
+        sb.AppendLine(new string('-', 55));
+        foreach (var g in grupos.OrderByDescending(x => x.Count()))
+        {
+            var pct = total > 0 ? g.Count() / (double)total * 100 : 0;
+            sb.AppendLine($"{g.Key,-30} | {g.Count(),10} | {pct,7:F1}%");
+        }
+        sb.AppendLine(new string('=', 90));
+
+        foreach (var grupo in grupos)
+        {
+            sb.AppendLine();
+            sb.AppendLine($">>> {grupo.Key} ({grupo.Count()} atendimento(s))");
+            sb.AppendLine(new string('-', 90));
+            sb.AppendLine($"{"ID",-5} | {"Falecido",-28} | {"Responsável",-24} | {"Data",-10} | {"Funerária",-15}");
+            sb.AppendLine(new string('-', 90));
+            foreach (var a in grupo.OrderByDescending(x => x.DataSepultamento ?? x.Falecido?.DataFalecimento))
+            {
+                var fal = (a.Falecido?.Nome ?? "N/A").PadRight(28); if (fal.Length > 28) fal = fal[..28];
+                var resp = (a.Responsavel?.Nome ?? "N/A").PadRight(24); if (resp.Length > 24) resp = resp[..24];
+                var data = ((a.DataSepultamento ?? a.Falecido?.DataFalecimento)?.ToString("dd/MM/yyyy") ?? "-").PadRight(10);
+                var fun = (a.Funeraria?.Nome ?? "-").PadRight(15); if (fun.Length > 15) fun = fun[..15];
+                sb.AppendLine($"{a.Id,-5} | {fal} | {resp} | {data} | {fun}");
+            }
+        }
+        sb.AppendLine(new string('=', 90));
         return Encoding.UTF8.GetBytes(sb.ToString());
     }
 }

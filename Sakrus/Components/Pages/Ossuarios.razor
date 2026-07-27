@@ -68,9 +68,9 @@ else
     <MudPaper Class="pa-4 mb-4" Elevation="1">
         <MudGrid>
             <MudItem xs="12" sm="4">
-                <MudTextField @bind-Value="filtroTexto" Placeholder="Buscar por identificador..."
+                <MudTextField @bind-Value="filtroTexto" Placeholder="Buscar por identificador, jazigo ou tipo..."
                               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                              Immediate="true" />
+                              Immediate="true" Clearable="true" />
             </MudItem>
             <MudItem xs="12" sm="4">
                 <MudSelect T="TipoOssuario?" Label="Tipo" @bind-Value="filtroTipo" Clearable="true">
@@ -78,6 +78,15 @@ else
                     <MudSelectItem T="TipoOssuario?" Value="TipoOssuario.Geral">Geral</MudSelectItem>
                     <MudSelectItem T="TipoOssuario?" Value="TipoOssuario.Particular">Particular</MudSelectItem>
                 </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4" Class="d-flex align-center">
+                @if (!string.IsNullOrEmpty(filtroTexto) || filtroTipo != null)
+                {
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small" Icon="@Icons.Material.Filled.FilterAlt">
+                        @OssuariosFiltrados.Count() resultado(s)
+                    </MudChip>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Class="ml-2" OnClick="LimparFiltros">Limpar filtros</MudButton>
+                }
             </MudItem>
         </MudGrid>
     </MudPaper>
@@ -153,8 +162,17 @@ else
 
     private IEnumerable<OssuarioViewModel> OssuariosFiltrados => ossuarioViewModels
         .Where(vm =>
-            (string.IsNullOrEmpty(filtroTexto) || vm.Ossuario.Identificador.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(filtroTexto) ||
+             vm.Ossuario.Identificador.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase) ||
+             (vm.JazigoNome != null && vm.JazigoNome.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)) ||
+             vm.Ossuario.Tipo.ToString().Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)) &&
             (filtroTipo == null || vm.Ossuario.Tipo == filtroTipo));
+
+    private void LimparFiltros()
+    {
+        filtroTexto = "";
+        filtroTipo = null;
+    }
 
     protected override async Task OnInitializedAsync()
     {

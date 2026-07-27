@@ -20,33 +20,50 @@
 <MudPaper Class="pa-4" Elevation="2">
     <MudForm @ref="form" @bind-IsValid="@sucesso">
         <MudGrid>
-            @* --- 1. DADOS DO RESPONSÁVEL --- *@
+            @* ── MODO INDIGENTE ─────────────────────────────────────────────── *@
             <MudItem xs="12">
-                <MudText Typo="Typo.h6" Color="Color.Primary">Dados do Responsável</MudText>
-                <MudDivider Class="mb-3" />
+                <MudPaper Elevation="0" Class="pa-3 mb-1" Style="@(EhIndigente ? "border: 2px solid var(--mud-palette-warning); border-radius: 8px; background: rgba(var(--mud-palette-warning-rgb), 0.05);" : "border: 1px dashed var(--mud-palette-lines-default); border-radius: 8px;")">
+                    <div class="d-flex align-center gap-3">
+                        <MudIcon Icon="@Icons.Material.Filled.PersonOff" Color="@(EhIndigente ? Color.Warning : Color.Default)" />
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.subtitle2">Atendimento de Pessoa Indigente</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Marque quando o falecido não possui documentos de identificação. Os dados pessoais serão ocultados e um código único será gerado.</MudText>
+                        </div>
+                        <MudSwitch @bind-Value="EhIndigente" Color="Color.Warning" Label="@(EhIndigente ? "Modo Indigente ATIVO" : "Modo Indigente")" />
+                    </div>
+                </MudPaper>
             </MudItem>
-            
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="novoAtendimento.Responsavel.Nome" Label="Nome Completo" Required="true" RequiredError="O nome é obrigatório" />
-            </MudItem>
-            <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.Responsavel.CPF" Label="CPF (somente números)" Required="true" RequiredError="CPF obrigatório" HelperText="11 dígitos, sem pontuação" />
-            </MudItem>
-            <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.Responsavel.RG" Label="RG" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.Responsavel.OrgaoEmissor" Label="Órgão Emissor" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.Responsavel.Profissao" Label="Profissão" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.Responsavel.Telefone" Label="Telefone" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="9">
-                <MudTextField @bind-Value="novoAtendimento.Responsavel.Endereco" Label="Endereço Completo" Required="true" />
-            </MudItem>
+
+            @* --- 1. DADOS DO RESPONSÁVEL — oculto para indigentes --- *@
+            @if (!EhIndigente)
+            {
+                <MudItem xs="12" Class="mt-3">
+                    <MudText Typo="Typo.h6" Color="Color.Primary">Dados do Responsável</MudText>
+                    <MudDivider Class="mb-3" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="novoAtendimento.Responsavel.Nome" Label="Nome Completo" Required="true" RequiredError="O nome é obrigatório" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="novoAtendimento.Responsavel.CPF" Label="CPF (somente números)" Required="true" RequiredError="CPF obrigatório" HelperText="11 dígitos, sem pontuação" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="novoAtendimento.Responsavel.RG" Label="RG" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="novoAtendimento.Responsavel.OrgaoEmissor" Label="Órgão Emissor" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="novoAtendimento.Responsavel.Profissao" Label="Profissão" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="novoAtendimento.Responsavel.Telefone" Label="Telefone" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="9">
+                    <MudTextField @bind-Value="novoAtendimento.Responsavel.Endereco" Label="Endereço Completo" Required="true" />
+                </MudItem>
+            }
 
             @* --- 2. DADOS DO FALECIDO --- *@
             <MudItem xs="12" Class="mt-4">
@@ -54,54 +71,63 @@
                 <MudDivider Class="mb-3" />
             </MudItem>
 
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="novoAtendimento.Falecido.Nome" Label="Nome Completo do Falecido" Required="true" RequiredError="Nome é obrigatório" />
-            </MudItem>
-            <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.Falecido.Cpf" Label="CPF do Falecido (somente números)" Required="true" RequiredError="CPF é obrigatório" HelperText="11 dígitos, sem pontuação" />
-            </MudItem>
-            <MudItem xs="12" sm="3">
-                <MudDatePicker Label="Data de Nascimento" @bind-Date="dataNascimento" Editable="true" HelperText="Opcional — usado para regra de jazigo infantil" />
-            </MudItem>
-            <MudItem xs="12" sm="3">
+            @* Identificação — oculta para indigentes *@
+            @if (!EhIndigente)
+            {
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="novoAtendimento.Falecido.Nome" Label="Nome Completo do Falecido" Required="true" RequiredError="Nome é obrigatório" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="novoAtendimento.Falecido.Cpf" Label="CPF do Falecido (somente números)" Required="true" RequiredError="CPF é obrigatório" HelperText="11 dígitos, sem pontuação" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudDatePicker Label="Data de Nascimento" @bind-Date="dataNascimento" Editable="true" HelperText="Opcional — usado para regra de jazigo infantil" />
+                </MudItem>
+            }
+
+            @* Data e Local do Falecimento — sempre visíveis *@
+            <MudItem xs="12" sm="@(EhIndigente ? 6 : 3)">
                 <MudDatePicker Label="Data de Falecimento" @bind-Date="dataFalecimento" Required="true" RequiredError="Data obrigatória" />
             </MudItem>
             
-            @if (novoAtendimento.Falecido.TipoRestosMortais != TipoRestosMortais.PecaAnatomica)
+            @if (!EhIndigente)
             {
-                <MudItem xs="12" sm="3">
-                    <MudSelect T="CausaMorte" Label="Causa da Morte" @bind-Value="novoAtendimento.Falecido.CausaMorte" Required="true">
-                        @foreach (CausaMorte causa in Enum.GetValues(typeof(CausaMorte)))
+                @if (novoAtendimento.Falecido.TipoRestosMortais != TipoRestosMortais.PecaAnatomica)
+                {
+                    <MudItem xs="12" sm="3">
+                        <MudSelect T="CausaMorte" Label="Causa da Morte" @bind-Value="novoAtendimento.Falecido.CausaMorte" Required="true">
+                            @foreach (CausaMorte causa in Enum.GetValues(typeof(CausaMorte)))
+                            {
+                                <MudSelectItem Value="@causa">@causa.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+                else
+                {
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="novoAtendimento.PecaAnatomicaHospital" Label="Hospital de Origem / CRM Médico" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="novoAtendimento.PecaAnatomicaIdentificacao" Label="Identificação da Peça" Required="true" />
+                    </MudItem>
+                }
+
+                <MudItem xs="12" sm="3" Class="d-flex align-center">
+                    <MudSelect T="TipoRestosMortais" Label="Tipo Restos Mortais" @bind-Value="novoAtendimento.Falecido.TipoRestosMortais" Required="true">
+                        @foreach (TipoRestosMortais tipo in Enum.GetValues(typeof(TipoRestosMortais)))
                         {
-                            <MudSelectItem Value="@causa">@causa.ToString()</MudSelectItem>
+                            <MudSelectItem Value="@tipo">@tipo.ToString()</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
-            }
-            else
-            {
-                <MudItem xs="12" sm="4">
-                    <MudTextField @bind-Value="novoAtendimento.PecaAnatomicaHospital" Label="Hospital de Origem / CRM Médico" Required="true" />
-                </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudTextField @bind-Value="novoAtendimento.PecaAnatomicaIdentificacao" Label="Identificação da Peça" Required="true" />
-                </MudItem>
-            }
-            
-            <MudItem xs="12" sm="3" Class="d-flex align-center">
-                <MudSelect T="TipoRestosMortais" Label="Tipo Restos Mortais" @bind-Value="novoAtendimento.Falecido.TipoRestosMortais" Required="true">
-                    @foreach (TipoRestosMortais tipo in Enum.GetValues(typeof(TipoRestosMortais)))
-                    {
-                        <MudSelectItem Value="@tipo">@tipo.ToString()</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            
-            <MudItem xs="12" sm="3">
-                <MudTextField @bind-Value="novoAtendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" Required="true" />
-            </MudItem>
 
-            <MudItem xs="12" sm="4">
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="novoAtendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" Required="true" />
+                </MudItem>
+            }
+
+            <MudItem xs="12" sm="@(EhIndigente ? 6 : 4)">
                 <MudTextField @bind-Value="novoAtendimento.LocalFalecimento" Label="Local do Falecimento" Required="true" />
             </MudItem>
 
@@ -112,7 +138,8 @@
             </MudItem>
 
             <MudItem xs="12" sm="4">
-                <MudSelect T="PerfilAtendimento" Label="Perfil" @bind-Value="novoAtendimento.Perfil" Required="true">
+                <MudSelect T="PerfilAtendimento" Label="Perfil" @bind-Value="novoAtendimento.Perfil" Required="true"
+                           HelperText="@(EhIndigente ? "Selecione a classificação do atendimento" : null)">
                     @foreach (PerfilAtendimento perfil in Enum.GetValues(typeof(PerfilAtendimento)))
                     {
                         <MudSelectItem Value="@perfil">@perfil.ToString()</MudSelectItem>
@@ -121,7 +148,8 @@
             </MudItem>
 
             <MudItem xs="12" sm="4">
-                <MudSelect T="OrigemAtendimento" Label="Origem" @bind-Value="novoAtendimento.Origem" Required="true">
+                <MudSelect T="OrigemAtendimento" Label="Origem / Convênio" @bind-Value="novoAtendimento.Origem" Required="true"
+                           HelperText="@(EhIndigente ? "Selecione a origem/convênio" : null)">
                     @foreach (OrigemAtendimento origem in Enum.GetValues(typeof(OrigemAtendimento)))
                     {
                         <MudSelectItem Value="@origem">@origem.ToString()</MudSelectItem>
@@ -149,46 +177,49 @@
             </MudItem>
 
             @* --- 4. DOCUMENTOS ANEXADOS --- *@
-            <MudItem xs="12" Class="mt-4">
-                <MudText Typo="Typo.h6" Color="Color.Primary">Documentos Anexados (PDF)</MudText>
-                <MudDivider Class="mb-3" />
-            </MudItem>
+            @if (!EhIndigente)
+            {
+                <MudItem xs="12" Class="mt-4">
+                    <MudText Typo="Typo.h6" Color="Color.Primary">Documentos Anexados (PDF)</MudText>
+                    <MudDivider Class="mb-3" />
+                </MudItem>
 
-            <MudItem xs="12">
-                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                    Anexe documentos em formato <strong>PDF</strong> (máx. 10 MB por arquivo). 
-                    Os documentos ficarão vinculados exclusivamente ao falecido deste atendimento.
-                </MudAlert>
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                        Anexe documentos em formato <strong>PDF</strong> (máx. 10 MB por arquivo). 
+                        Os documentos ficarão vinculados exclusivamente ao falecido deste atendimento.
+                    </MudAlert>
 
-                <InputFile id="fileInput" OnChange="OnFileSelected" multiple accept=".pdf" style="display:none" />
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.AttachFile"
-                           OnClick="@TriggerFileInput"
-                           Disabled="@isSaving">
-                    Selecionar PDF(s)
-                </MudButton>
+                    <InputFile id="fileInput" OnChange="OnFileSelected" multiple accept=".pdf" style="display:none" />
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.AttachFile"
+                               OnClick="@TriggerFileInput"
+                               Disabled="@isSaving">
+                        Selecionar PDF(s)
+                    </MudButton>
 
-                @if (arquivosParaAnexar.Any())
-                {
-                    <MudList T="string" Dense="true" Class="mt-2">
-                        @foreach (var arq in arquivosParaAnexar)
-                        {
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">
-                                <div class="d-flex align-center justify-space-between" style="width:100%">
-                                    <MudText Typo="Typo.body2">@arq.Name <MudText Inline="true" Typo="Typo.caption" Color="Color.Secondary">(@FormatBytes(arq.Size))</MudText></MudText>
-                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoverArquivo(arq))" />
-                                </div>
-                            </MudListItem>
-                        }
-                    </MudList>
-                }
+                    @if (arquivosParaAnexar.Any())
+                    {
+                        <MudList T="string" Dense="true" Class="mt-2">
+                            @foreach (var arq in arquivosParaAnexar)
+                            {
+                                <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">
+                                    <div class="d-flex align-center justify-space-between" style="width:100%">
+                                        <MudText Typo="Typo.body2">@arq.Name <MudText Inline="true" Typo="Typo.caption" Color="Color.Secondary">(@FormatBytes(arq.Size))</MudText></MudText>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoverArquivo(arq))" />
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
 
-                @if (!string.IsNullOrEmpty(erroUpload))
-                {
-                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@erroUpload</MudAlert>
-                }
-            </MudItem>
+                    @if (!string.IsNullOrEmpty(erroUpload))
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@erroUpload</MudAlert>
+                    }
+                </MudItem>
+            }
 
             @* --- BOTÃO DE AÇÃO --- *@
             <MudItem xs="12" Class="d-flex justify-end mt-4">
@@ -220,6 +251,23 @@
     private MudForm form = null!;
     private bool sucesso;
     private bool isSaving;
+    private bool ehIndigente = false;
+    private bool EhIndigente
+    {
+        get => ehIndigente;
+        set
+        {
+            if (ehIndigente != value)
+            {
+                ehIndigente = value;
+                if (ehIndigente)
+                {
+                    novoAtendimento.Perfil = PerfilAtendimento.Indigente;
+                    novoAtendimento.Origem = OrigemAtendimento.AssistenciaMunicipal;
+                }
+            }
+        }
+    }
     
     // Instancia o objeto já com as entidades filhas para evitar NullReferenceException no Bind do form
     private Atendimento novoAtendimento = new Atendimento
@@ -317,11 +365,15 @@
         await form.Validate();
         if (!form.IsValid) return;
 
-        // FEAT-02: Validação matemática do CPF
-        if (!Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Responsavel.CPF))
+        // FEAT-02: Validação matemática do CPF (pular para indigentes)
+        if (!EhIndigente)
         {
-            Snackbar.Add("O CPF do Responsável é inválido.", Severity.Error);
-            return;
+            if (!string.IsNullOrWhiteSpace(novoAtendimento.Responsavel.CPF) &&
+                !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Responsavel.CPF))
+            {
+                Snackbar.Add("O CPF do Responsável é inválido.", Severity.Error);
+                return;
+            }
         }
         if (!string.IsNullOrWhiteSpace(novoAtendimento.Falecido.Cpf) && !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Falecido.Cpf))
         {
@@ -352,22 +404,54 @@
             }
 
             // ROB-04: Comparar CPF de forma limpa, garantindo que o índice seja usado e compatibilidade com PostgreSQL
-            var cpfLimpo = new string(novoAtendimento.Responsavel.CPF.Where(char.IsDigit).ToArray());
-            var responsavelExistente = await DbContext.Responsaveis
-                .FirstOrDefaultAsync(r => r.CPF == cpfLimpo);
-
-            if (responsavelExistente != null)
+            if (EhIndigente)
             {
-                novoAtendimento.Responsavel = responsavelExistente;
-                novoAtendimento.ResponsavelId = responsavelExistente.Id;
+                // Indigente: responsável com campos opcionais
+                novoAtendimento.Falecido.EhIndigente = true;
+                var cpfResp = novoAtendimento.Responsavel.CPF ?? "";
+                var cpfRespLimpo = new string(cpfResp.Where(char.IsDigit).ToArray());
+
+                Responsavel? respExistente = null;
+                if (!string.IsNullOrEmpty(cpfRespLimpo))
+                    respExistente = await DbContext.Responsaveis.FirstOrDefaultAsync(r => r.CPF == cpfRespLimpo);
+
+                if (respExistente != null)
+                {
+                    novoAtendimento.Responsavel = respExistente;
+                    novoAtendimento.ResponsavelId = respExistente.Id;
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(cpfRespLimpo))
+                        novoAtendimento.Responsavel.CPF = cpfRespLimpo;
+                    // Nome padrão para indigentes sem responsável
+                    if (string.IsNullOrWhiteSpace(novoAtendimento.Responsavel.Nome))
+                        novoAtendimento.Responsavel.Nome = "Não Identificado";
+                    DbContext.Responsaveis.Add(novoAtendimento.Responsavel);
+                    await DbContext.SaveChangesAsync();
+                    novoAtendimento.ResponsavelId = novoAtendimento.Responsavel.Id;
+                }
             }
             else
             {
-                // Força o CPF sem máscara antes de salvar
-                novoAtendimento.Responsavel.CPF = cpfLimpo;
-                DbContext.Responsaveis.Add(novoAtendimento.Responsavel);
-                await DbContext.SaveChangesAsync();
-                novoAtendimento.ResponsavelId = novoAtendimento.Responsavel.Id;
+                // Não-indigente: fluxo original
+                var cpfLimpo = new string(novoAtendimento.Responsavel.CPF!.Where(char.IsDigit).ToArray());
+                var responsavelExistente = await DbContext.Responsaveis
+                    .FirstOrDefaultAsync(r => r.CPF == cpfLimpo);
+
+                if (responsavelExistente != null)
+                {
+                    novoAtendimento.Responsavel = responsavelExistente;
+                    novoAtendimento.ResponsavelId = responsavelExistente.Id;
+                }
+                else
+                {
+                    // Força o CPF sem máscara antes de salvar
+                    novoAtendimento.Responsavel.CPF = cpfLimpo;
+                    DbContext.Responsaveis.Add(novoAtendimento.Responsavel);
+                    await DbContext.SaveChangesAsync();
+                    novoAtendimento.ResponsavelId = novoAtendimento.Responsavel.Id;
+                }
             }
 
             // Salvar Falecido primeiro se for novo
@@ -378,9 +462,24 @@
                 {
                     novoAtendimento.Falecido.Cpf = new string(novoAtendimento.Falecido.Cpf.Where(char.IsDigit).ToArray());
                 }
+                // Se indigente e sem nome, usar placeholder temporário
+                if (EhIndigente && string.IsNullOrWhiteSpace(novoAtendimento.Falecido.Nome))
+                    novoAtendimento.Falecido.Nome = "INDIGENTE (a identificar)";
+
                 DbContext.Falecidos.Add(novoAtendimento.Falecido);
                 await DbContext.SaveChangesAsync();
                 novoAtendimento.FalecidoId = novoAtendimento.Falecido.Id;
+
+                // Gerar código de indigente após obter o ID
+                if (EhIndigente)
+                {
+                    novoAtendimento.Falecido.CodigoIndigente = $"IND-{DateTime.UtcNow.Year}-{novoAtendimento.Falecido.Id:D6}";
+                    // Se o nome ainda era placeholder, atualizar com código
+                    if (novoAtendimento.Falecido.Nome == "INDIGENTE (a identificar)")
+                        novoAtendimento.Falecido.Nome = $"INDIGENTE - {novoAtendimento.Falecido.CodigoIndigente}";
+                    DbContext.Falecidos.Update(novoAtendimento.Falecido);
+                    await DbContext.SaveChangesAsync();
+                }
             }
 
             // Agora salvar o Atendimento com as FK corrigidas

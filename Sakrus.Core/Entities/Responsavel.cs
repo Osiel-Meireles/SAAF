@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Sakrus.Core.Entities;
 
@@ -6,13 +6,11 @@ public class Responsavel
 {
     public int Id { get; set; }
     
-    [Required]
     [MaxLength(150)]
     public string Nome { get; set; } = string.Empty;
     
-    [Required]
     [RegularExpression(@"^\d{11}$", ErrorMessage = "CPF deve conter 11 dígitos")]
-    public string CPF { get; set; } = string.Empty;
+    public string? CPF { get; set; }
     
     [MaxLength(20)]
     public string RG { get; set; } = string.Empty;

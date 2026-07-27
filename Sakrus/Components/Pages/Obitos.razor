@@ -36,7 +36,17 @@
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
         <MudTd DataLabel="Responsável">@context.Responsavel.Nome</MudTd>
-        <MudTd DataLabel="Falecido">@context.Falecido.Nome</MudTd>
+        <MudTd DataLabel="Falecido">
+            <div class="d-flex align-center gap-1">
+                <span>@context.Falecido.Nome</span>
+                @if (context.Falecido.EhIndigente)
+                {
+                    <MudTooltip Text="@($"Indigente — Código: {context.Falecido.CodigoIndigente}")">
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.PersonOff">IND</MudChip>
+                    </MudTooltip>
+                }
+            </div>
+        </MudTd>
         <MudTd DataLabel="Causa da Morte">@context.Falecido.CausaMorte.ToString()</MudTd>
         <MudTd DataLabel="Status">
             @switch (context.Falecido.Status)
@@ -115,6 +125,9 @@
         if (atendimento.Falecido?.Nome?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
             return true;
         if (atendimento.NumeroOsAuxilio?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+        // Busca por código indigente
+        if (atendimento.Falecido?.CodigoIndigente?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
             return true;
         return false;
     }
@@ -243,7 +256,8 @@
             ["FalecidoId"]              = atendimento.FalecidoId,
             ["FalecidoNome"]            = atendimento.Falecido?.Nome ?? "",
             ["FalecidoDataNascimento"]  = atendimento.Falecido?.DataNascimento,
-            ["FalecidoDataFalecimento"] = atendimento.Falecido?.DataFalecimento ?? DateTime.UtcNow
+            ["FalecidoDataFalecimento"] = atendimento.Falecido?.DataFalecimento ?? DateTime.UtcNow,
+            ["TipoRestosMortais"]       = atendimento.Falecido?.TipoRestosMortais ?? TipoRestosMortais.CorpoInteiro
         };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
         

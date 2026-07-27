@@ -8,8 +8,8 @@ namespace Sakrus.Core.Entities;
 /// </summary>
 public enum StatusFalecido { NaoSepultado, Sepultado, Exumado }
 
-public enum PerfilAtendimento { Concessionario, Permissionario, Beneficiario, LiberacaoCorpo }
-public enum OrigemAtendimento { AuxilioFuneral, PlanoFuneral, Particular, Segurado, AssistenciaExterna }
+public enum PerfilAtendimento { Concessionario, Permissionario, Beneficiario, LiberacaoCorpo, Indigente, NaoIdentificado, VulnerabilidadeSocial, OrdemJudicial }
+public enum OrigemAtendimento { AuxilioFuneral, PlanoFuneral, Particular, Segurado, AssistenciaExterna, AssistenciaMunicipal, IML, SVO, OrdemJudicial, HospitalPublico, RequisicaoPolicial }
 public enum CausaMorte { Natural, Acidente, Homicidio, Pandemia, Desconhecida }
 public enum TipoProcedimento { Sepultamento, PecaAnatomica, ExumacaoJudicial, TransferenciaDespojos, RecebimentoExterno }
 public enum ExecutorExumacao { CemiterioMunicipal, FunerariaParceira }

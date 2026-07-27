@@ -41,6 +41,23 @@
                         </MudRadioGroup>
                     </MudItem>
 
+                    @* Seletor de tipo de gaveta — apenas para Peças Anatômicas *@
+                    @if (tipoLocal == "Gaveta" && isPecaAnatomica)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Info" Dense="true" Icon="@Icons.Material.Filled.Biotech">
+                                Peça anatômica: selecione o tipo de gaveta desejado.
+                            </MudAlert>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="bool" Label="Tipo de Gaveta" @bind-Value="gavetaInfantilSelecionada"
+                                       HelperText="Infantil (0-12 anos) ou Adulta (acima de 12 anos)">
+                                <MudSelectItem T="bool" Value="false">Adulta (padrão)</MudSelectItem>
+                                <MudSelectItem T="bool" Value="true">Infantil</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    }
+
                     @* ── Seleção pelo Mapa ─────────────────────────────────────────── *@
                     @if (tipoLocal == "Jazigo" || tipoLocal == "Gaveta")
                     {
@@ -129,6 +146,9 @@
     /// <summary>Data de falecimento do falecido — referência para calcular a idade.</summary>
     [Parameter] public DateTime FalecidoDataFalecimento { get; set; }
 
+    /// <summary>Tipo dos restos mortais — Peça Anatômica libera seleção manual de tipo de gaveta.</summary>
+    [Parameter] public TipoRestosMortais TipoRestosMortais { get; set; } = TipoRestosMortais.CorpoInteiro;
+
     private MudForm form = null!;
     private bool sucesso;
     private bool isLoading = false;
@@ -138,6 +158,12 @@
     private string tipoLocal = "Jazigo";
     private int anosPermanencia = 3;
     private bool tipoLocalAlterado = false;
+
+    /// <summary>True se o falecido é Peça Anatômica (libera seleção manual de tipo de gaveta).</summary>
+    private bool isPecaAnatomica;
+
+    /// <summary>Tipo de gaveta escolhido pelo operador para peças anatômicas (false = adulta, true = infantil).</summary>
+    private bool gavetaInfantilSelecionada = false;
 
     /// <summary>Resultado retornado pelo dialog do mapa.</summary>
     private SelecionarLocalSepultamentoDialog.ResultadoSelecaoLocal? localSelecionado;
@@ -151,6 +177,7 @@
     {
         DbContext = DbFactory.CreateDbContext();
         CalcularIsInfantil();
+        isPecaAnatomica = TipoRestosMortais == TipoRestosMortais.PecaAnatomica;
         _ultimoTipoLocal = tipoLocal;
         return Task.CompletedTask;
     }
@@ -191,7 +218,9 @@
 
         var parameters = new DialogParameters
         {
-            ["FalecidoIsInfantil"] = falecidoIsInfantil,
+            // Para peças anatômicas: usa o tipo de gaveta escolhido pelo operador
+            // Para demais: usa o cálculo de idade do falecido
+            ["FalecidoIsInfantil"] = (isPecaAnatomica && tipoLocal == "Gaveta") ? gavetaInfantilSelecionada : falecidoIsInfantil,
             ["TipoLocal"]          = tipoLocal
         };
         var options = new DialogOptions

@@ -127,6 +127,7 @@
                             </MudTableSortLabel>
                         </MudTh>
                         <MudTh Style="text-align:center">Download</MudTh>
+                        <MudTh Style="text-align:center">Excluir</MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Nome do Arquivo">
@@ -147,6 +148,14 @@
                                            Size="Size.Small"
                                            Disabled="@baixandoId.Contains(context.Id)"
                                            OnClick="@(() => BaixarDocumento(context))" />
+                        </MudTd>
+                        <MudTd DataLabel="Excluir" Style="text-align:center">
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           Title="Excluir documento"
+                                           Disabled="@(excluindoId.Contains(context.Id) || isSalvando)"
+                                           OnClick="@(() => ExcluirDocumento(context))" />
                         </MudTd>
                     </RowTemplate>
                 </MudTable>
@@ -186,6 +195,7 @@
     private List<ArquivoBuffer> arquivosParaAnexar = new();
     private string erroUpload = string.Empty;
     private bool isSalvando = false;
+    private HashSet<int> excluindoId = new();
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
     protected override async Task OnInitializedAsync()
@@ -319,6 +329,56 @@
         finally
         {
             isSalvando = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── Exclusão ──────────────────────────────────────────────────────────────
+
+    private async Task ExcluirDocumento(DocumentoAnexo doc)
+    {
+        bool? confirmado = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Deseja excluir permanentemente o documento '{doc.NomeArquivo}'? Esta ação não pode ser desfeita.");
+        if (confirmado != true) return;
+
+        if (excluindoId.Contains(doc.Id)) return;
+        excluindoId.Add(doc.Id);
+        StateHasChanged();
+
+        try
+        {
+            // Remove arquivo físico do disco
+            var caminhoRelativo = doc.CaminhoArquivo
+                .Replace('\\', Path.DirectorySeparatorChar)
+                .Replace('/', Path.DirectorySeparatorChar);
+            var caminhoFisico = Path.Combine(WebHostEnvironment.WebRootPath, caminhoRelativo);
+
+            if (File.Exists(caminhoFisico))
+            {
+                File.Delete(caminhoFisico);
+            }
+
+            // Remove o registro do banco
+            var docNoBanco = await DbContext.DocumentosAnexos.FindAsync(doc.Id);
+            if (docNoBanco != null)
+            {
+                DbContext.DocumentosAnexos.Remove(docNoBanco);
+                await DbContext.SaveChangesAsync();
+            }
+
+            // Recarrega a lista
+            DbContext.ChangeTracker.Clear();
+            await CarregarDocumentosAsync();
+
+            Snackbar.Add($"Documento '{doc.NomeArquivo}' excluído com sucesso.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao excluir documento: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            excluindoId.Remove(doc.Id);
             StateHasChanged();
         }
     }
