@@ -1,0 +1,515 @@
+@page "/responsaveis"
+@attribute [Authorize]
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IAuthService AuthService
+@inject Sakrus.Services.FileStorageService FileStorage
+@inject IJSRuntime JSRuntime
+@inject ILogger<Responsaveis> Logger
+
+<PageTitle>Responsáveis - Sakrus</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Cadastro de Responsáveis</MudText>
+
+<MudTable Items="@responsaveis" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@isLoading"
+          LoadingProgressColor="Color.Info" Dense="true" Elevation="2"
+          Filter="new Func<ResponsavelVm, bool>(FilterFunc)">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Pessoas Cadastradas</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="searchString" Placeholder="Buscar por nome ou CPF..."
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0 mr-4" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="OpenAddForm">Novo Responsável</MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Nome</MudTh>
+        <MudTh>CPF</MudTh>
+        <MudTh>Telefone</MudTh>
+        <MudTh>E-mail</MudTh>
+        <MudTh Style="text-align:center">Jazigos</MudTh>
+        <MudTh Style="text-align:center">Atendimentos</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Nome">
+            <div class="d-flex align-center gap-2">
+                @if (context.EhProprietario)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Home" Color="Color.Primary" Size="Size.Small" Title="Proprietário de Jazigo" />
+                }
+                <MudText>@context.Nome</MudText>
+            </div>
+        </MudTd>
+        <MudTd DataLabel="CPF">@FormatCpf(context.CPF)</MudTd>
+        <MudTd DataLabel="Telefone">@context.Telefone</MudTd>
+        <MudTd DataLabel="E-mail">@(context.Email ?? "—")</MudTd>
+        <MudTd DataLabel="Jazigos" Style="text-align:center">
+            @if (context.TotalJazigos > 0)
+            {
+                <MudChip T="string" Color="Color.Primary" Size="Size.Small">@context.TotalJazigos</MudChip>
+            }
+            else
+            {
+                <MudText Color="Color.Secondary" Typo="Typo.caption">0</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Atendimentos" Style="text-align:center">
+            <MudText Typo="Typo.body2">@context.TotalAtendimentos</MudText>
+        </MudTd>
+        <MudTd DataLabel="Ações">
+            <MudIconButton Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Warning"
+                           Size="Size.Small" Title="Ver Documentos"
+                           OnClick="@(() => OpenDocumentos(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.HomeWork" Color="Color.Info"
+                           Size="Size.Small" Title="Vincular a Jazigo"
+                           OnClick="@(() => OpenVincularJazigo(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"
+                           Size="Size.Small" OnClick="@(() => OpenEditForm(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                           Size="Size.Small" OnClick="@(() => Delete(context))" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@if (showForm)
+{
+    <MudPaper Class="pa-4 mt-4" Elevation="3">
+        <MudText Typo="Typo.h6" Class="mb-3">@(isEditing ? "Editar Responsável" : "Novo Responsável")</MudText>
+        <MudForm @ref="form" @bind-IsValid="sucesso">
+            <MudGrid>
+                @* Dados pessoais *@
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">Dados Pessoais</MudText>
+                    <MudDivider Class="mb-2" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentResp.Nome" Label="Nome Completo"
+                                  Required="true" RequiredError="Nome é obrigatório" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.CPF" Label="CPF (somente números)"
+                                  Required="true" RequiredError="CPF é obrigatório"
+                                  HelperText="11 dígitos, sem pontuação" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudDatePicker Label="Data de Nascimento" @bind-Date="dataNascimentoForm" Editable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.RG" Label="RG" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.OrgaoEmissor" Label="Órgão Emissor" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.Profissao" Label="Profissão" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.Telefone" Label="Telefone"
+                                  Required="true" Placeholder="(00) 00000-0000" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentResp.Email" Label="E-mail" InputType="InputType.Email"
+                                  HelperText="Futuramente usado para login GOV.br" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentResp.Endereco" Label="Endereço Completo"
+                                  Required="true" />
+                </MudItem>
+
+                @* Upload de documentos — obrigatório apenas na criação *@
+                @if (!isEditing)
+                {
+                    <MudItem xs="12" Class="mt-3">
+                        <MudText Typo="Typo.subtitle1" Color="Color.Primary">Documentos</MudText>
+                        <MudDivider Class="mb-2" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                            Anexe ao menos <strong>1 documento</strong> em formato PDF (RG, CPF, comprovante de residência etc.). Máx. 10 MB por arquivo.
+                        </MudAlert>
+                        <InputFile id="fileInputResp" OnChange="OnFileSelected" multiple accept=".pdf" style="display:none" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.AttachFile"
+                                   OnClick="TriggerFileInput" Disabled="@isSaving">
+                            Selecionar PDF(s)
+                        </MudButton>
+                        @if (arquivosParaAnexar.Any())
+                        {
+                            <MudList T="string" Dense="true" Class="mt-2">
+                                @foreach (var arq in arquivosParaAnexar)
+                                {
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">
+                                        <div class="d-flex align-center justify-space-between" style="width:100%">
+                                            <MudText Typo="Typo.body2">
+                                                @arq.Name
+                                                <MudText Inline="true" Typo="Typo.caption" Color="Color.Secondary">(@FormatBytes(arq.Size))</MudText>
+                                            </MudText>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                           Color="Color.Error" OnClick="@(() => RemoverArquivo(arq))" />
+                                        </div>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                        @if (!string.IsNullOrEmpty(erroUpload))
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@erroUpload</MudAlert>
+                        }
+                    </MudItem>
+                }
+
+                <MudItem xs="12" Class="d-flex justify-end mt-4">
+                    <MudButton Variant="Variant.Text" OnClick="CloseForm" Class="mr-2" Disabled="@isSaving">Cancelar</MudButton>
+                    @if (isSaving)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="true">
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            Salvando...
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   Disabled="@(!sucesso)" OnClick="Save">Salvar</MudButton>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </MudPaper>
+}
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+    public void Dispose() => DbContext?.Dispose();
+
+    // ── ViewModel para a tabela (agrega contagens) ───────────────────────────
+    private sealed record ResponsavelVm(
+        int Id, string Nome, string? CPF, string? Email, string Telefone,
+        bool EhProprietario, int TotalJazigos, int TotalAtendimentos);
+
+    private List<ResponsavelVm> responsaveis = new();
+    private bool isLoading = true;
+    private bool showForm = false;
+    private bool isEditing = false;
+    private bool sucesso;
+    private bool isSaving;
+    private string searchString = "";
+    private MudForm form = null!;
+
+    private Responsavel currentResp = new();
+    private DateTime? dataNascimentoForm;
+
+    // Upload
+    private sealed record ArquivoBuffer(string Name, long Size, byte[] Bytes);
+    private List<ArquivoBuffer> arquivosParaAnexar = new();
+    private string erroUpload = "";
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
+
+    private bool FilterFunc(ResponsavelVm r)
+    {
+        if (string.IsNullOrWhiteSpace(searchString)) return true;
+        if (r.Nome.Contains(searchString, StringComparison.OrdinalIgnoreCase)) return true;
+        if (r.CPF?.Contains(searchString) == true) return true;
+        return false;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        var lista = await DbContext.Responsaveis
+            .Select(r => new
+            {
+                r.Id, r.Nome, r.CPF, r.Email, r.Telefone, r.EhProprietario,
+                TotalJazigos = r.JazigoProprietarios.Count(jp => jp.Ativo),
+                TotalAtendimentos = DbContext.Atendimentos.Count(a => a.ResponsavelId == r.Id)
+            })
+            .OrderBy(r => r.Nome)
+            .ToListAsync();
+
+        responsaveis = lista.Select(r => new ResponsavelVm(
+            r.Id, r.Nome, r.CPF, r.Email, r.Telefone,
+            r.EhProprietario, r.TotalJazigos, r.TotalAtendimentos
+        )).ToList();
+        isLoading = false;
+    }
+
+    private void OpenAddForm()
+    {
+        currentResp = new Responsavel();
+        dataNascimentoForm = null;
+        arquivosParaAnexar.Clear();
+        erroUpload = "";
+        isEditing = false;
+        showForm = true;
+    }
+
+    private async Task OpenEditForm(ResponsavelVm vm)
+    {
+        var resp = await DbContext.Responsaveis.FindAsync(vm.Id);
+        if (resp == null) return;
+        currentResp = new Responsavel
+        {
+            Id = resp.Id, Nome = resp.Nome, CPF = resp.CPF, RG = resp.RG,
+            OrgaoEmissor = resp.OrgaoEmissor, Profissao = resp.Profissao,
+            Telefone = resp.Telefone, Endereco = resp.Endereco,
+            Email = resp.Email, EhProprietario = resp.EhProprietario
+        };
+        dataNascimentoForm = resp.DataNascimento;
+        isEditing = true;
+        showForm = true;
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+        currentResp = new Responsavel();
+        arquivosParaAnexar.Clear();
+        erroUpload = "";
+    }
+
+    private async Task Save()
+    {
+        await form.Validate();
+        if (!form.IsValid) return;
+
+        // Validação: documento obrigatório apenas na criação
+        if (!isEditing && !arquivosParaAnexar.Any())
+        {
+            Snackbar.Add("É obrigatório anexar ao menos um documento (RG, CPF etc.).", Severity.Error);
+            return;
+        }
+
+        // Validação de CPF
+        var cpfLimpo = new string((currentResp.CPF ?? "").Where(char.IsDigit).ToArray());
+        if (!string.IsNullOrEmpty(cpfLimpo) && !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(cpfLimpo))
+        {
+            Snackbar.Add("O CPF informado é inválido.", Severity.Error);
+            return;
+        }
+
+        // 2FA
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = isEditing ? "Editar Responsável" : "Criar Responsável",
+            ["MensagemConfirmacao"] = $"Você está prestes a {(isEditing ? "editar" : "criar")} o responsável '{currentResp.Nome}'. Confirme sua identidade."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
+
+        isSaving = true;
+        StateHasChanged();
+
+        await using var transaction = await DbContext.Database.BeginTransactionAsync();
+        try
+        {
+            currentResp.CPF = string.IsNullOrEmpty(cpfLimpo) ? null : cpfLimpo;
+            currentResp.DataNascimento = dataNascimentoForm.HasValue
+                ? DateTime.SpecifyKind(dataNascimentoForm.Value, DateTimeKind.Utc)
+                : null;
+
+            if (isEditing)
+            {
+                var r = await DbContext.Responsaveis.FindAsync(currentResp.Id);
+                if (r != null)
+                {
+                    r.Nome = currentResp.Nome; r.CPF = currentResp.CPF;
+                    r.RG = currentResp.RG; r.OrgaoEmissor = currentResp.OrgaoEmissor;
+                    r.Profissao = currentResp.Profissao; r.Telefone = currentResp.Telefone;
+                    r.Endereco = currentResp.Endereco; r.Email = currentResp.Email;
+                    r.DataNascimento = currentResp.DataNascimento;
+                    DbContext.Responsaveis.Update(r);
+                }
+            }
+            else
+            {
+                DbContext.Responsaveis.Add(currentResp);
+                await DbContext.SaveChangesAsync();
+
+                // Salvar documentos
+                if (arquivosParaAnexar.Any())
+                {
+                    foreach (var arquivo in arquivosParaAnexar)
+                    {
+                        // CRIT-01/02/03: FileStorageService — magic bytes, seguro, UUID no disco
+                        var caminhoRelativo = await FileStorage.SalvarArquivoAsync(
+                            "responsaveis", currentResp.Id, arquivo.Name, arquivo.Bytes);
+
+                        DbContext.DocumentosAnexos.Add(new DocumentoAnexo
+                        {
+                            ResponsavelId = currentResp.Id,
+                            Tipo = TipoDocumentoAnexo.Outro,
+                            NomeArquivo = arquivo.Name,
+                            CaminhoArquivo = caminhoRelativo,
+                            TamanhoBytes = arquivo.Bytes.LongLength,
+                            DataAnexo = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+
+            await DbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            Snackbar.Add($"Responsável {(isEditing ? "atualizado" : "cadastrado")} com sucesso!", Severity.Success);
+            CloseForm();
+            DbContext.ChangeTracker.Clear();
+            await LoadData();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await transaction.RollbackAsync();
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            Logger.LogError(ex, "Erro ao salvar responsável");
+            Snackbar.Add("Ocorreu um erro ao salvar o responsável. Tente novamente.", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Delete(ResponsavelVm vm)
+    {
+        if (vm.TotalAtendimentos > 0 || vm.TotalJazigos > 0)
+        {
+            Snackbar.Add("Não é possível excluir: este responsável possui atendimentos ou jazigos vinculados.", Severity.Warning);
+            return;
+        }
+
+        var param2FA = new DialogParameters
+        {
+            ["TituloOperacao"] = "Excluir Responsável",
+            ["MensagemConfirmacao"] = $"Você está prestes a excluir o responsável '{vm.Nome}'. Esta ação é irreversível."
+        };
+        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+        var res2FA = await dlg2FA.Result;
+        if (res2FA == null || res2FA.Canceled) return;
+
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Excluir Responsável",
+            $"Tem certeza que deseja excluir '{vm.Nome}'? Esta ação é irreversível.",
+            yesText: "Excluir", cancelText: "Cancelar");
+        if (confirm != true) return;
+
+        try
+        {
+            var r = await DbContext.Responsaveis.FindAsync(vm.Id);
+            if (r != null)
+            {
+                DbContext.Responsaveis.Remove(r);
+                await DbContext.SaveChangesAsync();
+                Snackbar.Add("Responsável removido.", Severity.Success);
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao excluir: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenDocumentos(ResponsavelVm vm)
+    {
+        var param = new DialogParameters
+        {
+            ["ResponsavelId"] = vm.Id,
+            ["ResponsavelNome"] = vm.Nome
+        };
+        var opt = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<DocumentosResponsavelDialog>("Documentos do Responsável", param, opt);
+    }
+
+    private async Task OpenVincularJazigo(ResponsavelVm vm)
+    {
+        var param = new DialogParameters
+        {
+            ["ResponsavelId"] = vm.Id,
+            ["ResponsavelNome"] = vm.Nome
+        };
+        var opt = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dlg = await DialogService.ShowAsync<VincularProprietarioDialog>("Vincular Responsável a Jazigo", param, opt);
+        var result = await dlg.Result;
+        if (result is { Canceled: false })
+        {
+            DbContext.ChangeTracker.Clear();
+            await LoadData();
+        }
+    }
+
+    // ── Upload ───────────────────────────────────────────────────────────────
+
+    private async Task TriggerFileInput()
+        => await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('fileInputResp').click()");
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        erroUpload = "";
+        var rejeitados = new List<string>();
+        foreach (var file in e.GetMultipleFiles(20))
+        {
+            if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
+                && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                rejeitados.Add($"{file.Name} (apenas PDF)"); continue;
+            }
+            if (file.Size > MaxFileSizeBytes) { rejeitados.Add($"{file.Name} (excede 10 MB)"); continue; }
+            if (arquivosParaAnexar.Any(a => a.Name == file.Name)) continue;
+            try
+            {
+                using var ms = new MemoryStream();
+                await using var stream = file.OpenReadStream(MaxFileSizeBytes);
+                await stream.CopyToAsync(ms);
+                arquivosParaAnexar.Add(new ArquivoBuffer(file.Name, file.Size, ms.ToArray()));
+            }
+            catch (Exception ex) { rejeitados.Add($"{file.Name} (erro: {ex.Message})"); }
+        }
+        if (rejeitados.Any()) erroUpload = $"Rejeitado(s): {string.Join("; ", rejeitados)}";
+    }
+
+    private void RemoverArquivo(ArquivoBuffer arq)
+    {
+        arquivosParaAnexar.Remove(arq);
+        erroUpload = "";
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private static string FormatCpf(string? cpf)
+    {
+        if (string.IsNullOrEmpty(cpf) || cpf.Length != 11) return cpf ?? "—";
+        return $"{cpf[..3]}.{cpf[3..6]}.{cpf[6..9]}-{cpf[9..]}";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
+}

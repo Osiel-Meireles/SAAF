@@ -47,6 +47,21 @@ function downloadFileFromBase64(fileName, base64) {
 }
 
 /**
+ * HIGH-04: Aciona um input de arquivo pelo ID de forma segura.
+ * Substitui o padrão eval() que era usado nos componentes Blazor.
+ *
+ * @param {string} elementId - ID do elemento <input type="file"> a acionar
+ */
+function triggerFileInput(elementId) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.click();
+    } else {
+        console.warn(`[SAAF] Elemento de upload não encontrado: ${elementId}`);
+    }
+}
+
+/**
  * Exibe uma notificação no console com timestamp
  * 
  * @param {string} mensagem - Mensagem a exibir

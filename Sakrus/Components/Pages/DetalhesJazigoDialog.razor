@@ -25,19 +25,65 @@
         else
         {
             <MudGrid>
+                @* Informações básicas *@
                 <MudItem xs="12" sm="6">
                     <MudText Typo="Typo.body1"><b>Status:</b> @(jazigo.Ocupado ? "Ocupado" : "Livre")</MudText>
                     <MudText Typo="Typo.body1"><b>Modelo:</b> @(jazigo.ModeloJazigo?.Nome ?? "N/A")</MudText>
                 </MudItem>
-                
-                @if (responsavelAtual != null)
+
+                @* Titular principal *@
+                @if (titularAtivo != null)
                 {
                     <MudItem xs="12" sm="6">
-                        <MudText Typo="Typo.body1"><b>Responsável:</b> @responsavelAtual.Nome</MudText>
-                        <MudText Typo="Typo.body1"><b>Contato:</b> @responsavelAtual.Telefone</MudText>
+                        <MudText Typo="Typo.body1"><b>Titular:</b> @titularAtivo.Responsavel.Nome</MudText>
+                        <MudText Typo="Typo.body1"><b>Contato:</b> @titularAtivo.Responsavel.Telefone</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mt-1">
+                            @TituloLabel(titularAtivo.TipoTitulo) — desde @titularAtivo.DataAquisicao.ToLocalTime().ToString("dd/MM/yyyy")
+                        </MudChip>
+                    </MudItem>
+                }
+                else if (responsavelLegado != null)
+                {
+                    @* Fallback para registros anteriores sem JazigoProprietario *@
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.body1"><b>Responsável (legado):</b> @responsavelLegado.Nome</MudText>
+                        <MudText Typo="Typo.body1"><b>Contato:</b> @responsavelLegado.Telefone</MudText>
                     </MudItem>
                 }
 
+                @* Seção de Proprietários *@
+                @if (vinculos.Any())
+                {
+                    <MudItem xs="12" Class="mt-2">
+                        <div class="d-flex align-center justify-space-between">
+                            <MudText Typo="Typo.subtitle1" Color="Color.Primary"><b>Proprietários / Co-usuários</b></MudText>
+                        </div>
+                        <MudDivider Class="mb-2" />
+                        <MudList T="object" Dense="true">
+                            @foreach (var v in vinculos)
+                            {
+                                <MudListItem T="object">
+                                    <div class="d-flex align-center justify-space-between">
+                                        <div>
+                                            <MudIcon Icon="@VinculoIcon(v.TipoVinculo)" Size="Size.Small" Color="@VinculoColor(v.TipoVinculo)" Class="mr-1" />
+                                            <strong>@v.Responsavel.Nome</strong>
+                                            <MudText Inline="true" Typo="Typo.caption" Color="Color.Secondary"> — @VinculoLabel(v.TipoVinculo)</MudText>
+                                        </div>
+                                        <MudText Typo="Typo.caption" Color="@(v.Ativo ? Color.Success : Color.Default)">
+                                            @(v.Ativo ? "Ativo" : "Inativo")
+                                        </MudText>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(v.Observacao))
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-4">@v.Observacao</MudText>
+                                    }
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudItem>
+                }
+
+                @* Sepultados *@
                 @if (jazigo.Ocupado && falecidos.Any())
                 {
                     <MudItem xs="12">
@@ -57,7 +103,7 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancelar">Fechar</MudButton>
-        
+
         @if (podeDesmembrar && !temSubLotes)
         {
             <MudButton Color="Color.Secondary" Variant="Variant.Outlined" OnClick="AbrirDesmembramento" StartIcon="@Icons.Material.Filled.AccountTree">Desmembrar</MudButton>
@@ -66,16 +112,21 @@
         {
             <MudButton Color="Color.Warning" Variant="Variant.Outlined" OnClick="DesfazerDivisao" StartIcon="@Icons.Material.Filled.CallMerge">Desfazer Divisão</MudButton>
         }
-        
+
         @if (falecidos.Any())
         {
             <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="AbrirExumacao" StartIcon="@Icons.Material.Filled.ArrowUpward">Exumar</MudButton>
         }
 
-        @if (responsavelAtual != null)
+        @if (titularAtivo != null || responsavelLegado != null)
         {
+            <MudButton Color="Color.Success" Variant="Variant.Outlined" OnClick="AbrirDocumentos" StartIcon="@Icons.Material.Filled.FolderOpen">Doc. Titular</MudButton>
             <MudButton Color="Color.Info" Variant="Variant.Text" OnClick="GerarTermo" StartIcon="@Icons.Material.Filled.PictureAsPdf">Termo de Concessão</MudButton>
             <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AbrirTransferencia">Transferir Titularidade</MudButton>
+        }
+        else
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AbrirVincularTitular" StartIcon="@Icons.Material.Filled.PersonAdd">Vincular Titular</MudButton>
         }
     </DialogActions>
 </MudDialog>
@@ -92,7 +143,10 @@
     [Parameter] public int JazigoId { get; set; }
 
     private Jazigo? jazigo;
-    private Responsavel? responsavelAtual;
+    private JazigoProprietario? titularAtivo;      // fonte de verdade: JazigoProprietario
+    private Responsavel? responsavelLegado;         // fallback para registros sem JazigoProprietario
+    private Responsavel? responsavelAtual => titularAtivo?.Responsavel ?? responsavelLegado;
+    private List<JazigoProprietario> vinculos = new(); // todos os vínculos ativos
     private List<Falecido> falecidos = new();
     private bool podeDesmembrar = false;
     private bool temSubLotes = false;
@@ -106,35 +160,45 @@
 
         if (jazigo != null)
         {
-            // Busca falecidos vinculados
             falecidos = await DbContext.Falecidos
                 .Where(f => f.JazigoId == JazigoId)
                 .ToListAsync();
 
-            // Busca responsável atual através de um atendimento (simplificação para o MVP, assumindo o primeiro responsável que faturou ou atendeu o jazigo)
-            var atendimento = await DbContext.Atendimentos
-                .Include(a => a.Responsavel)
-                .Where(a => a.Falecido.JazigoId == JazigoId)
-                .OrderByDescending(a => a.Id)
-                .FirstOrDefaultAsync();
+            // ── FONTE PRINCIPAL: JazigoProprietario ──────────────────────────
+            vinculos = await DbContext.JazigoProprietarios
+                .Include(jp => jp.Responsavel)
+                .Where(jp => jp.JazigoId == JazigoId && jp.Ativo)
+                .OrderBy(jp => jp.TipoVinculo)   // Titular primeiro
+                .ToListAsync();
 
-            if (atendimento != null)
+            titularAtivo = vinculos.FirstOrDefault(jp =>
+                jp.TipoVinculo == TipoVinculoJazigo.Titular && jp.Ativo);
+
+            // ── FALLBACK LEGADO: busca por atendimento ou histórico ───────────
+            if (titularAtivo == null)
             {
-                responsavelAtual = atendimento.Responsavel;
-            }
-            else
-            {
-                // Se não tem atendimento de sepultamento, mas a titularidade foi transferida?
-                // Buscar último histórico de titularidade
-                var hist = await DbContext.HistoricoTitularidadeJazigos
-                    .Include(h => h.ResponsavelNovo)
-                    .Where(h => h.JazigoId == JazigoId)
-                    .OrderByDescending(h => h.DataTransferencia)
+                var atendimento = await DbContext.Atendimentos
+                    .Include(a => a.Responsavel)
+                    .Where(a => a.Falecido.JazigoId == JazigoId)
+                    .OrderByDescending(a => a.Id)
                     .FirstOrDefaultAsync();
 
-                if (hist != null) responsavelAtual = hist.ResponsavelNovo;
+                if (atendimento != null)
+                {
+                    responsavelLegado = atendimento.Responsavel;
+                }
+                else
+                {
+                    var hist = await DbContext.HistoricoTitularidadeJazigos
+                        .Include(h => h.ResponsavelNovo)
+                        .Where(h => h.JazigoId == JazigoId)
+                        .OrderByDescending(h => h.DataTransferencia)
+                        .FirstOrDefaultAsync();
+
+                    if (hist != null) responsavelLegado = hist.ResponsavelNovo;
+                }
             }
-            
+
             temSubLotes = await DbContext.Jazigos.AnyAsync(j => j.JazigoPaiId == JazigoId);
             podeDesmembrar = jazigo.JazigoPaiId == null && !jazigo.Ocupado;
         }
@@ -158,23 +222,39 @@
 
     private async Task AbrirTransferencia()
     {
-        if (responsavelAtual == null)
+        var titular = responsavelAtual;
+        if (titular == null)
         {
-            Snackbar.Add("Não há responsável atual definido para transferência.", Severity.Warning);
+            Snackbar.Add("Não há responsável/titular definido para esta operação.", Severity.Warning);
             return;
         }
 
-        var parameters = new DialogParameters 
-        { 
+        var parameters = new DialogParameters
+        {
             ["JazigoId"] = JazigoId,
-            ["ResponsavelAntigoId"] = responsavelAtual.Id
+            ["ResponsavelAntigoId"] = titular.Id,
+            ["TitularAtualJazigoProprietarioId"] = titularAtivo?.Id  // passa o ID do vínculo ativo
         };
         var dialog = await DialogService.ShowAsync<TransferirTitularidadeDialog>("Transferir Titularidade", parameters);
         var result = await dialog.Result;
         if (result != null && !result.Canceled)
         {
-            MudDialog.Close(DialogResult.Ok(true)); // Repassa o OK para o grid atualizar
+            MudDialog.Close(DialogResult.Ok(true));
         }
+    }
+
+    private async Task AbrirDocumentos()
+    {
+        var titular = responsavelAtual;
+        if (titular == null) return;
+        
+        var parameters = new DialogParameters
+        {
+            ["ResponsavelId"] = titular.Id,
+            ["ResponsavelNome"] = titular.Nome
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<DocumentosResponsavelDialog>($"Documentos - {titular.Nome}", parameters, options);
     }
 
     private async Task AbrirDesmembramento()
@@ -235,5 +315,62 @@
             MudDialog.Close(DialogResult.Ok(true));
         }
     }
+
+    private async Task AbrirVincularTitular()
+    {
+        if (jazigo == null) return;
+        
+        var parameters = new DialogParameters { 
+            ["JazigoId"] = jazigo.Id,
+            ["CodigoJazigo"] = jazigo.CodigoIdentificador
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<VincularResponsavelDialog>("Vincular Responsável", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            // Recarregar os dados do modal
+            await OnInitializedAsync();
+            StateHasChanged();
+        }
+    }
+
+    // ── Helpers de exibição dos vínculos ───────────────────────────────────────
+
+    private static string VinculoLabel(TipoVinculoJazigo v) => v switch
+    {
+        TipoVinculoJazigo.Titular    => "Titular",
+        TipoVinculoJazigo.CoUsuario  => "Co-usuário",
+        TipoVinculoJazigo.Beneficiario => "Beneficiário",
+        TipoVinculoJazigo.Herdeiro   => "Herdeiro indicado",
+        _ => v.ToString()
+    };
+
+    private static string TituloLabel(TipoTituloJazigo t) => t switch
+    {
+        TipoTituloJazigo.Concessao => "Concessão",
+        TipoTituloJazigo.Permissao => "Permissão",
+        TipoTituloJazigo.Doacao    => "Doação",
+        TipoTituloJazigo.Heranca   => "Herança",
+        _ => t.ToString()
+    };
+
+    private static string VinculoIcon(TipoVinculoJazigo v) => v switch
+    {
+        TipoVinculoJazigo.Titular    => Icons.Material.Filled.Star,
+        TipoVinculoJazigo.CoUsuario  => Icons.Material.Filled.People,
+        TipoVinculoJazigo.Beneficiario => Icons.Material.Filled.PersonAdd,
+        TipoVinculoJazigo.Herdeiro   => Icons.Material.Filled.AccountTree,
+        _ => Icons.Material.Filled.Person
+    };
+
+    private static Color VinculoColor(TipoVinculoJazigo v) => v switch
+    {
+        TipoVinculoJazigo.Titular   => Color.Warning,
+        TipoVinculoJazigo.CoUsuario => Color.Info,
+        _ => Color.Default
+    };
 }
 

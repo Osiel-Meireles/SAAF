@@ -1,0 +1,226 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using MudBlazor
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Vincular Responsável ao Jazigo @CodigoJazigo</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center pa-4"><MudProgressCircular Indeterminate="true" /></div>
+        }
+        else
+        {
+            <MudForm @ref="form" @bind-IsValid="sucesso">
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                            O <strong>Titular</strong> é o responsável legal único perante o cemitério.
+                            Co-usuários e Beneficiários possuem direito de uso, não de administração.
+                        </MudAlert>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudAutocomplete T="Responsavel" Label="Pesquisar Responsável (Nome ou CPF)"
+                                         @bind-Value="responsavelSelecionado"
+                                         SearchFunc="@PesquisarResponsavel"
+                                         ToStringFunc="@(r => r == null ? null : $"{r.Nome} ({r.CPF})")"
+                                         ResetValueOnEmptyText="true"
+                                         Required="true" RequiredError="Selecione um responsável" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="TipoVinculoJazigo" Label="Tipo de Vínculo"
+                                   @bind-Value="vínculo.TipoVinculo" Required="true">
+                            @foreach (TipoVinculoJazigo tv in Enum.GetValues(typeof(TipoVinculoJazigo)))
+                            {
+                                <MudSelectItem Value="@tv">@VinculoLabel(tv)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="TipoTituloJazigo" Label="Tipo de Título"
+                                   @bind-Value="vínculo.TipoTitulo" Required="true">
+                            @foreach (TipoTituloJazigo tt in Enum.GetValues(typeof(TipoTituloJazigo)))
+                            {
+                                <MudSelectItem Value="@tt">@TituloLabel(tt)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="Data de Aquisição" @bind-Date="dataAquisicao"
+                                       Required="true" Editable="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="Data de Vencimento (opcional)" @bind-Date="dataVencimento"
+                                       Editable="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="vínculo.Observacao" Label="Observação"
+                                      Lines="2" Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    @if (erroTitular != null)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Warning" Dense="true">@erroTitular</MudAlert>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Confirmar" Disabled="@(!sucesso || isSaving)">
+            @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+            Vincular
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+    public void Dispose() => DbContext?.Dispose();
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int JazigoId { get; set; }
+    [Parameter] public string CodigoJazigo { get; set; } = string.Empty;
+
+    private MudForm form = null!;
+    private bool sucesso;
+    private bool isSaving;
+    private bool isLoading = true;
+    private string? erroTitular;
+
+    private Responsavel? responsavelSelecionado;
+    private JazigoProprietario vínculo = new();
+    private DateTime? dataAquisicao = DateTime.Today;
+    private DateTime? dataVencimento;
+    private List<Responsavel> todosResponsaveis = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = await DbFactory.CreateDbContextAsync();
+        
+        // Em um sistema real com muitos milhares de registros, buscar do banco on-demand seria melhor.
+        // Assumindo um limite razoável para cache em memória ou busca leve:
+        todosResponsaveis = await DbContext.Responsaveis
+            .AsNoTracking()
+            .OrderBy(r => r.Nome)
+            .ToListAsync();
+
+        vínculo.JazigoId = JazigoId;
+        vínculo.TipoVinculo = TipoVinculoJazigo.Titular;
+        vínculo.TipoTitulo = TipoTituloJazigo.Concessao;
+        isLoading = false;
+    }
+
+    private Task<IEnumerable<Responsavel>> PesquisarResponsavel(string value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult<IEnumerable<Responsavel>>(todosResponsaveis.Take(50));
+
+        var lowerValue = value.ToLowerInvariant();
+        return Task.FromResult(todosResponsaveis.Where(r =>
+            (r.Nome != null && r.Nome.ToLowerInvariant().Contains(lowerValue)) ||
+            (r.CPF != null && r.CPF.Contains(lowerValue))
+        ).Take(50));
+    }
+
+    private async Task Confirmar()
+    {
+        await form.Validate();
+        if (!form.IsValid || responsavelSelecionado == null) return;
+        erroTitular = null;
+
+        // Regra de negócio: apenas 1 titular ativo por jazigo
+        if (vínculo.TipoVinculo == TipoVinculoJazigo.Titular)
+        {
+            var titularAtivo = await DbContext.JazigoProprietarios
+                .AnyAsync(jp => jp.JazigoId == vínculo.JazigoId
+                             && jp.TipoVinculo == TipoVinculoJazigo.Titular
+                             && jp.Ativo);
+            if (titularAtivo)
+            {
+                erroTitular = "Este jazigo já possui um titular ativo. Para alterar a titularidade, use a opção 'Transferir Titularidade' no detalhe do jazigo.";
+                return;
+            }
+        }
+
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            vínculo.ResponsavelId = responsavelSelecionado.Id;
+            vínculo.DataAquisicao = dataAquisicao.HasValue
+                ? DateTime.SpecifyKind(dataAquisicao.Value, DateTimeKind.Utc)
+                : DateTime.UtcNow;
+
+            vínculo.DataVencimento = dataVencimento.HasValue
+                ? DateTime.SpecifyKind(dataVencimento.Value, DateTimeKind.Utc)
+                : null;
+
+            DbContext.JazigoProprietarios.Add(vínculo);
+
+            // Atualizar flag EhProprietario no Responsavel se for Titular
+            if (vínculo.TipoVinculo == TipoVinculoJazigo.Titular)
+            {
+                var resp = await DbContext.Responsaveis.FindAsync(responsavelSelecionado.Id);
+                if (resp != null && !resp.EhProprietario)
+                {
+                    resp.EhProprietario = true;
+                    DbContext.Responsaveis.Update(resp);
+                }
+            }
+
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Responsável vinculado ao jazigo como {VinculoLabel(vínculo.TipoVinculo)} com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao vincular: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private static string VinculoLabel(TipoVinculoJazigo v) => v switch
+    {
+        TipoVinculoJazigo.Titular => "Titular (responsável legal)",
+        TipoVinculoJazigo.CoUsuario => "Co-usuário",
+        TipoVinculoJazigo.Beneficiario => "Beneficiário",
+        TipoVinculoJazigo.Herdeiro => "Herdeiro indicado",
+        _ => v.ToString()
+    };
+
+    private static string TituloLabel(TipoTituloJazigo t) => t switch
+    {
+        TipoTituloJazigo.Concessao => "Concessão",
+        TipoTituloJazigo.Permissao => "Permissão",
+        TipoTituloJazigo.Doacao => "Doação",
+        TipoTituloJazigo.Heranca => "Herança",
+        _ => t.ToString()
+    };
+}

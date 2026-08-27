@@ -4,25 +4,45 @@ using System.ComponentModel.DataAnnotations;
 namespace Sakrus.Core.Entities;
 
 /// <summary>
-/// Representa um documento PDF anexado ao registro de um falecido no sistema.
-/// Cada documento pertence exclusivamente ao falecido para o qual foi enviado.
+/// Representa um documento PDF anexado a qualquer entidade do sistema que exija documentação.
+/// Ao menos uma das FK contextuais deve estar preenchida:
+///   - FalecidoId: documento do falecido (ex: Declaração de Óbito)
+///   - AtendimentoId: vínculo com o atendimento (suplementar ao FalecidoId)
+///   - ResponsavelId: documento da Pessoa/Responsável (ex: RG, CPF, comprovante)
+///   - FunerariaId: documento da funerária parceira (ex: alvará, contrato)
 /// </summary>
 public class DocumentoAnexo
 {
     public int Id { get; set; }
 
-    /// <summary>
-    /// FK para o Atendimento ao qual este documento está vinculado.
-    /// </summary>
-    public int AtendimentoId { get; set; }
-    public Atendimento Atendimento { get; set; } = null!;
+    // ── Contexto: Falecido / Atendimento ────────────────────────────────────
 
-    /// <summary>
-    /// FK para o Falecido ao qual este documento pertence.
-    /// Garante que documentos nunca se misturem entre falecidos distintos.
-    /// </summary>
-    public int FalecidoId { get; set; }
-    public Falecido Falecido { get; set; } = null!;
+    /// <summary>FK para o Atendimento. Nulo quando o documento pertence apenas à Pessoa ou Funerária.</summary>
+    public int? AtendimentoId { get; set; }
+    public Atendimento? Atendimento { get; set; }
+
+    /// <summary>FK para o Falecido. Nulo quando o documento pertence à Pessoa ou Funerária.</summary>
+    public int? FalecidoId { get; set; }
+    public Falecido? Falecido { get; set; }
+
+    // ── Contexto: Responsável (Pessoa) ──────────────────────────────────────
+
+    /// <summary>FK para o Responsável/Pessoa. Nulo quando o documento pertence ao Falecido ou Funerária.</summary>
+    public int? ResponsavelId { get; set; }
+    public Responsavel? Responsavel { get; set; }
+
+    // ── Contexto: Funerária ─────────────────────────────────────────────────
+
+    /// <summary>FK para a Funerária parceira. Nulo quando o documento pertence ao Falecido ou Pessoa.</summary>
+    public int? FunerariaId { get; set; }
+    public Funeraria? Funeraria { get; set; }
+
+    // ── Categorização ────────────────────────────────────────────────────────
+
+    /// <summary>Tipo do documento para facilitar consulta e organização.</summary>
+    public TipoDocumentoAnexo Tipo { get; set; } = TipoDocumentoAnexo.Outro;
+
+    // ── Arquivo ─────────────────────────────────────────────────────────────
 
     /// <summary>Nome original do arquivo enviado pelo usuário.</summary>
     [Required]

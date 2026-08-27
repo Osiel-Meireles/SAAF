@@ -3,3 +3,6 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+
+# Variáveis de ambiente sensíveis — NUNCA commitar
+.env

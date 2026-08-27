@@ -15,15 +15,18 @@ public class AuthService : IAuthService
     private readonly ApplicationDbContext _context;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<AuthService> _logger;
+    private readonly IAuditService _auditService;
 
     public AuthService(
         ApplicationDbContext context,
         IHttpContextAccessor httpContextAccessor,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IAuditService auditService)
     {
         _context = context;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
+        _auditService = auditService;
     }
 
     public async Task<bool> LoginAsync(string email, string senha, bool lembrarMe)
@@ -59,8 +62,12 @@ public class AuthService : IAuthService
             {
                 usuario.BloqueadoAte = DateTime.UtcNow.AddMinutes(15);
                 _logger.LogWarning("Conta bloqueada por 15 minutos (brute-force): {Email}", email);
+                // MED-01: Registrar lockout no AuditLog
+                await _auditService.LogAcaoAsync(usuario.Id, MascararEmail(email), "LOCKOUT", "Usuario", usuario.Id.ToString());
             }
             
+            // MED-01: Registrar tentativa de login falha no AuditLog
+            await _auditService.LogAcaoAsync(usuario.Id, MascararEmail(email), "LOGIN_FALHOU", "Usuario", usuario.Id.ToString());
             await _context.SaveChangesAsync();
             return false;
         }
@@ -98,6 +105,9 @@ public class AuthService : IAuthService
             principal,
             authProperties);
 
+        // MED-01: Registrar login bem-sucedido no AuditLog
+        await _auditService.LogAcaoAsync(usuario.Id, usuario.Nome, "LOGIN", "Usuario", usuario.Id.ToString());
+
         _logger.LogInformation("Login realizado com sucesso: {Email} (Role: {Role})",
             usuario.Email, role);
 
@@ -110,7 +120,15 @@ public class AuthService : IAuthService
         if (httpContext is null) return;
 
         var email = httpContext.User.FindFirst(ClaimTypes.Email)?.Value;
+        var idStr = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        // MED-01: Registrar logout no AuditLog
+        if (int.TryParse(idStr, out var userId) && email is not null)
+        {
+            await _auditService.LogAcaoAsync(userId, email, "LOGOUT", "Usuario", userId.ToString());
+        }
 
         _logger.LogInformation("Logout realizado: {Email}", email);
     }
@@ -240,10 +258,15 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
-    /// SEC-03: Valida complexidade da senha (ao menos 1 maiúscula + 1 número).
+    /// MED-02: Valida complexidade da senha — 1 maiúscula + 1 minúscula + 1 número + 1 especial + mín 10 chars.
     /// </summary>
     private static bool ValidarComplexidadeSenha(string senha)
     {
-        return senha.Any(char.IsUpper) && senha.Any(char.IsDigit);
+        if (senha.Length < 10) return false;
+        bool temMaiuscula = senha.Any(char.IsUpper);
+        bool temMinuscula = senha.Any(char.IsLower);
+        bool temDigito = senha.Any(char.IsDigit);
+        bool temEspecial = senha.Any(c => "!@#$%^&*()_+-=[]{}|;':\",./<>?".Contains(c));
+        return temMaiuscula && temMinuscula && temDigito && temEspecial;
     }
 }

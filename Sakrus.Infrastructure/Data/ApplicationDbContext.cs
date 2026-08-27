@@ -31,6 +31,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Ossuario> Ossuarios { get; set; }
     public DbSet<DocumentoAnexo> DocumentosAnexos { get; set; }
 
+    /// <summary>Vínculos de propriedade/uso entre Responsáveis e Jazigos.</summary>
+    public DbSet<JazigoProprietario> JazigoProprietarios { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -78,6 +81,72 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<HistoricoTitularidadeJazigo>().HasOne(h => h.ResponsavelAntigo).WithMany().HasForeignKey(h => h.ResponsavelAntigoId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<HistoricoTitularidadeJazigo>().HasOne(h => h.ResponsavelNovo).WithMany().HasForeignKey(h => h.ResponsavelNovoId).OnDelete(DeleteBehavior.Restrict);
 
+        // ── DocumentoAnexo: FKs todas opcionais com comportamentos corretos ──
+
+        // Falecido: cascade (documentos do falecido são removidos junto)
+        modelBuilder.Entity<DocumentoAnexo>()
+            .HasOne(d => d.Falecido)
+            .WithMany(f => f.Documentos)
+            .HasForeignKey(d => d.FalecidoId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired(false);
+
+        // Atendimento: restrict (preserva docs mesmo que atendimento seja alterado)
+        modelBuilder.Entity<DocumentoAnexo>()
+            .HasOne(d => d.Atendimento)
+            .WithMany()
+            .HasForeignKey(d => d.AtendimentoId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        // Responsavel: restrict (documentos da pessoa não são perdidos se responsável for editado)
+        modelBuilder.Entity<DocumentoAnexo>()
+            .HasOne(d => d.Responsavel)
+            .WithMany(r => r.Documentos)
+            .HasForeignKey(d => d.ResponsavelId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        // Funeraria: restrict
+        modelBuilder.Entity<DocumentoAnexo>()
+            .HasOne(d => d.Funeraria)
+            .WithMany(f => f.Documentos)
+            .HasForeignKey(d => d.FunerariaId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        // ── JazigoProprietario ───────────────────────────────────────────────
+
+        // Jazigo → JazigoProprietario
+        modelBuilder.Entity<JazigoProprietario>()
+            .HasOne(jp => jp.Jazigo)
+            .WithMany(j => j.Proprietarios)
+            .HasForeignKey(jp => jp.JazigoId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Responsavel (titular/co-usuário) → JazigoProprietario
+        modelBuilder.Entity<JazigoProprietario>()
+            .HasOne(jp => jp.Responsavel)
+            .WithMany(r => r.JazigoProprietarios)
+            .HasForeignKey(jp => jp.ResponsavelId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Responsavel (herdeiro previsto) — FK separada para evitar ciclos EF
+        modelBuilder.Entity<JazigoProprietario>()
+            .HasOne(jp => jp.HerdeiroPrevisto)
+            .WithMany()
+            .HasForeignKey(jp => jp.HerdeiroPrevistId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
+        // Índice de performance para buscar vínculos ativos por jazigo
+        modelBuilder.Entity<JazigoProprietario>()
+            .HasIndex(jp => new { jp.JazigoId, jp.Ativo });
+
+        // Índice para buscar jazigos de um responsável
+        modelBuilder.Entity<JazigoProprietario>()
+            .HasIndex(jp => new { jp.ResponsavelId, jp.Ativo });
+
         // Conversões de Enum (Visibilidade no Postgres)
         modelBuilder.Entity<Atendimento>().Property(a => a.Perfil).HasConversion<string>();
         modelBuilder.Entity<Atendimento>().Property(a => a.Origem).HasConversion<string>();
@@ -89,17 +158,9 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<MovimentacaoEstoque>().Property(m => m.TipoMovimentacao).HasConversion<string>();
         modelBuilder.Entity<Falecido>().Property(f => f.Status).HasConversion<string>();
 
-        // DocumentoAnexo: cascade delete quando Falecido for removido; Atendimento restrito
-        modelBuilder.Entity<DocumentoAnexo>()
-            .HasOne(d => d.Falecido)
-            .WithMany(f => f.Documentos)
-            .HasForeignKey(d => d.FalecidoId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        modelBuilder.Entity<DocumentoAnexo>()
-            .HasOne(d => d.Atendimento)
-            .WithMany()
-            .HasForeignKey(d => d.AtendimentoId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Novos enums
+        modelBuilder.Entity<JazigoProprietario>().Property(jp => jp.TipoVinculo).HasConversion<string>();
+        modelBuilder.Entity<JazigoProprietario>().Property(jp => jp.TipoTitulo).HasConversion<string>();
+        modelBuilder.Entity<DocumentoAnexo>().Property(d => d.Tipo).HasConversion<string>();
     }
-}
+}

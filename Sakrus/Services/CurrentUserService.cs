@@ -8,10 +8,12 @@ namespace Sakrus.Services;
 public class CurrentUserService : ICurrentUserService
 {
     private readonly AuthenticationStateProvider _authStateProvider;
+    private readonly ILogger<CurrentUserService> _logger;
 
-    public CurrentUserService(AuthenticationStateProvider authStateProvider)
+    public CurrentUserService(AuthenticationStateProvider authStateProvider, ILogger<CurrentUserService> logger)
     {
         _authStateProvider = authStateProvider;
+        _logger = logger;
     }
 
     public int? UserId
@@ -38,9 +40,10 @@ public class CurrentUserService : ICurrentUserService
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Fallback
+                // HIGH-05: Log exceções em vez de suprimi-las silenciosamente
+                _logger.LogError(ex, "Falha ao resolver UserId do CurrentUserService");
             }
             return null;
         }
@@ -61,9 +64,10 @@ public class CurrentUserService : ICurrentUserService
                     return user.Identity.Name ?? "Sistema";
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Fallback
+                // HIGH-05: Log exceções em vez de suprimi-las silenciosamente
+                _logger.LogError(ex, "Falha ao resolver UserName do CurrentUserService");
             }
             return "Sistema";
         }

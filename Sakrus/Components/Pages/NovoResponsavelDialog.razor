@@ -1,0 +1,290 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject IWebHostEnvironment WebHostEnvironment
+@inject Sakrus.Services.FileStorageService FileStorage
+@inject ILogger<NovoResponsavelDialog> Logger
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+            Novo Responsável
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="sucesso">
+            <MudGrid>
+                @* Dados pessoais *@
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">Dados Pessoais</MudText>
+                    <MudDivider Class="mb-2" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentResp.Nome" Label="Nome Completo" Required="true" RequiredError="Nome é obrigatório" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.CPF" Label="CPF (somente números)" Required="true" RequiredError="CPF é obrigatório" HelperText="11 dígitos" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudDatePicker Label="Data de Nascimento" @bind-Date="dataNascimentoForm" Editable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.RG" Label="RG" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.OrgaoEmissor" Label="Órgão Emissor" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.Profissao" Label="Profissão" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.Telefone" Label="Telefone" Required="true" Placeholder="(00) 00000-0000" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentResp.Email" Label="E-mail" InputType="InputType.Email" HelperText="Futuramente usado para login GOV.br" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentResp.Endereco" Label="Endereço Completo" Required="true" />
+                </MudItem>
+
+                @* Upload de documentos *@
+                <MudItem xs="12" Class="mt-3">
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">Documentos</MudText>
+                    <MudDivider Class="mb-2" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                        Anexe ao menos <strong>1 documento</strong> em formato PDF (RG, CPF, comprovante de residência etc.). Máx. 10 MB por arquivo.
+                    </MudAlert>
+                    <InputFile id="fileInputNovoResp" OnChange="OnFileSelected" multiple accept=".pdf" style="display:none" />
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" OnClick="TriggerFileInput" Disabled="@isSaving">
+                        Selecionar PDF(s)
+                    </MudButton>
+                    @if (arquivosParaAnexar.Any())
+                    {
+                        <MudList T="string" Dense="true" Class="mt-2">
+                            @foreach (var arq in arquivosParaAnexar)
+                            {
+                                <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">
+                                    <div class="d-flex align-center justify-space-between" style="width:100%">
+                                        <MudText Typo="Typo.body2">
+                                            @arq.Name
+                                            <MudText Inline="true" Typo="Typo.caption" Color="Color.Secondary">(@FormatBytes(arq.Size))</MudText>
+                                        </MudText>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoverArquivo(arq))" />
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                    @if (!string.IsNullOrEmpty(erroUpload))
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@erroUpload</MudAlert>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancelar" Disabled="@isSaving">Cancelar</MudButton>
+        @if (isSaving)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="true">
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                Salvando...
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!sucesso)" OnClick="Salvar">Salvar Responsável</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+    public void Dispose() => DbContext?.Dispose();
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    // Se o usuário já tiver digitado um CPF na tela anterior, podemos pré-preencher
+    [Parameter] public string PreFillCpf { get; set; } = string.Empty;
+
+    private MudForm form = null!;
+    private bool sucesso;
+    private bool isSaving;
+    private Responsavel currentResp = new();
+    private DateTime? dataNascimentoForm;
+
+    // Upload
+    private sealed record ArquivoBuffer(string Name, long Size, byte[] Bytes);
+    private List<ArquivoBuffer> arquivosParaAnexar = new();
+    private string erroUpload = "";
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
+
+    protected override void OnInitialized()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        if (!string.IsNullOrEmpty(PreFillCpf))
+        {
+            currentResp.CPF = PreFillCpf;
+        }
+    }
+
+    private async Task Salvar()
+    {
+        await form.Validate();
+        if (!form.IsValid) return;
+
+        // Limpar formatação do CPF
+        if (!string.IsNullOrWhiteSpace(currentResp.CPF))
+        {
+            currentResp.CPF = new string(currentResp.CPF.Where(char.IsDigit).ToArray());
+        }
+
+        // Validação de CPF
+        if (!string.IsNullOrWhiteSpace(currentResp.CPF) && !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(currentResp.CPF))
+        {
+            Snackbar.Add("O CPF informado é inválido.", Severity.Error);
+            return;
+        }
+
+        // Validação de documento obrigatório
+        if (!arquivosParaAnexar.Any())
+        {
+            Snackbar.Add("É obrigatório anexar ao menos um documento de identificação (RG, CPF etc.).", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            // Atribui a data convertida
+            if (dataNascimentoForm.HasValue)
+            {
+                currentResp.DataNascimento = DateTime.SpecifyKind(dataNascimentoForm.Value, DateTimeKind.Utc);
+            }
+
+            // Verifica se o CPF já existe
+            if (!string.IsNullOrWhiteSpace(currentResp.CPF))
+            {
+                var existe = await DbContext.Responsaveis.AnyAsync(r => r.CPF == currentResp.CPF);
+                if (existe)
+                {
+                    Snackbar.Add("Este CPF já está cadastrado na base de dados.", Severity.Error);
+                    isSaving = false;
+                    StateHasChanged();
+                    return;
+                }
+            }
+
+            DbContext.Responsaveis.Add(currentResp);
+            await DbContext.SaveChangesAsync();
+
+            // Salvar anexos
+            if (arquivosParaAnexar.Any())
+            {
+                foreach (var arquivo in arquivosParaAnexar)
+                {
+                    // CRIT-01/02/03: FileStorageService — magic bytes, seguro, UUID no disco
+                    var caminhoRelativo = await FileStorage.SalvarArquivoAsync(
+                        "responsaveis", currentResp.Id, arquivo.Name, arquivo.Bytes);
+
+                    DbContext.DocumentosAnexos.Add(new DocumentoAnexo
+                    {
+                        ResponsavelId = currentResp.Id,
+                        Tipo = TipoDocumentoAnexo.Rg,
+                        NomeArquivo = arquivo.Name,
+                        CaminhoArquivo = caminhoRelativo,
+                        TamanhoBytes = arquivo.Bytes.LongLength,
+                        DataAnexo = DateTime.UtcNow
+                    });
+                }
+                await DbContext.SaveChangesAsync();
+            }
+
+            Snackbar.Add("Responsável cadastrado com sucesso!", Severity.Success);
+            
+            // Retorna o objeto Responsável criado para a tela chamadora
+            MudDialog.Close(DialogResult.Ok(currentResp));
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+            isSaving = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar novo responsável");
+            Snackbar.Add("Ocorreu um erro ao salvar o responsável. Tente novamente.", Severity.Error);
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    // ── Métodos de Upload ──────────────────────────────────────────────────
+
+    private async Task TriggerFileInput()
+        => await JSRuntime.InvokeVoidAsync("triggerFileInput", "fileInputNovoResp"); // HIGH-04
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        erroUpload = "";
+        var rejeitados = new List<string>();
+
+        foreach (var file in e.GetMultipleFiles(20))
+        {
+            if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
+                && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                rejeitados.Add($"{file.Name} (apenas PDF)"); continue;
+            }
+            if (file.Size > MaxFileSizeBytes)
+            {
+                rejeitados.Add($"{file.Name} (excede 10 MB)"); continue;
+            }
+            if (arquivosParaAnexar.Any(a => a.Name == file.Name)) continue;
+
+            try
+            {
+                using var ms = new MemoryStream();
+                await using var stream = file.OpenReadStream(MaxFileSizeBytes);
+                await stream.CopyToAsync(ms);
+                arquivosParaAnexar.Add(new ArquivoBuffer(file.Name, file.Size, ms.ToArray()));
+            }
+            catch (Exception ex)
+            {
+                rejeitados.Add($"{file.Name} (erro ao ler: {ex.Message})");
+            }
+        }
+
+        if (rejeitados.Any())
+        {
+            erroUpload = $"Rejeitado(s): {string.Join("; ", rejeitados)}";
+        }
+    }
+
+    private void RemoverArquivo(ArquivoBuffer arq)
+    {
+        arquivosParaAnexar.Remove(arq);
+        erroUpload = "";
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
+}

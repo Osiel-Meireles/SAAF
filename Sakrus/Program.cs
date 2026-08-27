@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using QuestPDF.Infrastructure;
@@ -10,6 +11,7 @@ using Sakrus.Endpoints;
 using Sakrus.Data;
 using Sakrus.Infrastructure.Data;
 using Sakrus.Services;
+using System.Threading.RateLimiting;
 
 // ConfiguraÃ§Ã£o global do QuestPDF (feita uma Ãºnica vez, aqui, nÃ£o dentro dos mÃ©todos)
 QuestPDF.Settings.License = LicenseType.Community;
@@ -88,6 +90,23 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<Sakrus.Services.AgendaService>();
 
+// CRIT-02/03: Serviço de armazenamento seguro de arquivos (fora do wwwroot)
+builder.Services.AddSingleton<FileStorageService>();
+
+// HIGH-03: Rate Limiting — protege o endpoint de login contra brute-force em nível de rede
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("login", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 10;
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+    // Resposta padrão para requisições bloqueadas
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
 var app = builder.Build();
 
 // --- Configuração de Localização (pt-BR) ---
@@ -107,19 +126,31 @@ if (!app.Environment.IsDevelopment())
     // Se ativar HTTPS no futuro, descomentar: app.UseHsts();
 }
 
-// SEC-04: Headers de seguranÃ§a HTTP
+// SEC-04: Headers de segurança HTTP
 app.Use(async (context, next) =>
 {
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    // HIGH-01: Content Security Policy — previne XSS e injeção de scripts externos
+    // 'unsafe-inline' é necessário para Blazor Server e MudBlazor (estilos inline)
+    // wss: é necessário para o SignalR do Blazor Server
+    context.Response.Headers["Content-Security-Policy"] =
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline' fonts.googleapis.com; " +
+        "font-src 'self' fonts.gstatic.com data:; " +
+        "connect-src 'self' wss: ws:; " +
+        "img-src 'self' data:; " +
+        "frame-ancestors 'none';";
     await next();
 });
 
 app.UseStaticFiles();
 
-// A ORDEM IMPORTA: Authentication â†’ Authorization â†’ Antiforgery
+// A ORDEM IMPORTA: RateLimiter → Authentication → Authorization → Antiforgery
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();

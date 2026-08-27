@@ -1,0 +1,412 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+<MudDialog Style="max-height: 92vh; overflow: hidden;">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.HomeWork" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Vincular Responsável a Jazigo</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
+            @ResponsavelNome
+        </MudText>
+
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center align-center pa-8">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            </div>
+        }
+        else
+        {
+            <MudForm @ref="form" @bind-IsValid="sucesso">
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                            O <strong>Titular</strong> é o responsável legal único perante o cemitério.
+                            Co-usuários e Beneficiários possuem direito de uso, não de administração.
+                        </MudAlert>
+                    </MudItem>
+
+                    @* ── MAPA DE JAZIGOS ─────────────────────────────── *@
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-1">
+                            <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Small" Class="mr-1" />
+                            Selecione o Jazigo no Mapa
+                        </MudText>
+
+                        @* Legenda *@
+                        <div class="d-flex align-center gap-4 mb-2 flex-wrap">
+                            <div class="d-flex align-center gap-1">
+                                <div class="vp-legend-box" style="background-color:#4caf50;"></div>
+                                <MudText Typo="Typo.caption">Disponível</MudText>
+                            </div>
+                            <div class="d-flex align-center gap-1">
+                                <div class="vp-legend-box" style="background-color:#f44336;"></div>
+                                <MudText Typo="Typo.caption">Ocupado</MudText>
+                            </div>
+                            <div class="d-flex align-center gap-1">
+                                <div class="vp-legend-box" style="background-color:#1976d2;"></div>
+                                <MudText Typo="Typo.caption">Selecionado</MudText>
+                            </div>
+                        </div>
+
+                        @if (!quadrasJazigo.Any())
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true">
+                                Nenhum jazigo disponível para vincular.
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudTabs Elevation="0" Rounded="true" Outlined="true" Position="Position.Top">
+                                @foreach (var quadra in quadrasJazigo)
+                                {
+                                    <MudTabPanel Text="@($"Quadra {quadra}")">
+                                        <div class="d-flex flex-column gap-3 mt-3">
+                                            @foreach (var alaGroup in jazigosAgrupados[quadra])
+                                            {
+                                                <MudCard Elevation="1" Class="pa-2">
+                                                    <div class="d-flex align-center gap-2 mb-2">
+                                                        <MudChip T="string" Color="Color.Dark" Size="Size.Small">Ala @alaGroup.Key</MudChip>
+                                                        <MudDivider Class="flex-grow-1" />
+                                                    </div>
+                                                    <div class="d-flex flex-wrap gap-1">
+                                                        @foreach (var jazigo in alaGroup.Value)
+                                                        {
+                                                            var jIsSelected = selectedJazigoId == jazigo.Id;
+                                                            var jCorFundo = jIsSelected ? "#1976d2"
+                                                                          : jazigo.Ocupado ? "#f44336"
+                                                                          : "#4caf50";
+                                                            var jTooltip = jazigo.Ocupado
+                                                                ? $"Lote {jazigo.NumeroLote} — Ocupado"
+                                                                : jIsSelected
+                                                                    ? $"Lote {jazigo.NumeroLote} — SELECIONADO ✓"
+                                                                    : $"Lote {jazigo.NumeroLote} — Disponível (clique para selecionar)";
+
+                                                            <MudTooltip Text="@jTooltip">
+                                                                <MudPaper Class="@($"d-flex flex-column align-center justify-center vp-map-box {(!jazigo.Ocupado ? "cursor-pointer" : "")}")"
+                                                                          Style="@($"background-color:{jCorFundo}; color:white; opacity:{(!jazigo.Ocupado || jIsSelected ? "1" : "0.5")};")"
+                                                                          Elevation="2"
+                                                                          @onclick="@(() => SelecionarJazigo(jazigo))">
+                                                                    <MudText Typo="Typo.caption" Class="font-weight-bold vp-label">@jazigo.NumeroLote</MudText>
+                                                                    @if (jIsSelected)
+                                                                    {
+                                                                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Style="font-size:0.75rem;" />
+                                                                    }
+                                                                </MudPaper>
+                                                            </MudTooltip>
+                                                        }
+                                                    </div>
+                                                </MudCard>
+                                            }
+                                        </div>
+                                    </MudTabPanel>
+                                }
+                            </MudTabs>
+                        }
+
+                        @* Painel de confirmação da seleção *@
+                        @if (selectedJazigoId.HasValue)
+                        {
+                            <MudPaper Class="pa-3 mt-3 d-flex align-center gap-3"
+                                      Style="border:2px solid #1976d2; border-radius:8px; background:rgba(25,118,210,0.07);">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary" />
+                                <div class="flex-grow-1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Jazigo selecionado:</MudText>
+                                    <MudText Typo="Typo.body1" Style="font-weight:600;">@descricaoSelecionado</MudText>
+                                </div>
+                                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                               Size="Size.Small"
+                                               OnClick="LimparSelecao"
+                                               Title="Remover seleção" />
+                            </MudPaper>
+                        }
+                        else
+                        {
+                            @* Campo oculto para validação obrigatória *@
+                            <MudTextField Value="@("")" Label="Jazigo"
+                                          Required="true" RequiredError="Selecione um jazigo no mapa acima"
+                                          Style="display:none" />
+                            @if (mostrarErroSelecao)
+                            {
+                                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">
+                                    Selecione um jazigo no mapa acima para continuar.
+                                </MudAlert>
+                            }
+                        }
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="TipoVinculoJazigo" Label="Tipo de Vínculo"
+                                   @bind-Value="vínculo.TipoVinculo" Required="true">
+                            @foreach (TipoVinculoJazigo tv in Enum.GetValues(typeof(TipoVinculoJazigo)))
+                            {
+                                <MudSelectItem Value="@tv">@VinculoLabel(tv)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="TipoTituloJazigo" Label="Tipo de Título"
+                                   @bind-Value="vínculo.TipoTitulo" Required="true">
+                            @foreach (TipoTituloJazigo tt in Enum.GetValues(typeof(TipoTituloJazigo)))
+                            {
+                                <MudSelectItem Value="@tt">@TituloLabel(tt)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="Data de Aquisição" @bind-Date="dataAquisicao"
+                                       Required="true" Editable="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="Data de Vencimento (opcional)" @bind-Date="dataVencimento"
+                                       Editable="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="vínculo.Observacao" Label="Observação"
+                                      Lines="2" Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    @if (erroTitular != null)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Warning" Dense="true">@erroTitular</MudAlert>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Link"
+                   OnClick="Confirmar" Disabled="@isSaving">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+            }
+            Vincular
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .vp-map-box {
+        width: 48px;
+        height: 48px;
+        border-radius: 4px;
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .vp-map-box.cursor-pointer:hover {
+        transform: scale(1.2);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.35) !important;
+        z-index: 10;
+    }
+    .vp-legend-box {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        display: inline-block;
+    }
+    .vp-label {
+        font-size: 0.6rem !important;
+        line-height: 1.2;
+        text-align: center;
+        word-break: break-all;
+    }
+</style>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+    public void Dispose() => DbContext?.Dispose();
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int ResponsavelId { get; set; }
+    [Parameter] public string ResponsavelNome { get; set; } = string.Empty;
+
+    private MudForm form = null!;
+    private bool sucesso;
+    private bool isSaving;
+    private bool isLoading = true;
+    private bool mostrarErroSelecao;
+    private string? erroTitular;
+
+    // Mapa de jazigos
+    private List<string> quadrasJazigo = new();
+    private Dictionary<string, Dictionary<string, List<Jazigo>>> jazigosAgrupados = new();
+
+    // Seleção corrente
+    private int? selectedJazigoId;
+    private Jazigo? _jazigoSelecionado;
+    private string descricaoSelecionado = "";
+
+    private JazigoProprietario vínculo = new();
+    private DateTime? dataAquisicao = DateTime.Today;
+    private DateTime? dataVencimento;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        await CarregarMapaAsync();
+        vínculo.ResponsavelId = ResponsavelId;
+        vínculo.TipoVinculo = TipoVinculoJazigo.Titular;
+        vínculo.TipoTitulo = TipoTituloJazigo.Concessao;
+        isLoading = false;
+    }
+
+    private async Task CarregarMapaAsync()
+    {
+        // Carregar todos os jazigos (sem filtro de infantil — para seleção de proprietário)
+        var todosJazigos = await DbContext.Jazigos
+            .Include(j => j.Falecidos)
+            .Where(j => !DbContext.Jazigos.Any(filho => filho.JazigoPaiId == j.Id))
+            .OrderBy(j => j.Quadra)
+            .ThenBy(j => j.Ala)
+            .ThenBy(j => j.NumeroLote)
+            .ToListAsync();
+
+        var jazigosValidos = todosJazigos.Select(j =>
+        {
+            j.Quadra     = string.IsNullOrWhiteSpace(j.Quadra)     ? "S/Q" : j.Quadra;
+            j.Ala        = string.IsNullOrWhiteSpace(j.Ala)        ? "S/A" : j.Ala;
+            j.NumeroLote = string.IsNullOrWhiteSpace(j.NumeroLote) ? j.CodigoIdentificador : j.NumeroLote;
+            return j;
+        }).ToList();
+
+        quadrasJazigo = jazigosValidos.Select(j => j.Quadra).Distinct().OrderBy(q => q).ToList();
+        jazigosAgrupados = jazigosValidos
+            .GroupBy(j => j.Quadra)
+            .ToDictionary(
+                g => g.Key,
+                g => g.GroupBy(j => j.Ala)
+                       .OrderBy(a => a.Key)
+                       .ToDictionary(a => a.Key, a => a.ToList())
+            );
+    }
+
+    private void SelecionarJazigo(Jazigo jazigo)
+    {
+        // Permite selecionar qualquer jazigo, mesmo ocupado (pode ter múltiplos proprietários)
+        if (selectedJazigoId == jazigo.Id)
+        {
+            LimparSelecao();
+            return;
+        }
+
+        selectedJazigoId     = jazigo.Id;
+        _jazigoSelecionado   = jazigo;
+        vínculo.JazigoId     = jazigo.Id;
+        mostrarErroSelecao   = false;
+        descricaoSelecionado = $"Jazigo {jazigo.CodigoIdentificador}  |  Quadra {jazigo.Quadra}  ·  Ala {jazigo.Ala}  ·  Lote {jazigo.NumeroLote}";
+        StateHasChanged();
+    }
+
+    private void LimparSelecao()
+    {
+        selectedJazigoId   = null;
+        _jazigoSelecionado = null;
+        vínculo.JazigoId   = 0;
+        descricaoSelecionado = "";
+        StateHasChanged();
+    }
+
+    private async Task Confirmar()
+    {
+        await form.Validate();
+
+        // Validação manual da seleção de jazigo
+        if (!selectedJazigoId.HasValue)
+        {
+            mostrarErroSelecao = true;
+            return;
+        }
+
+        if (!form.IsValid) return;
+
+        erroTitular = null;
+
+        // Regra de negócio: apenas 1 titular ativo por jazigo
+        if (vínculo.TipoVinculo == TipoVinculoJazigo.Titular)
+        {
+            var titularAtivo = await DbContext.JazigoProprietarios
+                .AnyAsync(jp => jp.JazigoId == vínculo.JazigoId
+                             && jp.TipoVinculo == TipoVinculoJazigo.Titular
+                             && jp.Ativo);
+            if (titularAtivo)
+            {
+                erroTitular = "Este jazigo já possui um titular ativo. Para alterar a titularidade, use a opção 'Transferir Titularidade' no detalhe do jazigo.";
+                return;
+            }
+        }
+
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            vínculo.DataAquisicao = dataAquisicao.HasValue
+                ? DateTime.SpecifyKind(dataAquisicao.Value, DateTimeKind.Utc)
+                : DateTime.UtcNow;
+
+            vínculo.DataVencimento = dataVencimento.HasValue
+                ? DateTime.SpecifyKind(dataVencimento.Value, DateTimeKind.Utc)
+                : null;
+
+            DbContext.JazigoProprietarios.Add(vínculo);
+
+            // Atualizar flag EhProprietario no Responsavel
+            var resp = await DbContext.Responsaveis.FindAsync(ResponsavelId);
+            if (resp != null && !resp.EhProprietario)
+            {
+                resp.EhProprietario = true;
+                DbContext.Responsaveis.Update(resp);
+            }
+
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Responsável vinculado ao jazigo como {VinculoLabel(vínculo.TipoVinculo)} com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao vincular: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private static string VinculoLabel(TipoVinculoJazigo v) => v switch
+    {
+        TipoVinculoJazigo.Titular    => "Titular (responsável legal)",
+        TipoVinculoJazigo.CoUsuario  => "Co-usuário",
+        TipoVinculoJazigo.Beneficiario => "Beneficiário",
+        TipoVinculoJazigo.Herdeiro   => "Herdeiro indicado",
+        _ => v.ToString()
+    };
+
+    private static string TituloLabel(TipoTituloJazigo t) => t switch
+    {
+        TipoTituloJazigo.Concessao => "Concessão",
+        TipoTituloJazigo.Permissao => "Permissão",
+        TipoTituloJazigo.Doacao    => "Doação",
+        TipoTituloJazigo.Heranca   => "Herança",
+        _ => t.ToString()
+    };
+}

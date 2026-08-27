@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Sakrus.Services;
+using Sakrus.Infrastructure.Data;
 
 namespace Sakrus.Endpoints;
 
@@ -49,7 +50,7 @@ public static class AuthEndpoints
             }
 
             return Results.Redirect(destino);
-        }).AllowAnonymous(); // Antiforgery habilitado por padrão (SEC-02)
+        }).AllowAnonymous().RequireRateLimiting("login"); // HIGH-03: Rate limiting anti brute-force
 
         // SEC-05: Logout via POST — protegido contra CSRF
         auth.MapPost("/logout", async (
@@ -59,5 +60,39 @@ public static class AuthEndpoints
             await authService.LogoutAsync();
             return Results.Redirect("/login");
         }).AllowAnonymous();
+
+        // CRIT-02: Download seguro de documentos — exige autenticação obrigatória.
+        // Arquivos estão fora do wwwroot e são servidos somente por este endpoint autenticado.
+        app.MapGet("/api/documentos/{id:int}", async (
+            int id,
+            HttpContext httpContext,
+            ApplicationDbContext db,
+            FileStorageService fileStorage,
+            ILogger<Program> logger) =>
+        {
+            var user = httpContext.User;
+            if (user.Identity?.IsAuthenticated != true)
+                return Results.Unauthorized();
+
+            var doc = await db.DocumentosAnexos.FindAsync(id);
+            if (doc is null)
+                return Results.NotFound();
+
+            try
+            {
+                var bytes = await fileStorage.LerArquivoAsync(doc.CaminhoArquivo);
+                logger.LogInformation("Download de documento ID {DocId} por {User}", id, user.Identity.Name);
+                return Results.File(bytes, "application/pdf", doc.NomeArquivo);
+            }
+            catch (FileNotFoundException)
+            {
+                return Results.NotFound("Arquivo não encontrado no servidor.");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                logger.LogCritical("Tentativa de path traversal no download do documento ID {DocId}", id);
+                return Results.BadRequest("Caminho de arquivo inválido.");
+            }
+        }).RequireAuthorization();
     }
 }

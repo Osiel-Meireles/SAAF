@@ -1,0 +1,314 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject Sakrus.Services.FileStorageService FileStorage
+@inject ILogger<DocumentosResponsavelDialog> Logger
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Warning" />
+            <MudText Typo="Typo.h6">Documentos do Responsável</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center align-center pa-6">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            </div>
+        }
+        else
+        {
+            <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
+                @ResponsavelNome
+            </MudText>
+
+            @* Upload *@
+            <MudPaper Outlined="true" Class="pa-3 mb-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Upload" Size="Size.Small" Class="mr-1" />
+                    Anexar novos documentos (PDF)
+                </MudText>
+
+                <MudSelect T="TipoDocumentoAnexo" Label="Tipo do Documento" @bind-Value="tipoSelecionado" Class="mb-2" Dense="true">
+                    @foreach (TipoDocumentoAnexo tipo in Enum.GetValues(typeof(TipoDocumentoAnexo)))
+                    {
+                        <MudSelectItem Value="@tipo">@TipoDocLabel(tipo)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <InputFile id="fileInputRespDialog" OnChange="OnFileSelected" multiple accept=".pdf" style="display:none" />
+                <div class="d-flex align-center gap-2 flex-wrap">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small"
+                               OnClick="TriggerFileInput" Disabled="@isSalvando">
+                        Selecionar PDF(s)
+                    </MudButton>
+                    @if (arquivosParaAnexar.Any())
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.CloudUpload" Size="Size.Small"
+                                   OnClick="SalvarAnexos" Disabled="@isSalvando">
+                            @if (isSalvando)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                <span>Salvando...</span>
+                            }
+                            else { <span>Salvar @arquivosParaAnexar.Count arquivo(s)</span> }
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small"
+                                   OnClick="LimparSelecao" Disabled="@isSalvando">Limpar</MudButton>
+                    }
+                </div>
+
+                @if (arquivosParaAnexar.Any())
+                {
+                    <MudList T="string" Dense="true" Class="mt-2">
+                        @foreach (var arq in arquivosParaAnexar)
+                        {
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">
+                                <div class="d-flex align-center justify-space-between" style="width:100%">
+                                    <MudText Typo="Typo.body2">
+                                        @arq.Name
+                                        <MudText Inline="true" Typo="Typo.caption" Color="Color.Secondary">(@FormatBytes(arq.Size))</MudText>
+                                    </MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                   Color="Color.Error" OnClick="@(() => RemoverArquivo(arq))" />
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+                @if (!string.IsNullOrEmpty(erroUpload))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@erroUpload</MudAlert>
+                }
+            </MudPaper>
+
+            @* Lista de documentos *@
+            @if (documentos.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Icon="@Icons.Material.Filled.Info">
+                    Nenhum documento foi anexado a este responsável ainda.
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="@documentos" Hover="true" Striped="true" Elevation="0" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Tipo</MudTh>
+                        <MudTh>Nome do Arquivo</MudTh>
+                        <MudTh>Tamanho</MudTh>
+                        <MudTh>Data</MudTh>
+                        <MudTh Style="text-align:center">Download</MudTh>
+                        <MudTh Style="text-align:center">Excluir</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Tipo">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">@TipoDocLabel(context.Tipo)</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Nome">
+                            <div class="d-flex align-center gap-1">
+                                <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Error" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">@context.NomeArquivo</MudText>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Tamanho">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatBytes(context.TamanhoBytes)</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Data">
+                            <MudText Typo="Typo.caption">@context.DataAnexo.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Download" Style="text-align:center">
+                            <MudIconButton Icon="@Icons.Material.Filled.Download" Color="Color.Primary"
+                                           Size="Size.Small" Disabled="@baixandoId.Contains(context.Id)"
+                                           OnClick="@(() => BaixarDocumento(context))" />
+                        </MudTd>
+                        <MudTd DataLabel="Excluir" Style="text-align:center">
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error"
+                                           Size="Size.Small" Title="Excluir documento"
+                                           Disabled="@(excluindoId.Contains(context.Id) || isSalvando)"
+                                           OnClick="@(() => ExcluirDocumento(context))" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-3 d-block text-right">
+                    @documentos.Count documento(s)
+                </MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Fechar" Variant="Variant.Text">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+    public void Dispose() => DbContext?.Dispose();
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int ResponsavelId { get; set; }
+    [Parameter] public string ResponsavelNome { get; set; } = string.Empty;
+
+    private List<DocumentoAnexo> documentos = new();
+    private bool isLoading = true;
+    private HashSet<int> baixandoId = new();
+    private HashSet<int> excluindoId = new();
+
+    private sealed record ArquivoBuffer(string Name, long Size, byte[] Bytes);
+    private List<ArquivoBuffer> arquivosParaAnexar = new();
+    private string erroUpload = string.Empty;
+    private bool isSalvando = false;
+    private TipoDocumentoAnexo tipoSelecionado = TipoDocumentoAnexo.Outro;
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        isLoading = true;
+        documentos = await DbContext.DocumentosAnexos
+            .Where(d => d.ResponsavelId == ResponsavelId)
+            .OrderByDescending(d => d.DataAnexo)
+            .ToListAsync();
+        isLoading = false;
+    }
+
+    private async Task TriggerFileInput()
+        => await JSRuntime.InvokeVoidAsync("triggerFileInput", "fileInputRespDialog"); // HIGH-04
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        erroUpload = string.Empty;
+        var rejeitados = new List<string>();
+        foreach (var file in e.GetMultipleFiles(20))
+        {
+            if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
+                && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            { rejeitados.Add($"{file.Name} (apenas PDF)"); continue; }
+            if (file.Size > MaxFileSizeBytes) { rejeitados.Add($"{file.Name} (excede 10 MB)"); continue; }
+            if (arquivosParaAnexar.Any(a => a.Name == file.Name)) continue;
+            try
+            {
+                using var ms = new MemoryStream();
+                await using var stream = file.OpenReadStream(MaxFileSizeBytes);
+                await stream.CopyToAsync(ms);
+                arquivosParaAnexar.Add(new ArquivoBuffer(file.Name, file.Size, ms.ToArray()));
+            }
+            catch (Exception ex) { rejeitados.Add($"{file.Name} (erro: {ex.Message})"); }
+        }
+        if (rejeitados.Any()) erroUpload = $"Rejeitado(s): {string.Join("; ", rejeitados)}";
+    }
+
+    private void RemoverArquivo(ArquivoBuffer arq) { arquivosParaAnexar.Remove(arq); erroUpload = string.Empty; }
+    private void LimparSelecao() { arquivosParaAnexar.Clear(); erroUpload = string.Empty; }
+
+    private async Task SalvarAnexos()
+    {
+        if (!arquivosParaAnexar.Any()) return;
+        isSalvando = true; StateHasChanged();
+        try
+        {
+            foreach (var arquivo in arquivosParaAnexar)
+            {
+                // CRIT-01/02/03: FileStorageService — magic bytes, seguro, UUID no disco
+                var caminhoRelativo = await FileStorage.SalvarArquivoAsync(
+                    "responsaveis", ResponsavelId, arquivo.Name, arquivo.Bytes);
+
+                DbContext.DocumentosAnexos.Add(new DocumentoAnexo
+                {
+                    ResponsavelId = ResponsavelId, Tipo = tipoSelecionado,
+                    NomeArquivo = arquivo.Name,
+                    CaminhoArquivo = caminhoRelativo,
+                    TamanhoBytes = arquivo.Bytes.LongLength, DataAnexo = DateTime.UtcNow
+                });
+            }
+            await DbContext.SaveChangesAsync();
+            var qtd = arquivosParaAnexar.Count;
+            arquivosParaAnexar.Clear(); erroUpload = string.Empty;
+            DbContext.ChangeTracker.Clear();
+            await CarregarAsync();
+            Snackbar.Add($"{qtd} documento(s) anexado(s) com sucesso!", Severity.Success);
+        }
+        catch (InvalidOperationException ex) { Snackbar.Add(ex.Message, Severity.Warning); }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar documentos do responsável {ResponsavelId}", ResponsavelId);
+            Snackbar.Add("Ocorreu um erro ao salvar os documentos. Tente novamente.", Severity.Error);
+        }
+        finally { isSalvando = false; StateHasChanged(); }
+    }
+
+    private async Task ExcluirDocumento(DocumentoAnexo doc)
+    {
+        bool? confirmado = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Deseja excluir permanentemente '{doc.NomeArquivo}'?");
+        if (confirmado != true) return;
+        excluindoId.Add(doc.Id); StateHasChanged();
+        try
+        {
+            FileStorage.ExcluirArquivo(doc.CaminhoArquivo); // CRIT-02
+            var docNoBanco = await DbContext.DocumentosAnexos.FindAsync(doc.Id);
+            if (docNoBanco != null) { DbContext.DocumentosAnexos.Remove(docNoBanco); await DbContext.SaveChangesAsync(); }
+            DbContext.ChangeTracker.Clear();
+            await CarregarAsync();
+            Snackbar.Add($"Documento excluído.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao excluir documento ID {DocId}", doc.Id);
+            Snackbar.Add("Ocorreu um erro ao excluir o documento.", Severity.Error);
+        }
+    }
+
+    private async Task BaixarDocumento(DocumentoAnexo doc)
+    {
+        if (baixandoId.Contains(doc.Id)) return;
+        baixandoId.Add(doc.Id); StateHasChanged();
+        try
+        {
+            var bytes = await FileStorage.LerArquivoAsync(doc.CaminhoArquivo); // CRIT-02
+            await JSRuntime.InvokeVoidAsync("downloadFileFromBase64", doc.NomeArquivo, Convert.ToBase64String(bytes));
+        }
+        catch (FileNotFoundException) { Snackbar.Add("Arquivo não encontrado no servidor.", Severity.Error); }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao baixar documento ID {DocId}", doc.Id);
+            Snackbar.Add("Ocorreu um erro ao baixar o arquivo.", Severity.Error);
+        }
+        finally { baixandoId.Remove(doc.Id); StateHasChanged(); }
+    }
+
+    private static string TipoDocLabel(TipoDocumentoAnexo tipo) => tipo switch
+    {
+        TipoDocumentoAnexo.DeclaracaoObito => "Declaração de Óbito",
+        TipoDocumentoAnexo.Rg => "RG",
+        TipoDocumentoAnexo.Cpf => "CPF",
+        TipoDocumentoAnexo.ComprovanteResidencia => "Comprovante de Residência",
+        TipoDocumentoAnexo.ContratoFuneraria => "Contrato Funerária",
+        TipoDocumentoAnexo.AlvaraFuneraria => "Alvará Funerária",
+        TipoDocumentoAnexo.DocumentoJazigo => "Documento do Jazigo",
+        _ => "Outro"
+    };
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
+
+    private void Fechar() => MudDialog.Cancel();
+}

@@ -21,4 +21,7 @@ public class Funeraria
     public string Endereco { get; set; } = string.Empty;
 
     public List<Atendimento> Atendimentos { get; set; } = new();
+
+    /// <summary>Documentos anexados a esta funerária (alvará, contrato etc.).</summary>
+    public List<DocumentoAnexo> Documentos { get; set; } = new();
 }

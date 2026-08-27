@@ -3,11 +3,15 @@
 @using Sakrus.Core.Entities
 @using Sakrus.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject IAuthService AuthService
+@inject Sakrus.Services.FileStorageService FileStorage
+@inject IJSRuntime JSRuntime
+@inject ILogger<Funerarias> Logger
 
 <PageTitle>Funerárias Parceiras - Sakrus</PageTitle>
 
@@ -35,8 +39,9 @@
         <MudTd DataLabel="Telefone">@context.Telefone</MudTd>
         <MudTd DataLabel="Endereço">@context.Endereco</MudTd>
         <MudTd DataLabel="Ações">
-            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenEditForm(context))" />
-            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => Delete(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Warning" Size="Size.Small" Title="Ver Documentos" OnClick="@(() => OpenDocumentos(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" Title="Editar" OnClick="@(() => OpenEditForm(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" Title="Excluir" OnClick="@(() => Delete(context))" />
         </MudTd>
     </RowTemplate>
     <PagerContent>
@@ -63,6 +68,40 @@
                 <MudItem xs="12" sm="6">
                     <MudTextField @bind-Value="currentFuneraria.Endereco" Label="Endereço Completo" Required="false" />
                 </MudItem>
+
+                @* Upload obrigatório apenas na criação (Q3) *@
+                @if (!isEditing)
+                {
+                    <MudItem xs="12" Class="mt-2">
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                            Anexe ao menos <strong>1 documento</strong> da funerária (ex: alvará de funcionamento, contrato). Formato PDF, máx. 10 MB.
+                        </MudAlert>
+                        <InputFile id="fileInputFuneraria" OnChange="OnFileSelected" multiple accept=".pdf" style="display:none" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.AttachFile"
+                                   OnClick="TriggerFileInput">Selecionar PDF(s)</MudButton>
+                        @if (arquivosParaAnexar.Any())
+                        {
+                            <MudList T="string" Dense="true" Class="mt-2">
+                                @foreach (var arq in arquivosParaAnexar)
+                                {
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">
+                                        <div class="d-flex align-center justify-space-between" style="width:100%">
+                                            <MudText Typo="Typo.body2">@arq.Name</MudText>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                           Color="Color.Error" OnClick="@(() => RemoverArquivo(arq))" />
+                                        </div>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                        @if (!string.IsNullOrEmpty(erroUpload))
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@erroUpload</MudAlert>
+                        }
+                    </MudItem>
+                }
+
                 <MudItem xs="12" Class="d-flex justify-end mt-4">
                     <MudButton Variant="Variant.Text" OnClick="CloseForm" Class="mr-2">Cancelar</MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!sucesso)" OnClick="Save">Salvar</MudButton>
@@ -87,8 +126,13 @@
     private bool sucesso;
     private MudForm form = null!;
     private string searchString = "";
-    
     private Funeraria currentFuneraria = new();
+
+    // Upload — obrigatório apenas na criação
+    private sealed record ArquivoBuffer(string Name, long Size, byte[] Bytes);
+    private List<ArquivoBuffer> arquivosParaAnexar = new();
+    private string erroUpload = "";
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
     private bool FilterFunc(Funeraria funeraria)
     {
@@ -117,6 +161,8 @@
     private void OpenAddForm()
     {
         currentFuneraria = new Funeraria();
+        arquivosParaAnexar.Clear();
+        erroUpload = "";
         isEditing = false;
         showForm = true;
     }
@@ -136,16 +182,36 @@
         showForm = true;
     }
 
+    private async Task OpenDocumentos(Funeraria f)
+    {
+        var param = new DialogParameters
+        {
+            ["FunerariaId"] = f.Id,
+            ["FurariaName"] = f.Nome
+        };
+        var opt = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<DocumentosFunerariaDialog>("Documentos da Funerária", param, opt);
+    }
+
     private void CloseForm()
     {
         showForm = false;
         currentFuneraria = new Funeraria();
+        arquivosParaAnexar.Clear();
+        erroUpload = "";
     }
 
     private async Task Save()
     {
         await form.Validate();
         if (!form.IsValid) return;
+
+        // Validação: documento obrigatório apenas na criação
+        if (!isEditing && !arquivosParaAnexar.Any())
+        {
+            Snackbar.Add("É obrigatório anexar ao menos um documento da funerária (alvará, contrato etc.).", Severity.Error);
+            return;
+        }
 
         // FEAT-03: Validação de CNPJ
         if (!string.IsNullOrWhiteSpace(currentFuneraria.CNPJ) && !Sakrus.Core.Helpers.DocumentValidator.IsCnpjValido(currentFuneraria.CNPJ))
@@ -182,16 +248,45 @@
             else
             {
                 DbContext.Funerarias.Add(currentFuneraria);
+                await DbContext.SaveChangesAsync();
+
+                // Salvar documentos da funerária
+                if (arquivosParaAnexar.Any())
+                {
+                    foreach (var arquivo in arquivosParaAnexar)
+                    {
+                        // CRIT-01/02/03: FileStorageService — magic bytes, seguro, UUID no disco
+                        var caminhoRelativo = await FileStorage.SalvarArquivoAsync(
+                            "funerarias", currentFuneraria.Id, arquivo.Name, arquivo.Bytes);
+
+                        DbContext.DocumentosAnexos.Add(new DocumentoAnexo
+                        {
+                            FunerariaId = currentFuneraria.Id,
+                            Tipo = TipoDocumentoAnexo.AlvaraFuneraria,
+                            NomeArquivo = arquivo.Name,
+                            CaminhoArquivo = caminhoRelativo,
+                            TamanhoBytes = arquivo.Bytes.LongLength,
+                            DataAnexo = DateTime.UtcNow
+                        });
+                    }
+                    await DbContext.SaveChangesAsync();
+                }
             }
 
-            await DbContext.SaveChangesAsync();
+            // Para edição: salvar aqui. Para criação: já foi feito dentro do else.
+            if (isEditing) await DbContext.SaveChangesAsync();
             Snackbar.Add("Funerária salva com sucesso!", Severity.Success);
             CloseForm();
             await LoadData();
         }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Erro ao salvar funerária");
+            Snackbar.Add("Ocorreu um erro ao salvar a funerária. Tente novamente.", Severity.Error);
         }
     }
 
@@ -231,5 +326,34 @@
             Snackbar.Add($"Não é possível remover funerária em uso ({ex.Message})", Severity.Error);
         }
     }
-}
 
+    // ── Upload helpers ────────────────────────────────────────────────────────
+
+    private async Task TriggerFileInput()
+        => await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('fileInputFuneraria').click()");
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        erroUpload = "";
+        var rejeitados = new List<string>();
+        foreach (var file in e.GetMultipleFiles(20))
+        {
+            if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
+                && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            { rejeitados.Add($"{file.Name} (apenas PDF)"); continue; }
+            if (file.Size > MaxFileSizeBytes) { rejeitados.Add($"{file.Name} (excede 10 MB)"); continue; }
+            if (arquivosParaAnexar.Any(a => a.Name == file.Name)) continue;
+            try
+            {
+                using var ms = new MemoryStream();
+                await using var stream = file.OpenReadStream(MaxFileSizeBytes);
+                await stream.CopyToAsync(ms);
+                arquivosParaAnexar.Add(new ArquivoBuffer(file.Name, file.Size, ms.ToArray()));
+            }
+            catch (Exception ex) { rejeitados.Add($"{file.Name} (erro: {ex.Message})"); }
+        }
+        if (rejeitados.Any()) erroUpload = $"Rejeitado(s): {string.Join("; ", rejeitados)}";
+    }
+
+    private void RemoverArquivo(ArquivoBuffer arq) { arquivosParaAnexar.Remove(arq); erroUpload = ""; }
+}

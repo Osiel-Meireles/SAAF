@@ -1,0 +1,190 @@
+@page "/jazigos"
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Sakrus.Services
+@using MudBlazor
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IDialogService DialogService
+@inject IJazigoService JazigoService
+@implements IDisposable
+
+<PageTitle>Jazigos - Sakrus</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Class="mr-2" />
+    Gerenciamento de Jazigos
+</MudText>
+
+@if (isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="@jazigos" Dense="true" Hover="true" Striped="true" 
+              Filter="new Func<JazigoDto,bool>(FilterFunc)" @bind-SelectedItem="selectedItem"
+              Elevation="1" Class="mb-4">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Lista de Jazigos</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="searchString" Placeholder="Buscar por Código, Quadra ou Titular..." 
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Código</MudTh>
+            <MudTh>Localização</MudTh>
+            <MudTh>Modelo</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Titular Atual</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Código">
+                <b>@context.Jazigo.CodigoIdentificador</b>
+                @if (context.Jazigo.JazigoPaiId != null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined" Class="ml-2">Sub-lote</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Localização">Q: @context.Jazigo.Quadra | A: @context.Jazigo.Ala | L: @context.Jazigo.NumeroLote</MudTd>
+            <MudTd DataLabel="Modelo">@context.Jazigo.ModeloJazigo?.Nome</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Jazigo.Ocupado)
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Ocupado</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Livre</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Titular Atual">
+                @if (context.Titular != null)
+                {
+                    @context.Titular.Nome
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Sem titular</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Ações">
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                           OnClick="@(() => AbrirDetalhes(context.Jazigo.Id))"
+                           StartIcon="@Icons.Material.Filled.Visibility">
+                    Detalhes
+                </MudButton>
+                @if (context.Titular == null)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Class="ml-2"
+                               OnClick="@(() => AbrirVincularTitular(context.Jazigo))"
+                               StartIcon="@Icons.Material.Filled.PersonAdd">
+                        Vincular
+                    </MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+    private bool isLoading = true;
+    private string searchString = "";
+    private JazigoDto? selectedItem;
+    private List<JazigoDto> jazigos = new();
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        DbContext = await DbFactory.CreateDbContextAsync();
+        
+        var query = await DbContext.Jazigos
+            .Include(j => j.ModeloJazigo)
+            .Include(j => j.Proprietarios)
+                .ThenInclude(p => p.Responsavel)
+            .OrderBy(j => j.CodigoIdentificador)
+            .ToListAsync();
+
+        jazigos = query.Select(j => new JazigoDto
+        {
+            Jazigo = j,
+            Titular = j.Proprietarios.FirstOrDefault(p => p.TipoVinculo == TipoVinculoJazigo.Titular && p.Ativo)?.Responsavel
+        }).ToList();
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private bool FilterFunc(JazigoDto element)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+            
+        if (element.Jazigo.CodigoIdentificador.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+            
+        if (element.Jazigo.Quadra.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+            
+        if (element.Titular != null && element.Titular.Nome.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+            
+        if (element.Titular != null && element.Titular.CPF != null && element.Titular.CPF.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    private async Task AbrirDetalhes(int jazigoId)
+    {
+        var parameters = new DialogParameters { ["JazigoId"] = jazigoId };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<DetalhesJazigoDialog>("Detalhes do Jazigo", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result != null && !result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task AbrirVincularTitular(Jazigo jazigo)
+    {
+        var parameters = new DialogParameters { 
+            ["JazigoId"] = jazigo.Id,
+            ["CodigoJazigo"] = jazigo.CodigoIdentificador
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<VincularResponsavelDialog>("Vincular Responsável", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private class JazigoDto
+    {
+        public Jazigo Jazigo { get; set; } = null!;
+        public Responsavel? Titular { get; set; }
+    }
+}

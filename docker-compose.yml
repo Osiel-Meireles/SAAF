@@ -6,10 +6,13 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-1234}
+      # CRIT-04: Fallback removido — se DB_PASSWORD não for definida, o container falha explicitamente
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?ERRO: A variavel de ambiente DB_PASSWORD deve ser definida no arquivo .env}"
       POSTGRES_DB: SakrusDb
-    ports:
-      - "5439:5432"
+    # LOW-04: Porta do banco NÃO exposta ao host — acessível apenas internamente via rede Docker
+    # Se precisar de acesso local para desenvolvimento, use: 127.0.0.1:5439:5432
+    expose:
+      - "5432"
     volumes:
       - sakrus_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -28,14 +31,15 @@ services:
         condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=SakrusDb;Username=postgres;Password=${DB_PASSWORD:-1234}
+      - "ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=SakrusDb;Username=postgres;Password=${DB_PASSWORD:?ERRO: DB_PASSWORD nao definida}"
     ports:
       - "8085:8080"
     volumes:
       - sakrus_dataprotection:/app/dataprotection-keys
-      - sakrus_uploads:/app/wwwroot/uploads
+      # CRIT-02: Uploads seguros fora do wwwroot — não acessíveis via URL direta
+      - sakrus_secure_uploads:/app/secure-uploads
 
 volumes:
   sakrus_pgdata:
   sakrus_dataprotection:
-  sakrus_uploads:
+  sakrus_secure_uploads:

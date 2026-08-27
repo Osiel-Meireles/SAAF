@@ -31,6 +31,19 @@
                 </MudItem>
 
                 <MudItem xs="12">
+                    <MudSelect T="TipoTituloJazigo" Label="Novo Tipo de Título" @bind-Value="novoTipoTitulo" Required="true">
+                        @foreach (TipoTituloJazigo tt in Enum.GetValues(typeof(TipoTituloJazigo)))
+                        {
+                            <MudSelectItem Value="@tt">@TituloLabel(tt)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSwitch @bind-Value="manterComoCoUsuario" Label="Manter antigo titular como Co-usuário" Color="Color.Primary" />
+                </MudItem>
+
+                <MudItem xs="12">
                     <MudTextField @bind-Value="historico.Motivo" Label="Motivo da Transferência" Required="true" Lines="3" Variant="Variant.Outlined" />
                 </MudItem>
             </MudGrid>
@@ -54,12 +67,15 @@
     
     [Parameter] public int JazigoId { get; set; }
     [Parameter] public int ResponsavelAntigoId { get; set; }
+    [Parameter] public int? TitularAtualJazigoProprietarioId { get; set; }
 
     private MudForm form = null!;
     private bool sucesso;
     
     private HistoricoTitularidadeJazigo historico = new();
     private List<Responsavel> responsaveis = new();
+    private TipoTituloJazigo novoTipoTitulo = TipoTituloJazigo.Concessao;
+    private bool manterComoCoUsuario = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -82,8 +98,71 @@
 
         try
         {
+            await using var transaction = await DbContext.Database.BeginTransactionAsync();
+            
+            // 1. Registra no histórico
             DbContext.HistoricoTitularidadeJazigos.Add(historico);
+            
+            // 2. Inativa o vínculo atual, se existir
+            if (TitularAtualJazigoProprietarioId.HasValue)
+            {
+                var vinculoAtual = await DbContext.JazigoProprietarios.FindAsync(TitularAtualJazigoProprietarioId.Value);
+                if (vinculoAtual != null)
+                {
+                    vinculoAtual.Ativo = false;
+                    vinculoAtual.DataVencimento = DateTime.UtcNow; // Encerra na data atual
+                    DbContext.JazigoProprietarios.Update(vinculoAtual);
+                    
+                    if (manterComoCoUsuario)
+                    {
+                        var vinculoCoUsuario = new JazigoProprietario
+                        {
+                            JazigoId = JazigoId,
+                            ResponsavelId = vinculoAtual.ResponsavelId,
+                            TipoVinculo = TipoVinculoJazigo.CoUsuario,
+                            TipoTitulo = vinculoAtual.TipoTitulo,
+                            DataAquisicao = DateTime.UtcNow,
+                            Ativo = true
+                        };
+                        DbContext.JazigoProprietarios.Add(vinculoCoUsuario);
+                    }
+                }
+            }
+            
+            // 2.b Inativa qualquer vínculo ativo anterior do NOVO responsável neste jazigo
+            var vinculosAnterioresNovoResp = await DbContext.JazigoProprietarios
+                .Where(jp => jp.JazigoId == JazigoId && jp.ResponsavelId == historico.ResponsavelNovoId && jp.Ativo)
+                .ToListAsync();
+                
+            foreach (var vinculo in vinculosAnterioresNovoResp)
+            {
+                vinculo.Ativo = false;
+                vinculo.DataVencimento = DateTime.UtcNow;
+                DbContext.JazigoProprietarios.Update(vinculo);
+            }
+            
+            // 3. Cria o novo vínculo de titularidade
+            var novoVinculo = new JazigoProprietario
+            {
+                JazigoId = JazigoId,
+                ResponsavelId = historico.ResponsavelNovoId,
+                TipoVinculo = TipoVinculoJazigo.Titular,
+                TipoTitulo = novoTipoTitulo,
+                DataAquisicao = DateTime.UtcNow,
+                Ativo = true
+            };
+            DbContext.JazigoProprietarios.Add(novoVinculo);
+            
+            // 4. Marca o novo responsável como proprietário
+            var novoResponsavel = await DbContext.Responsaveis.FindAsync(historico.ResponsavelNovoId);
+            if (novoResponsavel != null && !novoResponsavel.EhProprietario)
+            {
+                novoResponsavel.EhProprietario = true;
+                DbContext.Responsaveis.Update(novoResponsavel);
+            }
+
             await DbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
             
             Snackbar.Add("Titularidade transferida com sucesso!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
@@ -95,5 +174,14 @@
     }
 
     private void Cancelar() => MudDialog.Cancel();
+    
+    private static string TituloLabel(TipoTituloJazigo t) => t switch
+    {
+        TipoTituloJazigo.Concessao => "Concessão",
+        TipoTituloJazigo.Permissao => "Permissão",
+        TipoTituloJazigo.Doacao => "Doação",
+        TipoTituloJazigo.Heranca => "Herança",
+        _ => t.ToString()
+    };
 }
 

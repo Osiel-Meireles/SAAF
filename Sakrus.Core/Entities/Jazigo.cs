@@ -37,4 +37,11 @@ public class Jazigo
     
     // Relacionamento 1:N com Falecidos sepultados neste Jazigo
     public List<Falecido> Falecidos { get; set; } = new();
+
+    /// <summary>
+    /// Vínculos de propriedade/uso deste jazigo com Responsáveis.
+    /// Inclui titular legal único (TipoVinculo = Titular, Ativo = true)
+    /// e possíveis co-usuários ou beneficiários.
+    /// </summary>
+    public List<JazigoProprietario> Proprietarios { get; set; } = new();
 }

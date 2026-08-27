@@ -10,8 +10,10 @@
 @inject ISnackbar Snackbar
 @inject Sakrus.Services.IAuditService AuditService
 @inject AuthenticationStateProvider AuthStateProvider
-@inject IWebHostEnvironment WebHostEnvironment
+@inject Sakrus.Services.FileStorageService FileStorage
 @inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
+@inject ILogger<NovoAtendimento> Logger
 
 <PageTitle>Novo Atendimento - Sakrus</PageTitle>
 
@@ -42,26 +44,19 @@
                     <MudDivider Class="mb-3" />
                 </MudItem>
 
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="novoAtendimento.Responsavel.Nome" Label="Nome Completo" Required="true" RequiredError="O nome é obrigatório" />
-                </MudItem>
-                <MudItem xs="12" sm="3">
-                    <MudTextField @bind-Value="novoAtendimento.Responsavel.CPF" Label="CPF (somente números)" Required="true" RequiredError="CPF obrigatório" HelperText="11 dígitos, sem pontuação" />
-                </MudItem>
-                <MudItem xs="12" sm="3">
-                    <MudTextField @bind-Value="novoAtendimento.Responsavel.RG" Label="RG" Required="true" />
-                </MudItem>
-                <MudItem xs="12" sm="3">
-                    <MudTextField @bind-Value="novoAtendimento.Responsavel.OrgaoEmissor" Label="Órgão Emissor" Required="true" />
-                </MudItem>
-                <MudItem xs="12" sm="3">
-                    <MudTextField @bind-Value="novoAtendimento.Responsavel.Profissao" Label="Profissão" Required="true" />
-                </MudItem>
-                <MudItem xs="12" sm="3">
-                    <MudTextField @bind-Value="novoAtendimento.Responsavel.Telefone" Label="Telefone" Required="true" />
-                </MudItem>
                 <MudItem xs="12" sm="9">
-                    <MudTextField @bind-Value="novoAtendimento.Responsavel.Endereco" Label="Endereço Completo" Required="true" />
+                    <MudAutocomplete T="Responsavel" Label="Pesquisar Responsável (Nome ou CPF)"
+                                     @bind-Value="responsavelSelecionado"
+                                     SearchFunc="@PesquisarResponsavel"
+                                     ToStringFunc="@(r => r == null ? null : $"{r.Nome} (CPF: {r.CPF})")"
+                                     Required="true" RequiredError="Selecione ou cadastre um responsável"
+                                     ResetValueOnEmptyText="true"
+                                     CoerceText="false" CoerceValue="false" />
+                </MudItem>
+                <MudItem xs="12" sm="3" Class="d-flex align-end pb-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovoResponsavelDialog">
+                        Novo Responsável
+                    </MudButton>
                 </MudItem>
             }
 
@@ -185,8 +180,8 @@
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                        Anexe documentos em formato <strong>PDF</strong> (máx. 10 MB por arquivo). 
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                        Anexe ao menos <strong>1 documento</strong> em formato <strong>PDF</strong> (ex: Declaração de Óbito — máx. 10 MB por arquivo).
                         Os documentos ficarão vinculados exclusivamente ao falecido deste atendimento.
                     </MudAlert>
 
@@ -272,13 +267,38 @@
     // Instancia o objeto já com as entidades filhas para evitar NullReferenceException no Bind do form
     private Atendimento novoAtendimento = new Atendimento
     {
-        Responsavel = new Responsavel(),
         Falecido = new Falecido()
     };
+    
+    private Responsavel? responsavelSelecionado;
     
     private DateTime? dataFalecimento = DateTime.Today;
     private DateTime? dataNascimento;
     private List<Funeraria> funerarias = new();
+
+    private async Task<IEnumerable<Responsavel>> PesquisarResponsavel(string valor, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+            return await DbContext.Responsaveis.Take(20).ToListAsync(token);
+        
+        return await DbContext.Responsaveis
+            .Where(r => r.Nome.Contains(valor, StringComparison.OrdinalIgnoreCase) || 
+                        (r.CPF != null && r.CPF.Contains(valor)))
+            .Take(20)
+            .ToListAsync(token);
+    }
+
+    private async Task AbrirNovoResponsavelDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<NovoResponsavelDialog>("Novo Responsável", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is Responsavel novoResp)
+        {
+            responsavelSelecionado = novoResp;
+        }
+    }
 
     // Upload de documentos
     // FIX: IBrowserFile torna-se inválido após re-render do componente.
@@ -364,20 +384,15 @@
     {
         await form.Validate();
         if (!form.IsValid) return;
-
-        // FEAT-02: Validação matemática do CPF (pular para indigentes)
-        if (!EhIndigente)
-        {
-            if (!string.IsNullOrWhiteSpace(novoAtendimento.Responsavel.CPF) &&
-                !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Responsavel.CPF))
-            {
-                Snackbar.Add("O CPF do Responsável é inválido.", Severity.Error);
-                return;
-            }
-        }
         if (!string.IsNullOrWhiteSpace(novoAtendimento.Falecido.Cpf) && !Sakrus.Core.Helpers.DocumentValidator.IsCpfValido(novoAtendimento.Falecido.Cpf))
         {
             Snackbar.Add("O CPF do Falecido é inválido.", Severity.Error);
+            return;
+        }
+
+        if (!EhIndigente && !arquivosParaAnexar.Any())
+        {
+            Snackbar.Add("É obrigatório anexar ao menos um documento do falecido (ex: Declaração de Óbito).", Severity.Error);
             return;
         }
 
@@ -387,70 +402,58 @@
         await using var transaction = await DbContext.Database.BeginTransactionAsync();
         try
         {
-            // Atribuir data de falecimento do DatePicker
             if (dataFalecimento.HasValue)
-            {
                 novoAtendimento.Falecido.DataFalecimento = DateTime.SpecifyKind(dataFalecimento.Value, DateTimeKind.Utc);
-            }
             else
-            {
                 novoAtendimento.Falecido.DataFalecimento = DateTime.UtcNow;
-            }
 
-            // Atribuir data de nascimento (para regra de jazigo infantil ≤ 12 anos)
             if (dataNascimento.HasValue)
-            {
                 novoAtendimento.Falecido.DataNascimento = DateTime.SpecifyKind(dataNascimento.Value, DateTimeKind.Utc);
-            }
 
-            // ROB-04: Comparar CPF de forma limpa, garantindo que o índice seja usado e compatibilidade com PostgreSQL
+            // ROB-04: Lógica de vinculação do Responsável
             if (EhIndigente)
             {
-                // Indigente: responsável com campos opcionais
+                // Indigente: responsável genérico
                 novoAtendimento.Falecido.EhIndigente = true;
-                var cpfResp = novoAtendimento.Responsavel.CPF ?? "";
-                var cpfRespLimpo = new string(cpfResp.Where(char.IsDigit).ToArray());
-
-                Responsavel? respExistente = null;
-                if (!string.IsNullOrEmpty(cpfRespLimpo))
-                    respExistente = await DbContext.Responsaveis.FirstOrDefaultAsync(r => r.CPF == cpfRespLimpo);
-
-                if (respExistente != null)
+                
+                // Procurar responsável "Não Identificado" ou criar
+                var respIndigente = await DbContext.Responsaveis.FirstOrDefaultAsync(r => r.Nome == "Não Identificado" && r.CPF == "00000000000");
+                if (respIndigente == null)
                 {
-                    novoAtendimento.Responsavel = respExistente;
-                    novoAtendimento.ResponsavelId = respExistente.Id;
-                }
-                else
-                {
-                    if (!string.IsNullOrEmpty(cpfRespLimpo))
-                        novoAtendimento.Responsavel.CPF = cpfRespLimpo;
-                    // Nome padrão para indigentes sem responsável
-                    if (string.IsNullOrWhiteSpace(novoAtendimento.Responsavel.Nome))
-                        novoAtendimento.Responsavel.Nome = "Não Identificado";
-                    DbContext.Responsaveis.Add(novoAtendimento.Responsavel);
+                    respIndigente = new Responsavel { Nome = "Não Identificado", CPF = "00000000000", Endereco = "NI", RG = "NI", OrgaoEmissor = "NI", Telefone = "NI" };
+                    DbContext.Responsaveis.Add(respIndigente);
                     await DbContext.SaveChangesAsync();
-                    novoAtendimento.ResponsavelId = novoAtendimento.Responsavel.Id;
                 }
+                
+                novoAtendimento.Responsavel = respIndigente;
+                novoAtendimento.ResponsavelId = respIndigente.Id;
             }
             else
             {
-                // Não-indigente: fluxo original
-                var cpfLimpo = new string(novoAtendimento.Responsavel.CPF!.Where(char.IsDigit).ToArray());
-                var responsavelExistente = await DbContext.Responsaveis
-                    .FirstOrDefaultAsync(r => r.CPF == cpfLimpo);
-
-                if (responsavelExistente != null)
+                // Não-indigente: usar o responsável selecionado no Autocomplete
+                if (responsavelSelecionado == null)
                 {
-                    novoAtendimento.Responsavel = responsavelExistente;
-                    novoAtendimento.ResponsavelId = responsavelExistente.Id;
+                    Snackbar.Add("Selecione ou cadastre um responsável.", Severity.Error);
+                    await transaction.RollbackAsync();
+                    isSaving = false;
+                    StateHasChanged();
+                    return;
+                }
+                
+                // Como ele pode ter sido criado em outra instância de DbContext (no Dialog),
+                // precisamos anexá-lo ou buscar do banco local para evitar erro de tracking
+                var respAnexado = await DbContext.Responsaveis.FindAsync(responsavelSelecionado.Id);
+                if (respAnexado != null)
+                {
+                    novoAtendimento.ResponsavelId = respAnexado.Id;
+                    novoAtendimento.Responsavel = respAnexado;
                 }
                 else
                 {
-                    // Força o CPF sem máscara antes de salvar
-                    novoAtendimento.Responsavel.CPF = cpfLimpo;
-                    DbContext.Responsaveis.Add(novoAtendimento.Responsavel);
-                    await DbContext.SaveChangesAsync();
-                    novoAtendimento.ResponsavelId = novoAtendimento.Responsavel.Id;
+                    // Caso excepcional onde ele não tá no banco ainda? Não deve acontecer pq o Dialog já salvou.
+                    novoAtendimento.ResponsavelId = responsavelSelecionado.Id;
+                    DbContext.Responsaveis.Attach(responsavelSelecionado);
+                    novoAtendimento.Responsavel = responsavelSelecionado;
                 }
             }
 
@@ -494,25 +497,18 @@
             // --- Salvar arquivos PDF em disco e criar registros no banco ---
             if (arquivosParaAnexar.Any())
             {
-                var pastaBase = Path.Combine(WebHostEnvironment.WebRootPath, "uploads", "atendimentos", novoAtendimento.FalecidoId.ToString());
-                Directory.CreateDirectory(pastaBase);
-
                 foreach (var arquivo in arquivosParaAnexar)
                 {
-                    // Nome único para evitar colisão
-                    var nomeUnico = $"{Guid.NewGuid():N}_{Path.GetFileName(arquivo.Name)}";
-                    var caminhoFisico = Path.Combine(pastaBase, nomeUnico);
-
-                    // Escrever os bytes já lidos na seleção (ArquivoBuffer.Bytes)
-                    await File.WriteAllBytesAsync(caminhoFisico, arquivo.Bytes);
+                    // CRIT-01/02/03: FileStorageService — magic bytes, seguro, UUID no disco
+                    var caminhoRelativo = await FileStorage.SalvarArquivoAsync(
+                        "atendimentos", novoAtendimento.FalecidoId, arquivo.Name, arquivo.Bytes);
 
                     var doc = new DocumentoAnexo
                     {
                         AtendimentoId = novoAtendimento.Id,
                         FalecidoId = novoAtendimento.FalecidoId,
                         NomeArquivo = arquivo.Name,
-                        // Sempre usa '/' como separador para compatibilidade Windows ↔ Linux/Docker
-                        CaminhoArquivo = $"uploads/atendimentos/{novoAtendimento.FalecidoId}/{nomeUnico}",
+                        CaminhoArquivo = caminhoRelativo,
                         TamanhoBytes = arquivo.Bytes.LongLength,
                         DataAnexo = DateTime.UtcNow
                     };

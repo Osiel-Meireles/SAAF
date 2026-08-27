@@ -6,7 +6,8 @@
 @implements IDisposable
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
-@inject IWebHostEnvironment WebHostEnvironment
+@inject Sakrus.Services.FileStorageService FileStorage
+@inject ILogger<DocumentosDialog> Logger
 
 <MudDialog>
     <TitleContent>
@@ -218,7 +219,8 @@
 
     private async Task TriggerFileInput()
     {
-        await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('fileInputDialog').click()");
+        // HIGH-04: Usa função JS dedicada em vez de eval()
+        await JSRuntime.InvokeVoidAsync("triggerFileInput", "fileInputDialog");
     }
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
@@ -250,11 +252,22 @@
                 using var ms = new MemoryStream();
                 await using var stream = file.OpenReadStream(MaxFileSizeBytes);
                 await stream.CopyToAsync(ms);
-                arquivosParaAnexar.Add(new ArquivoBuffer(file.Name, file.Size, ms.ToArray()));
+                var bytes = ms.ToArray();
+
+                // CRIT-01: Pré-validação de magic bytes antes mesmo de adicionar à lista
+                // A validação completa é feita novamente no SalvarAnexos pelo FileStorageService
+                if (bytes.Length < 4 || bytes[0] != 0x25 || bytes[1] != 0x50 || bytes[2] != 0x44 || bytes[3] != 0x46)
+                {
+                    rejeitados.Add($"{file.Name} (não é um PDF válido)");
+                    continue;
+                }
+
+                arquivosParaAnexar.Add(new ArquivoBuffer(file.Name, file.Size, bytes));
             }
             catch (Exception ex)
             {
-                rejeitados.Add($"{file.Name} (erro ao ler: {ex.Message})");
+                Logger.LogError(ex, "Erro ao ler arquivo de upload: {Nome}", file.Name);
+                rejeitados.Add($"{file.Name} (erro ao ler o arquivo)");
             }
         }
 
@@ -283,26 +296,19 @@
 
         try
         {
-            var pastaBase = Path.Combine(
-                WebHostEnvironment.WebRootPath,
-                "uploads", "atendimentos", FalecidoId.ToString());
-
-            Directory.CreateDirectory(pastaBase);
-
             foreach (var arquivo in arquivosParaAnexar)
             {
-                var nomeUnico = $"{Guid.NewGuid():N}_{Path.GetFileName(arquivo.Name)}";
-                var caminhoFisico = Path.Combine(pastaBase, nomeUnico);
-
-                await File.WriteAllBytesAsync(caminhoFisico, arquivo.Bytes);
+                // CRIT-01/02/03: FileStorageService valida magic bytes, salva fora do wwwroot,
+                // usa UUID no nome do disco — sem nome original
+                var caminhoRelativo = await FileStorage.SalvarArquivoAsync(
+                    "atendimentos", FalecidoId, arquivo.Name, arquivo.Bytes);
 
                 var doc = new DocumentoAnexo
                 {
                     AtendimentoId = AtendimentoId,
                     FalecidoId = FalecidoId,
-                    NomeArquivo = arquivo.Name,
-                    // Sempre '/' para compatibilidade Windows ↔ Linux/Docker
-                    CaminhoArquivo = $"uploads/atendimentos/{FalecidoId}/{nomeUnico}",
+                    NomeArquivo = arquivo.Name,       // nome original apenas no banco
+                    CaminhoArquivo = caminhoRelativo, // caminho seguro fora do wwwroot
                     TamanhoBytes = arquivo.Bytes.LongLength,
                     DataAnexo = DateTime.UtcNow
                 };
@@ -322,9 +328,15 @@
 
             Snackbar.Add($"{quantidade} documento(s) anexado(s) com sucesso!", Severity.Success);
         }
+        catch (InvalidOperationException ex)
+        {
+            // Erro de validação de PDF — exibir mensagem amigável ao usuário
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao salvar documentos: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Erro ao salvar documentos do falecido {FalecidoId}", FalecidoId);
+            Snackbar.Add("Ocorreu um erro ao salvar os documentos. Tente novamente.", Severity.Error);
         }
         finally
         {
@@ -347,16 +359,8 @@
 
         try
         {
-            // Remove arquivo físico do disco
-            var caminhoRelativo = doc.CaminhoArquivo
-                .Replace('\\', Path.DirectorySeparatorChar)
-                .Replace('/', Path.DirectorySeparatorChar);
-            var caminhoFisico = Path.Combine(WebHostEnvironment.WebRootPath, caminhoRelativo);
-
-            if (File.Exists(caminhoFisico))
-            {
-                File.Delete(caminhoFisico);
-            }
+            // CRIT-02: Usa FileStorageService para excluir com segurança (fora do wwwroot)
+            FileStorage.ExcluirArquivo(doc.CaminhoArquivo);
 
             // Remove o registro do banco
             var docNoBanco = await DbContext.DocumentosAnexos.FindAsync(doc.Id);
@@ -374,7 +378,8 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao excluir documento: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Erro ao excluir documento ID {DocId}", doc.Id);
+            Snackbar.Add("Ocorreu um erro ao excluir o documento. Tente novamente.", Severity.Error);
         }
         finally
         {
@@ -393,28 +398,21 @@
 
         try
         {
-            var caminhoRelativo = doc.CaminhoArquivo
-                .Replace('\\', Path.DirectorySeparatorChar)
-                .Replace('/', Path.DirectorySeparatorChar);
-
-            var caminhoFisico = Path.Combine(WebHostEnvironment.WebRootPath, caminhoRelativo);
-
-            if (!File.Exists(caminhoFisico))
-            {
-                Snackbar.Add(
-                    $"Arquivo não encontrado no servidor: {doc.NomeArquivo}. " +
-                    $"O arquivo pode ter sido perdido após reinicialização do servidor.",
-                    Severity.Error);
-                return;
-            }
-
-            var bytes = await File.ReadAllBytesAsync(caminhoFisico);
+            // CRIT-02: Lê o arquivo a partir do armazenamento seguro (fora do wwwroot)
+            var bytes = await FileStorage.LerArquivoAsync(doc.CaminhoArquivo);
             await JSRuntime.InvokeVoidAsync("downloadFileFromBase64", doc.NomeArquivo, Convert.ToBase64String(bytes));
             Snackbar.Add($"Download iniciado: {doc.NomeArquivo}", Severity.Success);
         }
+        catch (FileNotFoundException)
+        {
+            Snackbar.Add(
+                $"Arquivo não encontrado no servidor: {doc.NomeArquivo}.",
+                Severity.Error);
+        }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao baixar o arquivo: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Erro ao baixar documento ID {DocId}", doc.Id);
+            Snackbar.Add("Ocorreu um erro ao baixar o arquivo. Tente novamente.", Severity.Error);
         }
         finally
         {
