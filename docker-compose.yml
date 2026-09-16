@@ -31,6 +31,7 @@ services:
         condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
       - "ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=SakrusDb;Username=postgres;Password=${DB_PASSWORD:?ERRO: DB_PASSWORD nao definida}"
     ports:
       - "8085:8080"
