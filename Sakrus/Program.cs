@@ -162,7 +162,9 @@ app.UseAntiforgery();
 app.MapAuthEndpoints();
 
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AllowAnonymous(); // Permite que _framework/* seja servido sem auth de endpoint.
+                       // A proteção real das páginas é feita pelo AuthorizeRouteView (Routes.razor).
 
 // --- InicializaÃ§Ã£o do Banco: Migrations + Seed (com retry) ---
 using (var scope = app.Services.CreateScope())
