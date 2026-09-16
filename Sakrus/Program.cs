@@ -46,11 +46,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
         options.Cookie.HttpOnly = true;
-        // SEC-01: Em produÃ§Ã£o, cookies sÃ³ sÃ£o enviados via HTTPS
-        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-            ? CookieSecurePolicy.SameAsRequest
-            : CookieSecurePolicy.Always;
-        options.Cookie.SameSite = SameSiteMode.Strict;
+        // SEC-01: Política de segurança do cookie configurável via env var.
+        // Por padrão usa SameAsRequest (compatível com HTTP por IP).
+        // Para forçar HTTPS, defina REQUIRE_HTTPS_COOKIES=true no ambiente.
+        var requireHttps = Environment.GetEnvironmentVariable("REQUIRE_HTTPS_COOKIES") == "true";
+        options.Cookie.SecurePolicy = requireHttps
+            ? CookieSecurePolicy.Always
+            : CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SameSite = SameSiteMode.Lax; // Lax é compatível com HTTP e redirecionamentos
     });
 
 builder.Services.AddAuthorization(options =>
