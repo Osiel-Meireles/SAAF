@@ -465,7 +465,7 @@
     // ── Upload ───────────────────────────────────────────────────────────────
 
     private async Task TriggerFileInput()
-        => await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('fileInputResp').click()");
+        => await JSRuntime.InvokeVoidAsync("triggerFileInput", "fileInputResp"); // HIGH-04
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {

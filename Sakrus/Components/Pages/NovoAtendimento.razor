@@ -315,9 +315,7 @@
     }
 
     private async Task TriggerFileInput()
-    {
-        await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('fileInput').click()");
-    }
+        => await JSRuntime.InvokeVoidAsync("triggerFileInput", "fileInput"); // HIGH-04
 
     // FIX: Tornado async para ler os bytes imediatamente, antes que o IBrowserFile expire.
     // Referência: https://aka.ms/aspnet/blazor-input-file-multiple-selections

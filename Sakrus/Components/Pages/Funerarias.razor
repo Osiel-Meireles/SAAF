@@ -330,7 +330,7 @@
     // ── Upload helpers ────────────────────────────────────────────────────────
 
     private async Task TriggerFileInput()
-        => await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('fileInputFuneraria').click()");
+        => await JSRuntime.InvokeVoidAsync("triggerFileInput", "fileInputFuneraria"); // HIGH-04
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
