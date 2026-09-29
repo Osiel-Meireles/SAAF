@@ -269,8 +269,11 @@
                 .Include(j => j.Falecidos)
                 .Where(j => !db.Jazigos.Any(filho => filho.JazigoPaiId == j.Id))
                 .Where(j => j.IsInfantil == FalecidoIsInfantil)          // Regra de negócio
+                // Apenas jazigos com pelo menos um proprietário/responsável ativo vinculado
+                .Where(j => db.JazigoProprietarios.Any(jp => jp.JazigoId == j.Id && jp.Ativo))
                 .OrderBy(j => j.NumeroLote)
                 .ToListAsync();
+
 
             var jazigosValidos = todosJazigos.Select(j =>
             {

@@ -72,6 +72,9 @@
             <MudIconButton Icon="@Icons.Material.Filled.HomeWork" Color="Color.Info"
                            Size="Size.Small" Title="Vincular a Jazigo"
                            OnClick="@(() => OpenVincularJazigo(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.PersonSearch" Color="Color.Secondary"
+                           Size="Size.Small" Title="Gerenciar Falecidos Vinculados"
+                           OnClick="@(() => OpenGerenciarFalecidos(context))" />
             <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"
                            Size="Size.Small" OnClick="@(() => OpenEditForm(context))" />
             <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
@@ -82,6 +85,85 @@
         <MudTablePager />
     </PagerContent>
 </MudTable>
+
+@if (showFalecidosPanel)
+{
+    <MudPaper Class="pa-4 mt-4" Elevation="3">
+        <div class="d-flex align-center justify-space-between mb-3">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Class="mr-1" />
+                Falecidos Vinculados — @responsavelFalecidosNome
+            </MudText>
+            <MudButton Variant="Variant.Text" OnClick="CloseFalecidosPanel">Fechar</MudButton>
+        </div>
+
+        @if (falecidosDoResponsavel.Any())
+        {
+            <MudTable Items="@falecidosDoResponsavel" Dense="true" Hover="true" Elevation="1" Class="mb-4">
+                <HeaderContent>
+                    <MudTh>Nome do Falecido</MudTh>
+                    <MudTh>Data Falecimento</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Protocolo</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Nome">@context.NomeFalecido</MudTd>
+                    <MudTd DataLabel="Data">@context.DataFalecimento.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+                    <MudTd DataLabel="Status">
+                        @switch (context.Status)
+                        {
+                            case StatusFalecido.NaoSepultado:
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default">Aguardando Sepultamento</MudChip>
+                                break;
+                            case StatusFalecido.Sepultado:
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success">Sepultado</MudChip>
+                                break;
+                            case StatusFalecido.Exumado:
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning">Exumado</MudChip>
+                                break;
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Protocolo">@(context.Protocolo ?? "—")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">Nenhum falecido vinculado a este responsável.</MudAlert>
+        }
+
+        <MudDivider Class="mb-3" />
+        <MudText Typo="Typo.subtitle1" Color="Color.Primary" Class="mb-2">Vincular Falecido Existente</MudText>
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+            Busque um falecido já cadastrado no sistema e vincule-o a este responsável criando um novo atendimento.
+        </MudAlert>
+        <MudGrid>
+            <MudItem xs="12" sm="9">
+                <MudAutocomplete T="FalecidoVinculoVm"
+                                Label="Buscar Falecido (Nome ou CPF)"
+                                @bind-Value="falecidoParaVincular"
+                                SearchFunc="@PesquisarFalecidoParaVincular"
+                                ToStringFunc="@(f => f == null ? null : $"{f.Nome} — {f.DataFalecimento.ToLocalTime():dd/MM/yyyy}")"
+                                ResetValueOnEmptyText="true"
+                                MinCharacters="2"
+                                DebounceInterval="300"
+                                Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" sm="3" Class="d-flex align-end pb-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Link"
+                           Disabled="@(falecidoParaVincular == null || isVinculandoFalecido)"
+                           OnClick="VincularFalecidoAoResponsavel">
+                    @if (isVinculandoFalecido)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                    }
+                    Vincular
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
 
 @if (showForm)
 {
@@ -199,6 +281,10 @@
         int Id, string Nome, string? CPF, string? Email, string Telefone,
         bool EhProprietario, int TotalJazigos, int TotalAtendimentos);
 
+    /// <summary>Projeção de falecido para o autocomplete de vínculo.</summary>
+    private sealed record FalecidoVinculoVm(
+        int Id, string Nome, DateTime DataFalecimento, StatusFalecido Status);
+
     private List<ResponsavelVm> responsaveis = new();
     private bool isLoading = true;
     private bool showForm = false;
@@ -216,6 +302,17 @@
     private List<ArquivoBuffer> arquivosParaAnexar = new();
     private string erroUpload = "";
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
+
+    // ── Painel de falecidos vinculados ──────────────────────────────────────────────────────
+    private bool showFalecidosPanel = false;
+    private int responsavelFalecidosId;
+    private string responsavelFalecidosNome = "";
+    private bool isVinculandoFalecido;
+    private FalecidoVinculoVm? falecidoParaVincular;
+
+    private sealed record FalecidoPainelVm(
+        string NomeFalecido, DateTime DataFalecimento, StatusFalecido Status, string? Protocolo);
+    private List<FalecidoPainelVm> falecidosDoResponsavel = new();
 
     private bool FilterFunc(ResponsavelVm r)
     {
@@ -511,5 +608,105 @@
         if (bytes < 1024) return $"{bytes} B";
         if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
         return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
+
+    // ── Gerenciar Falecidos Vinculados ────────────────────────────────────────
+
+    private async Task OpenGerenciarFalecidos(ResponsavelVm vm)
+    {
+        responsavelFalecidosId   = vm.Id;
+        responsavelFalecidosNome = vm.Nome;
+        falecidoParaVincular     = null;
+
+        // Carregar falecidos já vinculados via atendimentos
+        var atendimentos = await DbContext.Atendimentos
+            .Include(a => a.Falecido)
+            .Where(a => a.ResponsavelId == vm.Id)
+            .ToListAsync();
+
+        falecidosDoResponsavel = atendimentos
+            .Select(a => new FalecidoPainelVm(
+                a.Falecido.Nome,
+                a.Falecido.DataFalecimento,
+                a.Falecido.Status,
+                a.NumeroOsAuxilio))
+            .ToList();
+
+        showFalecidosPanel = true;
+        showForm = false;
+        StateHasChanged();
+    }
+
+    private void CloseFalecidosPanel()
+    {
+        showFalecidosPanel     = false;
+        falecidoParaVincular   = null;
+        falecidosDoResponsavel = new();
+    }
+
+    private async Task<IEnumerable<FalecidoVinculoVm>> PesquisarFalecidoParaVincular(string valor, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(valor) || valor.Length < 2)
+            return Enumerable.Empty<FalecidoVinculoVm>();
+
+        var valorLower = valor.ToLower();
+        var lista = await DbContext.Falecidos
+            .Where(f => f.Nome.ToLower().Contains(valorLower) ||
+                        (f.Cpf != null && f.Cpf.Contains(valor)))
+            .Take(15)
+            .ToListAsync(token);
+
+        return lista.Select(f => new FalecidoVinculoVm(f.Id, f.Nome, f.DataFalecimento, f.Status));
+    }
+
+    private async Task VincularFalecidoAoResponsavel()
+    {
+        if (falecidoParaVincular == null) return;
+
+        // Verificar se já existe atendimento para esse falecido com esse responsável
+        var jaExiste = await DbContext.Atendimentos
+            .AnyAsync(a => a.FalecidoId == falecidoParaVincular.Id && a.ResponsavelId == responsavelFalecidosId);
+        if (jaExiste)
+        {
+            Snackbar.Add("Este falecido já está vinculado a este responsável.", Severity.Warning);
+            return;
+        }
+
+        isVinculandoFalecido = true;
+        StateHasChanged();
+
+        try
+        {
+            // Buscar atendimento existente do falecido para atualizar o responsável
+            var atendimentoExistente = await DbContext.Atendimentos
+                .FirstOrDefaultAsync(a => a.FalecidoId == falecidoParaVincular.Id);
+
+            if (atendimentoExistente != null)
+            {
+                atendimentoExistente.ResponsavelId = responsavelFalecidosId;
+                DbContext.Atendimentos.Update(atendimentoExistente);
+                await DbContext.SaveChangesAsync();
+                Snackbar.Add($"Falecido '{falecidoParaVincular.Nome}' vinculado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Falecido sem atendimento registrado. Crie um atendimento para ele em 'Novo Registro'.", Severity.Warning);
+            }
+
+            falecidoParaVincular = null;
+            DbContext.ChangeTracker.Clear();
+            await OpenGerenciarFalecidos(new ResponsavelVm(
+                responsavelFalecidosId, responsavelFalecidosNome, null, null, "", false, 0, 0));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao vincular falecido ao responsável");
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isVinculandoFalecido = false;
+            StateHasChanged();
+        }
     }
 }

@@ -60,15 +60,47 @@
                     <MudTh>Categoria</MudTh>
                     <MudTh>Qtd/KM</MudTh>
                     <MudTh>Valor Total</MudTh>
+                    <MudTh Style="text-align:center">Ações</MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd DataLabel="Categoria">@context.CategoriaItem</MudTd>
-                    <MudTd DataLabel="Qtd/KM">@context.QuantidadeOuKm</MudTd>
-                    <MudTd DataLabel="Valor Total">R$ @context.ValorTotalCalculado.ToString("N2")</MudTd>
+                    @if (itemEditandoId == context.Id)
+                    {
+                        <MudTd>
+                            <MudSelect T="string" @bind-Value="editCategoria" Dense="true" Margin="Margin.Dense">
+                                <MudSelectItem Value="@("urna padrão")">Urna Padrão</MudSelectItem>
+                                <MudSelectItem Value="@("urna especial")">Urna Especial</MudSelectItem>
+                                <MudSelectItem Value="@("translado (km)")">Translado (KM)</MudSelectItem>
+                                <MudSelectItem Value="@("pompa")">Pompa</MudSelectItem>
+                                <MudSelectItem Value="@("preparo")">Preparo</MudSelectItem>
+                            </MudSelect>
+                        </MudTd>
+                        <MudTd>
+                            <MudNumericField @bind-Value="editQuantidade" Min="1" Dense="true" Margin="Margin.Dense" />
+                        </MudTd>
+                        <MudTd>—</MudTd>
+                        <MudTd Style="text-align:center">
+                            <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" OnClick="SalvarEdicaoItem" Title="Confirmar" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Default" Size="Size.Small" OnClick="CancelarEdicaoItem" Title="Cancelar" />
+                        </MudTd>
+                    }
+                    else
+                    {
+                        <MudTd DataLabel="Categoria">@context.CategoriaItem</MudTd>
+                        <MudTd DataLabel="Qtd/KM">@context.QuantidadeOuKm</MudTd>
+                        <MudTd DataLabel="Valor Total">R$ @context.ValorTotalCalculado.ToString("N2")</MudTd>
+                        <MudTd Style="text-align:center">
+                            @if (!atendimento.OsFinalizada)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small" OnClick="@(() => IniciarEdicaoItem(context))" Title="Editar" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoverItem(context.Id))" Title="Remover" />
+                            }
+                        </MudTd>
+                    }
                 </RowTemplate>
                 <FooterContent>
                     <MudTd colspan="2" class="text-right"><strong>Total Geral:</strong></MudTd>
                     <MudTd><strong>R$ @atendimento.ItensFaturados.Sum(i => i.ValorTotalCalculado).ToString("N2")</strong></MudTd>
+                    <MudTd></MudTd>
                 </FooterContent>
             </MudTable>
 
@@ -76,7 +108,7 @@
             {
                 <MudGrid Class="mt-4">
                     <MudItem xs="12">
-                        <MudTextField @bind-Value="numeroGuia" Label="Nº da Guia do Auxílio (CAAF)" Required="true" HelperText="Deixe em branco para o sistema gerar um automático, ou digite a guia física." />
+                        <MudTextField @bind-Value="numeroGuia" Label="Nº da Guia do Auxílio (CAAFE)" Required="true" HelperText="Deixe em branco para o sistema gerar um automático, ou digite a guia física." />
                     </MudItem>
                 </MudGrid>
             }
@@ -108,6 +140,11 @@
     private string novoCategoria = "urna padrão";
     private decimal novaQuantidade = 1;
     private string numeroGuia = "";
+
+    // Estado de edição inline de item
+    private int? itemEditandoId;
+    private string editCategoria = "urna padrão";
+    private decimal editQuantidade = 1;
 
     protected override async Task OnInitializedAsync()
     {
@@ -141,8 +178,51 @@
         {
             await FaturamentoService.AdicionarItemFaturadoAsync(AtendimentoId, novoCategoria, novaQuantidade);
             Snackbar.Add("Item adicionado!", Severity.Success);
-            await CarregarAtendimento(); 
-            novaQuantidade = 1; 
+            await CarregarAtendimento();
+            novaQuantidade = 1;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task RemoverItem(int itemId)
+    {
+        try
+        {
+            await FaturamentoService.RemoverItemFaturadoAsync(itemId);
+            Snackbar.Add("Item removido.", Severity.Success);
+            await CarregarAtendimento();
+            itemEditandoId = null;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private void IniciarEdicaoItem(ItemFaturado item)
+    {
+        itemEditandoId = item.Id;
+        editCategoria  = item.CategoriaItem;
+        editQuantidade = item.QuantidadeOuKm;
+    }
+
+    private void CancelarEdicaoItem()
+    {
+        itemEditandoId = null;
+    }
+
+    private async Task SalvarEdicaoItem()
+    {
+        if (!itemEditandoId.HasValue) return;
+        try
+        {
+            await FaturamentoService.EditarItemFaturadoAsync(itemEditandoId.Value, editCategoria, editQuantidade);
+            Snackbar.Add("Item atualizado!", Severity.Success);
+            itemEditandoId = null;
+            await CarregarAtendimento();
         }
         catch (Exception ex)
         {

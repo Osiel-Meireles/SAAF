@@ -117,12 +117,8 @@
     {
         DbContext = await DbFactory.CreateDbContextAsync();
         
-        // Em um sistema real com muitos milhares de registros, buscar do banco on-demand seria melhor.
-        // Assumindo um limite razoável para cache em memória ou busca leve:
-        todosResponsaveis = await DbContext.Responsaveis
-            .AsNoTracking()
-            .OrderBy(r => r.Nome)
-            .ToListAsync();
+        // Removido carregamento total para memória para evitar estouro de RAM em produção.
+        // O Autocomplete buscará diretamente do banco.
 
         vínculo.JazigoId = JazigoId;
         vínculo.TipoVinculo = TipoVinculoJazigo.Titular;
@@ -130,16 +126,18 @@
         isLoading = false;
     }
 
-    private Task<IEnumerable<Responsavel>> PesquisarResponsavel(string value, CancellationToken cancellationToken)
+    private async Task<IEnumerable<Responsavel>> PesquisarResponsavel(string value, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return Task.FromResult<IEnumerable<Responsavel>>(todosResponsaveis.Take(50));
+            return await DbContext.Responsaveis.AsNoTracking().Take(50).ToListAsync(cancellationToken);
 
         var lowerValue = value.ToLowerInvariant();
-        return Task.FromResult(todosResponsaveis.Where(r =>
-            (r.Nome != null && r.Nome.ToLowerInvariant().Contains(lowerValue)) ||
-            (r.CPF != null && r.CPF.Contains(lowerValue))
-        ).Take(50));
+        return await DbContext.Responsaveis
+            .AsNoTracking()
+            .Where(r => (r.Nome != null && r.Nome.ToLower().Contains(lowerValue)) ||
+                        (r.CPF != null && r.CPF.Contains(value)))
+            .Take(50)
+            .ToListAsync(cancellationToken);
     }
 
     private async Task Confirmar()

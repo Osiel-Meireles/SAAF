@@ -10,19 +10,23 @@ namespace Sakrus.Services;
 
 public class CapelaService : ICapelaService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
-    public CapelaService(ApplicationDbContext context)
+    public CapelaService(IDbContextFactory<ApplicationDbContext> dbFactory)
     {
-        _context = context;
+        _dbFactory = dbFactory;
     }
 
     public async Task<List<Capela>> ObterTodasAsync()
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var capelas = await _context.Capelas.ToListAsync();
         
         // BUG-11: Auto-correção (Self-healing) dos status das capelas
-        var ativos = await ObterRegistrosAtivosAsync();
+        var ativos = await _context.RegistrosCapela
+            .Where(r => r.HoraSaida == null)
+            .ToListAsync();
+            
         bool precisaSalvar = false;
 
         foreach (var capela in capelas)
@@ -48,6 +52,7 @@ public class CapelaService : ICapelaService
 
     public async Task<List<RegistroCapela>> ObterRegistrosAtivosAsync()
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         // Retorna todos os registros que ainda não foram encerrados
         return await _context.RegistrosCapela
             .Include(r => r.Capela)
@@ -59,6 +64,7 @@ public class CapelaService : ICapelaService
 
     public async Task<RegistroCapela> AgendarCapelaAsync(int capelaId, int atendimentoId, DateTime horaEntrada, DateTime? horaSaidaPrevista)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var capela = await _context.Capelas.FindAsync(capelaId);
         if (capela == null)
             throw new InvalidOperationException("Capela não encontrada.");
@@ -90,6 +96,7 @@ public class CapelaService : ICapelaService
 
     public async Task EncerrarVelorioAsync(int registroId)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var registro = await _context.RegistrosCapela
             .Include(r => r.Capela)
             .FirstOrDefaultAsync(r => r.Id == registroId);

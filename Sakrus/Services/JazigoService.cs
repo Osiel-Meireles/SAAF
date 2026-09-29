@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Sakrus.Core.Entities;
 using Sakrus.Infrastructure.Data;
 
@@ -10,12 +11,12 @@ namespace Sakrus.Services;
 
 public class JazigoService : IJazigoService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
     private readonly ILogger<JazigoService> _logger;
 
-    public JazigoService(ApplicationDbContext context, ILogger<JazigoService> logger)
+    public JazigoService(IDbContextFactory<ApplicationDbContext> dbFactory, ILogger<JazigoService> logger)
     {
-        _context = context;
+        _dbFactory = dbFactory;
         _logger = logger;
     }
 
@@ -23,6 +24,7 @@ public class JazigoService : IJazigoService
     // Retorna todos os jazigos cadastrados no banco de dados
     public async Task<List<Jazigo>> ObterTodosAsync()
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         return await _context.Jazigos
             .Include(j => j.ModeloJazigo) // Traz os dados do modelo vinculado (opcional, mas recomendado)
             .ToListAsync();
@@ -32,6 +34,7 @@ public class JazigoService : IJazigoService
     // Permite criar novos tipos de jazigos dinamicamente (Ex: "Mausoléu Premium")
     public async Task<ModeloJazigo> CadastrarModeloJazigoAsync(string nome, decimal pctConcessao, decimal pctManutencao, decimal taxaConstrucao)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var modelo = new ModeloJazigo
         {
             Nome = nome,
@@ -50,6 +53,7 @@ public class JazigoService : IJazigoService
     // Sem limites de quantidade. Adiciona um lote sob demanda.
     public async Task<Jazigo> AdicionarJazigoInfantilAsync(string codigoIdentificador, int modeloId)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var modelo = await _context.ModelosJazigos.FindAsync(modeloId);
         if (modelo == null) 
             throw new InvalidOperationException("Modelo de jazigo não encontrado.");
@@ -72,6 +76,7 @@ public class JazigoService : IJazigoService
     // Divide um Lote grande em lotes menores (Ex: Lote 10 vira 10-A, 10-B, 10-C...)
     public async Task<List<Jazigo>> DesmembrarJazigoAsync(int jazigoPaiId, int quantidadePartes)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         // Validação: máximo 26 partes (A-Z)
         if (quantidadePartes > 26)
             throw new InvalidOperationException("Não é possível criar mais de 26 partes (A-Z) em um desmembramento.");
@@ -129,6 +134,7 @@ public class JazigoService : IJazigoService
 
     public async Task DesfazerDesmembramentoJazigoAsync(int jazigoPaiId)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var jazigoPai = await _context.Jazigos
             .Include(j => j.Falecidos)
             .FirstOrDefaultAsync(j => j.Id == jazigoPaiId);
@@ -186,6 +192,7 @@ public class JazigoService : IJazigoService
     // Implementa a regra crítica: "A gaveta DEVE libertar o Jazigo para novo sepultamento"
     public async Task ExumarJazigoAsync(int falecidoId, int jazigoId, ExecutorExumacao executor, string observacoes = "")
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         // Utiliza transação para garantir consistência dos dados
         using var transaction = await _context.Database.BeginTransactionAsync();
         try
@@ -237,15 +244,14 @@ public class JazigoService : IJazigoService
             
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
-
-            // Após a transação, tenta desfazer a divisão automaticamente se aplicável
-            await TentarDesfazerDivisaoAutomaticaAsync(jazigoId);
         }
         catch
         {
             await transaction.RollbackAsync();
             throw;
         }
+        // Após a transação, tenta desfazer a divisão automaticamente se aplicável
+        await TentarDesfazerDivisaoAutomaticaAsync(jazigoId);
     }
 
     // --- Desfazimento Automático de Divisão ---
@@ -253,6 +259,7 @@ public class JazigoService : IJazigoService
     // desfaz o desmembramento automaticamente (remove sub-lotes, libera o pai)
     public async Task TentarDesfazerDivisaoAutomaticaAsync(int jazigoId)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         // Busca o jazigo para verificar se é um sub-lote (tem JazigoPaiId)
         var jazigo = await _context.Jazigos.FirstOrDefaultAsync(j => j.Id == jazigoId);
         if (jazigo == null || jazigo.JazigoPaiId == null)
@@ -307,6 +314,7 @@ public class JazigoService : IJazigoService
     // Cria um ossuário geral padrão caso nenhum exista no sistema
     public async Task GarantirOssuarioGeralExisteAsync()
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var existeGeral = await _context.Ossuarios.AnyAsync(o => o.Tipo == TipoOssuario.Geral);
         if (!existeGeral)
         {

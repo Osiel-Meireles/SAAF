@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Sakrus.Core.Entities;
@@ -8,16 +8,17 @@ namespace Sakrus.Services;
 
 public class GavetaPublicaService : IGavetaPublicaService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
-    public GavetaPublicaService(ApplicationDbContext context)
+    public GavetaPublicaService(IDbContextFactory<ApplicationDbContext> dbFactory)
     {
-        _context = context;
+        _dbFactory = dbFactory;
     }
 
     // 1. Regra de Negócio: Limite Rígido de 256 Posições
     public async Task AdicionarGavetaAsync(GavetaPublica novaGaveta)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var totalGavetas = await _context.GavetasPublicas.CountAsync();
         
         if (totalGavetas >= 256)
@@ -32,6 +33,7 @@ public class GavetaPublicaService : IGavetaPublicaService
     // 2. Regra de Negócio: Ciclo de Vida, Exumação e Desvinculação
     public async Task EfetivarExumacaoAsync(int gavetaId, ExecutorExumacao executor, string observacoes)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         // Utiliza transação para garantir consistência dos dados
         using var transaction = await _context.Database.BeginTransactionAsync();
         try

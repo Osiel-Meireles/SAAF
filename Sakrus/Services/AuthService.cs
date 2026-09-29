@@ -12,18 +12,18 @@ namespace Sakrus.Services;
 
 public class AuthService : IAuthService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<AuthService> _logger;
     private readonly IAuditService _auditService;
 
     public AuthService(
-        ApplicationDbContext context,
+        IDbContextFactory<ApplicationDbContext> dbFactory,
         IHttpContextAccessor httpContextAccessor,
         ILogger<AuthService> logger,
         IAuditService auditService)
     {
-        _context = context;
+        _dbFactory = dbFactory;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
         _auditService = auditService;
@@ -33,6 +33,8 @@ public class AuthService : IAuthService
     {
         var httpContext = _httpContextAccessor.HttpContext;
         if (httpContext is null) return false;
+
+        using var _context = await _dbFactory.CreateDbContextAsync();
 
         // Busca o usuário ativo pelo e-mail (case-insensitive)
         var usuario = await _context.Usuarios
@@ -135,6 +137,7 @@ public class AuthService : IAuthService
 
     public async Task<(bool Sucesso, string Erro)> RegistrarUsuarioAsync(Usuario usuario, string senhaPlana)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         if (await _context.Usuarios.AnyAsync(u => u.Email.ToLower() == usuario.Email.ToLower()))
             return (false, "Já existe um usuário cadastrado com este e-mail.");
 
@@ -156,6 +159,7 @@ public class AuthService : IAuthService
 
     public async Task<(bool Sucesso, string Erro)> AlterarSenhaAsync(int usuarioId, string senhaAtual, string novaSenha)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var usuario = await _context.Usuarios.FindAsync(usuarioId);
         if (usuario is null)
             return (false, "Usuário não encontrado.");
@@ -185,6 +189,7 @@ public class AuthService : IAuthService
         var idClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(idClaim, out var id)) return null;
 
+        using var _context = await _dbFactory.CreateDbContextAsync();
         return await _context.Usuarios.FindAsync(id);
     }
 
@@ -198,6 +203,7 @@ public class AuthService : IAuthService
 
     public async Task<(bool Sucesso, string Erro)> AtualizarUsuarioAsync(int usuarioId, string nome, string email, int nivelAcesso, bool ativo)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var usuario = await _context.Usuarios.FindAsync(usuarioId);
         if (usuario is null)
             return (false, "Usuário não encontrado.");
@@ -219,6 +225,7 @@ public class AuthService : IAuthService
 
     public async Task<(bool Sucesso, string Erro, string SenhaGerada)> RedefinirSenhaAsync(int usuarioId)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var usuario = await _context.Usuarios.FindAsync(usuarioId);
         if (usuario is null)
             return (false, "Usuário não encontrado.", string.Empty);

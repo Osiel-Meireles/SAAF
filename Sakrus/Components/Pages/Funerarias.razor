@@ -59,7 +59,7 @@
                     <MudTextField @bind-Value="currentFuneraria.Nome" Label="Nome da Funerária" Required="true" RequiredError="Nome é obrigatório" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="currentFuneraria.CNPJ" Label="CNPJ" Required="false" Mask="@(new PatternMask("00.000.000/0000-00"))" />
+                    <MudTextField @bind-Value="currentFuneraria.CNPJ" Label="CNPJ" Required="false" Mask="@(new PatternMask("00.000.000/0000-00"))" Immediate="false" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
                     <MudTextField @bind-Value="currentFuneraria.Telefone" Label="Telefone" Required="false"

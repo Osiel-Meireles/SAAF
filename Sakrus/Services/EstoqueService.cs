@@ -10,17 +10,18 @@ namespace Sakrus.Services;
 
 public class EstoqueService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
     private readonly ILogger<EstoqueService> _logger;
 
-    public EstoqueService(ApplicationDbContext context, ILogger<EstoqueService> logger)
+    public EstoqueService(IDbContextFactory<ApplicationDbContext> dbFactory, ILogger<EstoqueService> logger)
     {
-        _context = context;
+        _dbFactory = dbFactory;
         _logger = logger;
     }
 
     public async Task DarBaixaEstoqueAsync(string nomeProduto, int quantidade, string motivo)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var produto = await _context.ProdutosEstoque
             .FirstOrDefaultAsync(p => p.Nome.ToLower() == nomeProduto.ToLower());
 
@@ -62,6 +63,7 @@ public class EstoqueService
     // Método para ser chamado quando faturar um atendimento
     public async Task ProcessarFaturamentoAtendimentoAsync(int atendimentoId)
     {
+        using var _context = await _dbFactory.CreateDbContextAsync();
         var atendimento = await _context.Atendimentos
             .Include(a => a.ItensFaturados)
             .FirstOrDefaultAsync(a => a.Id == atendimentoId);

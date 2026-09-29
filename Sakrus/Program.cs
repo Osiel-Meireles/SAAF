@@ -32,9 +32,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((sp, options) =>
     options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
 }, ServiceLifetime.Scoped);
 
-// ServiÃ§os Scoped ainda podem usar o ApplicationDbContext
-builder.Services.AddScoped<ApplicationDbContext>(p => 
-    p.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
+
 
 // --- AutenticaÃ§Ã£o com Cookie ---
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

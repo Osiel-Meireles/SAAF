@@ -8,17 +8,18 @@ namespace Sakrus.Services
 {
     public class FalecidoService : IFalecidoService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
         private readonly IJazigoService _jazigoService;
 
-        public FalecidoService(ApplicationDbContext context, IJazigoService jazigoService)
+        public FalecidoService(IDbContextFactory<ApplicationDbContext> dbFactory, IJazigoService jazigoService)
         {
-            _context = context;
+            _dbFactory = dbFactory;
             _jazigoService = jazigoService;
         }
 
         public async Task<Falecido> RegistrarSepultamentoAsync(Falecido falecido)
         {
+            using var _context = await _dbFactory.CreateDbContextAsync();
             if (falecido.JazigoId.HasValue)
             {
                 var jazigo = await _context.Jazigos.FindAsync(falecido.JazigoId.Value);
@@ -51,6 +52,7 @@ namespace Sakrus.Services
 
         public async Task ExumarAsync(int falecidoId, ExecutorExumacao executor, string observacoes = "")
         {
+            using var _context = await _dbFactory.CreateDbContextAsync();
             // Busca o falecido e seu jazigo
             var falecido = await _context.Falecidos
                 .Include(f => f.Jazigo)

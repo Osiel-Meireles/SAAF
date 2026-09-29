@@ -51,7 +51,10 @@
                                      ToStringFunc="@(r => r == null ? null : $"{r.Nome} (CPF: {r.CPF})")"
                                      Required="true" RequiredError="Selecione ou cadastre um responsável"
                                      ResetValueOnEmptyText="true"
-                                     CoerceText="false" CoerceValue="false" />
+                                     MinCharacters="0"
+                                     CoerceText="false" CoerceValue="false"
+                                     Immediate="true"
+                                     DebounceInterval="300" />
                 </MudItem>
                 <MudItem xs="12" sm="3" Class="d-flex align-end pb-2">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovoResponsavelDialog">
@@ -123,7 +126,18 @@
             }
 
             <MudItem xs="12" sm="@(EhIndigente ? 6 : 4)">
-                <MudTextField @bind-Value="novoAtendimento.LocalFalecimento" Label="Local do Falecimento" Required="true" />
+                <MudAutocomplete T="string"
+                                @bind-Value="novoAtendimento.LocalFalecimento"
+                                Label="Local do Falecimento"
+                                Required="true"
+                                RequiredError="Local é obrigatório"
+                                SearchFunc="@PesquisarLocalFalecimento"
+                                CoerceText="true"
+                                CoerceValue="true"
+                                ResetValueOnEmptyText="false"
+                                Immediate="true"
+                                DebounceInterval="200"
+                                HelperText="Selecione um hospital/estabelecimento ou digite outro local" />
             </MudItem>
 
             @* --- 3. INFORMAÇÕES DO ATENDIMENTO --- *@
@@ -279,13 +293,43 @@
     private async Task<IEnumerable<Responsavel>> PesquisarResponsavel(string valor, CancellationToken token)
     {
         if (string.IsNullOrWhiteSpace(valor))
-            return await DbContext.Responsaveis.Take(20).ToListAsync(token);
-        
+            return Enumerable.Empty<Responsavel>();
+
+        var valorLower = valor.ToLower();
         return await DbContext.Responsaveis
-            .Where(r => r.Nome.Contains(valor, StringComparison.OrdinalIgnoreCase) || 
+            .Where(r => r.Nome.ToLower().Contains(valorLower) ||
                         (r.CPF != null && r.CPF.Contains(valor)))
             .Take(20)
             .ToListAsync(token);
+    }
+
+    // Lista de hospitais/estabelecimentos do município para autocomplete
+    private static readonly List<string> HospitaisDoMunicipio = new()
+    {
+        "Hospital Municipal",
+        "UPA 24 Horas",
+        "Santa Casa de Misericórdia",
+        "Hospital Regional",
+        "Pronto-Socorro Municipal",
+        "UBS Central",
+        "Clínica São Lucas",
+        "Hospital São Francisco",
+        "Maternidade Municipal",
+        "Instituto de Oncologia",
+        "Residência / Domicílio",
+        "Via Pública",
+        "Outro Estabelecimento de Saúde"
+    };
+
+    private Task<IEnumerable<string>> PesquisarLocalFalecimento(string valor, CancellationToken token)
+    {
+        IEnumerable<string> resultado;
+        if (string.IsNullOrWhiteSpace(valor))
+            resultado = HospitaisDoMunicipio;
+        else
+            resultado = HospitaisDoMunicipio
+                .Where(h => h.Contains(valor, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(resultado);
     }
 
     private async Task AbrirNovoResponsavelDialog()

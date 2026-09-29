@@ -28,10 +28,23 @@
             <MudForm @ref="form" @bind-IsValid="sucesso">
                 <MudGrid>
                     <MudItem xs="12" sm="6">
-                        <MudDatePicker Label="Data do Sepultamento" @bind-Date="dataSepultamento" Required="true" RequiredError="Data é obrigatória" Editable="true" />
+                        <MudTextField @bind-Value="dataSepultamentoTexto"
+                                      Label="Data do Sepultamento"
+                                      Placeholder="dd/mm/aaaa"
+                                      Required="true" RequiredError="Data é obrigatória"
+                                      Mask="@(new PatternMask("00/00/0000"))"
+                                      HelperText="Formato: dd/mm/aaaa"
+                                      Immediate="true"
+                                      @onblur="ParseDataSepultamento" />
                     </MudItem>
                     <MudItem xs="12" sm="6">
-                        <MudTimePicker Label="Horário do Sepultamento" @bind-Time="horarioSepultamento" Editable="true" />
+                        <MudTextField @bind-Value="horarioSepultamentoTexto"
+                                      Label="Horário do Sepultamento"
+                                      Placeholder="hh:mm"
+                                      Mask="@(new PatternMask("00:00"))"
+                                      HelperText="Formato: hh:mm"
+                                      Immediate="true"
+                                      @onblur="ParseHorarioSepultamento" />
                     </MudItem>
 
                     <MudItem xs="12">
@@ -155,6 +168,38 @@
 
     private DateTime? dataSepultamento = DateTime.Today;
     private TimeSpan? horarioSepultamento = DateTime.Now.TimeOfDay;
+
+    // Campos de texto com máscara para data e horário
+    private string dataSepultamentoTexto = DateTime.Today.ToString("dd/MM/yyyy");
+    private string horarioSepultamentoTexto = DateTime.Now.ToString("HH:mm");
+
+    private void ParseDataSepultamento()
+    {
+        if (DateTime.TryParseExact(dataSepultamentoTexto, "dd/MM/yyyy",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var d))
+        {
+            dataSepultamento = d;
+        }
+        else if (!string.IsNullOrWhiteSpace(dataSepultamentoTexto))
+        {
+            Snackbar.Add("Data inválida. Use o formato dd/mm/aaaa.", Severity.Warning);
+        }
+    }
+
+    private void ParseHorarioSepultamento()
+    {
+        if (TimeSpan.TryParseExact(horarioSepultamentoTexto, "hh\\:mm",
+            System.Globalization.CultureInfo.InvariantCulture, out var t))
+        {
+            horarioSepultamento = t;
+        }
+        else if (!string.IsNullOrWhiteSpace(horarioSepultamentoTexto))
+        {
+            horarioSepultamento = null;
+        }
+    }
+
     private string tipoLocal = "Jazigo";
     private int anosPermanencia = 3;
     private bool tipoLocalAlterado = false;
