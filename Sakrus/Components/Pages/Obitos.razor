@@ -81,6 +81,8 @@
             
             <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Primary" Size="Size.Small" OnClick="@(() => BaixarGuiaSepultamento(context))" Title="Guia de Sepultamento" Disabled="@(context.Falecido.Status == StatusFalecido.NaoSepultado)" />
 
+            <MudIconButton Icon="@Icons.Material.Filled.Description" Color="Color.Primary" Size="Size.Small" OnClick="@(() => AbrirEmissaoDocumentos(context))" Title="Emitir Documentos" />
+
             @* Botão de documentos anexos com badge de contagem *@
             <MudBadge Content="@context.Falecido.Documentos.Count"
                       Color="Color.Secondary"
@@ -216,6 +218,19 @@
         {
             Snackbar.Add($"Erro ao gerar PDF: {ex.Message}", Severity.Error);
         }
+    }
+
+    private async Task AbrirEmissaoDocumentos(Atendimento a)
+    {
+        var parameters = new DialogParameters
+        {
+            ["EntidadeTipo"] = "Atendimento",
+            ["EntidadeId"] = a.Id,
+            ["Descricao"] = a.Falecido.Nome,
+            ["ResponsavelId"] = a.ResponsavelId
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<EmitirDocumentosDialog>("Emitir Documentos", parameters, options);
     }
 
     private async Task EditarAtendimento(Atendimento atendimento)

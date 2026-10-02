@@ -1,0 +1,442 @@
+@using System.Globalization
+@using System.Text.RegularExpressions
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Sakrus.Services.Documentos
+@inject IDocumentoEmissaoService EmissaoService
+@inject IEnumerable<IDocumentoGerador> Geradores
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Description" Color="Color.Primary" />
+            <div>
+                <MudText Typo="Typo.h6">Emitir Documentos</MudText>
+                @if (!string.IsNullOrEmpty(Descricao))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@Descricao</MudText>
+                }
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center align-center pa-6">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            </div>
+        }
+        else
+        {
+            <MudTabs>
+                <MudTabPanel Text="Emitir">
+                    @if (tipos.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">Nenhum documento disponível para este registro.</MudAlert>
+                    }
+                    else if (implementados.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">Os documentos para este registro ainda estão em desenvolvimento.</MudAlert>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Selecione um ou mais documentos para emitir:</MudText>
+                        <MudGrid>
+                            @foreach (var tipo in tipos)
+                            {
+                                <MudItem xs="12" sm="6">
+                                    <MudCheckBox T="bool"
+                                                 Value="@tiposSelecionados.Contains(tipo)"
+                                                 ValueChanged="@(v => OnTipoSelecaoChanged(tipo, v))"
+                                                 Disabled="@(!implementados.Contains(tipo.Codigo))"
+                                                 Label="@TextoTipo(tipo)" />
+                                </MudItem>
+                            }
+                        </MudGrid>
+
+                        @foreach (var tipo in tiposSelecionados)
+                        {
+                            <MudDivider Class="my-3" />
+                            <MudText Typo="Typo.subtitle1" Class="mb-2">@TextoTipo(tipo)</MudText>
+                            <MudGrid>
+                                @foreach (var campo in camposPorTipo[tipo.Codigo])
+                                {
+                                    <MudItem xs="12" sm="6">
+                                        @switch (campo.Tipo)
+                                        {
+                                            case TipoCampo.Texto:
+                                                <MudTextField T="string" Label="@campo.Rotulo" Required="@campo.Obrigatorio" HelperText="@campo.Ajuda"
+                                                              Value="@GetValor(tipo.Codigo, campo.Chave)" ValueChanged="@(v => SetValor(tipo.Codigo, campo.Chave, v))" />
+                                                break;
+                                            case TipoCampo.TextoLongo:
+                                                <MudTextField T="string" Label="@campo.Rotulo" Required="@campo.Obrigatorio" HelperText="@campo.Ajuda" Lines="3"
+                                                              Value="@GetValor(tipo.Codigo, campo.Chave)" ValueChanged="@(v => SetValor(tipo.Codigo, campo.Chave, v))" />
+                                                break;
+                                            case TipoCampo.Numero:
+                                                <MudNumericField T="int?" Label="@campo.Rotulo" Required="@campo.Obrigatorio" HelperText="@campo.Ajuda"
+                                                                 Value="@GetInt(tipo.Codigo, campo.Chave)" ValueChanged="@(v => SetInt(tipo.Codigo, campo.Chave, v))" />
+                                                break;
+                                            case TipoCampo.Data:
+                                                <MudDatePicker Label="@campo.Rotulo" Required="@campo.Obrigatorio" HelperText="@campo.Ajuda"
+                                                               Date="@GetData(tipo.Codigo, campo.Chave)" DateChanged="@(v => SetData(tipo.Codigo, campo.Chave, v))" />
+                                                break;
+                                            case TipoCampo.Hora:
+                                                <MudTimePicker Label="@campo.Rotulo" Required="@campo.Obrigatorio" HelperText="@campo.Ajuda"
+                                                               Time="@GetHora(tipo.Codigo, campo.Chave)" TimeChanged="@(v => SetHora(tipo.Codigo, campo.Chave, v))" />
+                                                break;
+                                            case TipoCampo.SimNao:
+                                                <MudSwitch T="bool" Label="@campo.Rotulo" HelperText="@campo.Ajuda"
+                                                           Value="@GetBool(tipo.Codigo, campo.Chave)" ValueChanged="@(v => SetBool(tipo.Codigo, campo.Chave, v))" />
+                                                break;
+                                            case TipoCampo.Selecao:
+                                                <MudSelect T="string" Label="@campo.Rotulo" Required="@campo.Obrigatorio" HelperText="@campo.Ajuda"
+                                                           Value="@GetValor(tipo.Codigo, campo.Chave)" ValueChanged="@(v => SetValor(tipo.Codigo, campo.Chave, v))">
+                                                    @foreach (var opcao in OpcoesDe(tipo.Codigo, campo.Chave))
+                                                    {
+                                                        <MudSelectItem T="string" Value="@opcao.Valor">@opcao.Texto</MudSelectItem>
+                                                    }
+                                                </MudSelect>
+                                                break;
+                                        }
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                        }
+
+                        @if (motivosBloqueio != null)
+                        {
+                            @foreach (var motivo in motivosBloqueio)
+                            {
+                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@motivo</MudAlert>
+                            }
+                        }
+
+                        <div class="d-flex justify-end mt-4">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Description"
+                                       Disabled="@(tiposSelecionados.Count == 0 || ocupado)"
+                                       OnClick="Emitir">
+                                @if (ocupado)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                }
+                                Emitir (@tiposSelecionados.Count)
+                            </MudButton>
+                        </div>
+                    }
+                </MudTabPanel>
+                <MudTabPanel Text="Histórico">
+                    @if (historico.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">Nenhum documento emitido ainda.</MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable Items="@historico" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Documento</MudTh>
+                                <MudTh>Nº</MudTh>
+                                <MudTh>Versão</MudTh>
+                                <MudTh>Emitido por</MudTh>
+                                <MudTh>Emitido em</MudTh>
+                                <MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Documento">@($"{context.TipoDocumento.Codigo} — {context.TipoDocumento.Nome}")</MudTd>
+                                <MudTd DataLabel="Nº">@(context.Numero ?? "—")</MudTd>
+                                <MudTd DataLabel="Versão">@context.Versao</MudTd>
+                                <MudTd DataLabel="Emitido por">@context.EmitidoPorNome</MudTd>
+                                <MudTd DataLabel="Emitido em">@context.EmitidoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
+                                <MudTd DataLabel="Ações">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" Title="Reimprimir"
+                                                   OnClick="@(() => Reimprimir(context))" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudTabPanel>
+            </MudTabs>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="Fechar">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string EntidadeTipo { get; set; } = "";
+    [Parameter] public int EntidadeId { get; set; }
+    [Parameter] public string? Descricao { get; set; }
+    [Parameter] public int? ResponsavelId { get; set; }
+    [Parameter] public IReadOnlyList<TipoDocumento>? Tipos { get; set; }
+
+    private List<TipoDocumento> tipos = new();
+    private HashSet<string> implementados = new(StringComparer.OrdinalIgnoreCase);
+    private List<DocumentoEmitido> historico = new();
+    private List<TipoDocumento> tiposSelecionados = new();
+    private Dictionary<string, IReadOnlyList<CampoDefinicao>> camposPorTipo = new();
+    private Dictionary<string, Dictionary<string, string?>> valoresPorTipo = new();
+    private Dictionary<string, Dictionary<string, List<OpcaoSelecao>>> opcoesSelecaoPorTipo = new();
+    private readonly Dictionary<string, List<Funeraria>> cacheEmpresas = new();
+    private IReadOnlyList<string>? motivosBloqueio;
+    private bool isLoading = true;
+    private bool ocupado;
+
+    private sealed record OpcaoSelecao(string Valor, string Texto);
+
+    protected override async Task OnInitializedAsync()
+    {
+        foreach (var gerador in Geradores)
+            implementados.Add(gerador.Codigo);
+        tipos = Tipos != null ? Tipos.ToList() : (await EmissaoService.ListarDisponiveisAsync(EntidadeTipo)).ToList();
+        await CarregarHistorico();
+        isLoading = false;
+    }
+
+    private async Task OnTipoSelecaoChanged(TipoDocumento tipo, bool selecionado)
+    {
+        if (selecionado)
+        {
+            if (!tiposSelecionados.Contains(tipo))
+            {
+                tiposSelecionados.Add(tipo);
+                await CarregarCamposTipo(tipo);
+            }
+        }
+        else
+        {
+            tiposSelecionados.Remove(tipo);
+            camposPorTipo.Remove(tipo.Codigo);
+            valoresPorTipo.Remove(tipo.Codigo);
+            opcoesSelecaoPorTipo.Remove(tipo.Codigo);
+        }
+    }
+
+    private async Task CarregarCamposTipo(TipoDocumento tipo)
+    {
+        var campos = EmissaoService.ObterCampos(tipo.Codigo);
+        camposPorTipo[tipo.Codigo] = campos;
+        valoresPorTipo[tipo.Codigo] = new Dictionary<string, string?>();
+
+        var opcoes = new Dictionary<string, List<OpcaoSelecao>>();
+        foreach (var campo in campos.Where(c => c.Tipo == TipoCampo.Selecao))
+        {
+            if (campo.Opcoes != null)
+            {
+                opcoes[campo.Chave] = campo.Opcoes.Select(o => new OpcaoSelecao(o, o)).ToList();
+            }
+            else if (string.Equals(campo.FonteOpcoes, "empresas", StringComparison.OrdinalIgnoreCase))
+            {
+                var empresas = await OpcoesEmpresasAsync();
+                opcoes[campo.Chave] = empresas.Select(o => new OpcaoSelecao(o.Id.ToString(CultureInfo.InvariantCulture), o.Nome)).ToList();
+            }
+            else if (string.Equals(campo.FonteOpcoes, "responsaveis", StringComparison.OrdinalIgnoreCase))
+            {
+                opcoes[campo.Chave] = await OpcoesResponsaveisAsync();
+            }
+            else if (string.Equals(campo.FonteOpcoes, "falecidos", StringComparison.OrdinalIgnoreCase))
+            {
+                opcoes[campo.Chave] = await OpcoesFalecidosAsync();
+            }
+            else if (string.Equals(campo.FonteOpcoes, "gavetas", StringComparison.OrdinalIgnoreCase))
+            {
+                opcoes[campo.Chave] = await OpcoesGavetasAsync();
+            }
+        }
+        opcoesSelecaoPorTipo[tipo.Codigo] = opcoes;
+    }
+
+    private async Task<List<OpcaoSelecao>> OpcoesResponsaveisAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var itens = await db.Responsaveis
+            .OrderBy(r => r.Nome)
+            .Select(r => new { r.Id, r.Nome, r.CPF })
+            .ToListAsync();
+
+        return itens
+            .Select(r => new OpcaoSelecao(
+                r.Id.ToString(CultureInfo.InvariantCulture),
+                string.IsNullOrWhiteSpace(r.CPF) ? r.Nome : $"{r.Nome} — CPF {r.CPF}"))
+            .ToList();
+    }
+
+    private async Task<List<OpcaoSelecao>> OpcoesFalecidosAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var itens = await db.Falecidos
+            .OrderByDescending(f => f.DataFalecimento)
+            .Select(f => new { f.Id, f.Nome, f.DataFalecimento })
+            .ToListAsync();
+
+        return itens
+            .Select(f => new OpcaoSelecao(
+                f.Id.ToString(CultureInfo.InvariantCulture),
+                $"{f.Nome} — óbito {f.DataFalecimento:dd/MM/yyyy}"))
+            .ToList();
+    }
+
+    private async Task<List<OpcaoSelecao>> OpcoesGavetasAsync()
+    {
+        var service = new GavetaSelecaoService(DbFactory);
+        var opcoes = await service.ListarOpcoesAsync(ResponsavelId, incluirPublicas: true, somenteLivres: false);
+
+        return opcoes
+            .Select(o => new OpcaoSelecao(o.Chave, o.Descricao))
+            .ToList();
+    }
+
+    private async Task<List<Funeraria>> OpcoesEmpresasAsync()
+    {
+        if (!cacheEmpresas.TryGetValue("empresas", out var opcoes))
+        {
+            using var db = await DbFactory.CreateDbContextAsync();
+            opcoes = await db.Funerarias
+                .Where(f => f.Ativo && f.EhExecutora)
+                .OrderBy(f => f.Nome)
+                .ToListAsync();
+            cacheEmpresas["empresas"] = opcoes;
+        }
+        return opcoes;
+    }
+
+    private List<OpcaoSelecao> OpcoesDe(string tipoCodigo, string chave)
+        => opcoesSelecaoPorTipo.TryGetValue(tipoCodigo, out var opcoes) && opcoes.TryGetValue(chave, out var lista)
+            ? lista
+            : new List<OpcaoSelecao>();
+
+    private string TextoTipo(TipoDocumento tipo)
+        => implementados.Contains(tipo.Codigo)
+            ? $"{tipo.Codigo} — {tipo.Nome}"
+            : $"{tipo.Codigo} — {tipo.Nome} (em desenvolvimento)";
+
+    private async Task Emitir()
+    {
+        if (tiposSelecionados.Count == 0) return;
+        ocupado = true;
+        motivosBloqueio = null;
+        var emitidos = 0;
+        var bloqueados = new List<string>();
+        try
+        {
+            foreach (var tipo in tiposSelecionados)
+            {
+                var camposValores = new CamposValores();
+                if (valoresPorTipo.TryGetValue(tipo.Codigo, out var valores))
+                {
+                    foreach (var kv in valores)
+                    {
+                        if (!string.IsNullOrEmpty(kv.Value))
+                            camposValores[kv.Key] = kv.Value;
+                    }
+                }
+
+                try
+                {
+                    var resultado = await EmissaoService.EmitirAsync(tipo.Codigo, EntidadeId, camposValores);
+                    var nomeArquivo = SanitizarNomeArquivo($"{tipo.Codigo}_{EntidadeTipo}_{EntidadeId}_v{resultado.Versao}") + ".pdf";
+                    await JSRuntime.InvokeVoidAsync("downloadFileFromBase64", nomeArquivo, Convert.ToBase64String(resultado.Pdf));
+                    emitidos++;
+                }
+                catch (DocumentoBloqueadoException ex)
+                {
+                    bloqueados.Add($"{tipo.Codigo} — {tipo.Nome}: {string.Join("; ", ex.Motivos)}");
+                }
+            }
+
+            if (emitidos > 0)
+                Snackbar.Add(emitidos == 1 ? "Documento emitido com sucesso!" : $"{emitidos} documentos emitidos com sucesso!", Severity.Success);
+            if (bloqueados.Count > 0)
+                motivosBloqueio = bloqueados;
+            await CarregarHistorico();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao emitir documentos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            ocupado = false;
+        }
+    }
+
+    private async Task Reimprimir(DocumentoEmitido doc)
+    {
+        try
+        {
+            var bytes = await EmissaoService.ReimprimirAsync(doc.Id);
+            if (bytes == null)
+            {
+                Snackbar.Add("Arquivo do documento não encontrado.", Severity.Warning);
+                return;
+            }
+            var nomeArquivo = SanitizarNomeArquivo($"{doc.TipoDocumento.Codigo}_{doc.EntidadeTipo}_{doc.EntidadeId}_v{doc.Versao}") + ".pdf";
+            await JSRuntime.InvokeVoidAsync("downloadFileFromBase64", nomeArquivo, Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao reimprimir documento: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CarregarHistorico()
+    {
+        historico = await EmissaoService.HistoricoAsync(EntidadeTipo, EntidadeId);
+    }
+
+    private static string SanitizarNomeArquivo(string nome)
+        => Regex.Replace(nome, @"[^a-zA-Z0-9\-_]", "_");
+
+    private string? GetValor(string tipoCodigo, string chave)
+        => valoresPorTipo.TryGetValue(tipoCodigo, out var valores) && valores.TryGetValue(chave, out var v) ? v : null;
+
+    private void SetValor(string tipoCodigo, string chave, string? valor)
+    {
+        if (!valoresPorTipo.TryGetValue(tipoCodigo, out var valores))
+        {
+            valores = new Dictionary<string, string?>();
+            valoresPorTipo[tipoCodigo] = valores;
+        }
+        if (valor == null) valores.Remove(chave);
+        else valores[chave] = valor;
+    }
+
+    private DateTime? GetData(string tipoCodigo, string chave)
+    {
+        var v = GetValor(tipoCodigo, chave);
+        return DateTime.TryParseExact(v, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+    }
+
+    private void SetData(string tipoCodigo, string chave, DateTime? v)
+        => SetValor(tipoCodigo, chave, v?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+    private TimeSpan? GetHora(string tipoCodigo, string chave)
+    {
+        var v = GetValor(tipoCodigo, chave);
+        return TimeSpan.TryParseExact(v, @"hh\:mm", CultureInfo.InvariantCulture, out var t) ? t : null;
+    }
+
+    private void SetHora(string tipoCodigo, string chave, TimeSpan? v)
+        => SetValor(tipoCodigo, chave, v?.ToString(@"hh\:mm", CultureInfo.InvariantCulture));
+
+    private int? GetInt(string tipoCodigo, string chave)
+    {
+        var v = GetValor(tipoCodigo, chave);
+        return int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) ? i : null;
+    }
+
+    private void SetInt(string tipoCodigo, string chave, int? v)
+        => SetValor(tipoCodigo, chave, v?.ToString(CultureInfo.InvariantCulture));
+
+    private bool GetBool(string tipoCodigo, string chave)
+        => string.Equals(GetValor(tipoCodigo, chave), "true", StringComparison.OrdinalIgnoreCase);
+
+    private void SetBool(string tipoCodigo, string chave, bool v)
+        => SetValor(tipoCodigo, chave, v ? "true" : "false");
+
+    private void Fechar() => MudDialog.Close(DialogResult.Ok(true));
+}

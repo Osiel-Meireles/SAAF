@@ -34,6 +34,22 @@ public class ApplicationDbContext : DbContext
     /// <summary>Vínculos de propriedade/uso entre Responsáveis e Jazigos.</summary>
     public DbSet<JazigoProprietario> JazigoProprietarios { get; set; }
 
+    // Módulo de Documentos (CAAFE)
+    public DbSet<Cemiterio> Cemiterios { get; set; }
+    public DbSet<ClassificacaoEspaco> ClassificacoesEspaco { get; set; }
+    public DbSet<Gaveta> Gavetas { get; set; }
+    public DbSet<ServicoAuxilio> ServicosAuxilio { get; set; }
+    public DbSet<AtendimentoServicoAuxilio> AtendimentosServicosAuxilio { get; set; }
+    public DbSet<AssuntoProtocolo> AssuntosProtocolo { get; set; }
+    public DbSet<AssuntoProtocoloDocumento> AssuntosProtocoloDocumentos { get; set; }
+    public DbSet<Protocolo> Protocolos { get; set; }
+    public DbSet<TipoDocumento> TiposDocumento { get; set; }
+    public DbSet<NumeroRegistro> NumerosRegistro { get; set; }
+    public DbSet<DocumentoEmitido> DocumentosEmitidos { get; set; }
+    public DbSet<ValorMetroQuadrado> ValoresMetroQuadrado { get; set; }
+    public DbSet<LancamentoFinanceiro> LancamentosFinanceiros { get; set; }
+    public DbSet<ConfiguracaoInstitucional> ConfiguracoesInstitucionais { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -162,5 +178,72 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<JazigoProprietario>().Property(jp => jp.TipoVinculo).HasConversion<string>();
         modelBuilder.Entity<JazigoProprietario>().Property(jp => jp.TipoTitulo).HasConversion<string>();
         modelBuilder.Entity<DocumentoAnexo>().Property(d => d.Tipo).HasConversion<string>();
+
+        // ── Módulo de Documentos (CAAFE) ─────────────────────────────────────
+
+        // Cemiterio
+        modelBuilder.Entity<Cemiterio>().HasIndex(c => c.Nome).IsUnique();
+
+        // ClassificacaoEspaco
+        modelBuilder.Entity<ClassificacaoEspaco>().Property(c => c.Natureza).HasConversion<string>();
+
+        // Gaveta: índice único (JazigoId, Numero); Jazigo Restrict; Falecido SetNull
+        modelBuilder.Entity<Gaveta>().HasIndex(g => new { g.JazigoId, g.Numero }).IsUnique();
+        modelBuilder.Entity<Gaveta>().HasOne(g => g.Jazigo).WithMany(j => j.Gavetas).HasForeignKey(g => g.JazigoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Gaveta>().HasOne(g => g.Falecido).WithMany().HasForeignKey(g => g.FalecidoId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Gaveta>().HasOne(g => g.ClassificacaoEspaco).WithMany().HasForeignKey(g => g.ClassificacaoEspacoId).OnDelete(DeleteBehavior.Restrict);
+
+        // ServicoAuxilio: índice único em Codigo
+        modelBuilder.Entity<ServicoAuxilio>().HasIndex(s => s.Codigo).IsUnique();
+
+        // AtendimentoServicoAuxilio: índice único (AtendimentoId, ServicoAuxilioId); Atendimento Cascade
+        modelBuilder.Entity<AtendimentoServicoAuxilio>().HasIndex(a => new { a.AtendimentoId, a.ServicoAuxilioId }).IsUnique();
+        modelBuilder.Entity<AtendimentoServicoAuxilio>().HasOne(a => a.Atendimento).WithMany(at => at.ServicosAuxilio).HasForeignKey(a => a.AtendimentoId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AtendimentoServicoAuxilio>().HasOne(a => a.ServicoAuxilio).WithMany().HasForeignKey(a => a.ServicoAuxilioId).OnDelete(DeleteBehavior.Restrict);
+
+        // AssuntoProtocoloDocumento: índice único (AssuntoProtocoloId, TipoDocumentoCodigo); Assunto Cascade
+        modelBuilder.Entity<AssuntoProtocoloDocumento>().HasIndex(a => new { a.AssuntoProtocoloId, a.TipoDocumentoCodigo }).IsUnique();
+        modelBuilder.Entity<AssuntoProtocoloDocumento>().HasOne(a => a.AssuntoProtocolo).WithMany(ap => ap.Documentos).HasForeignKey(a => a.AssuntoProtocoloId).OnDelete(DeleteBehavior.Cascade);
+
+        // Protocolo: índices únicos (Ano, Sequencia) e Numero
+        modelBuilder.Entity<Protocolo>().HasIndex(p => new { p.Ano, p.Sequencia }).IsUnique();
+        modelBuilder.Entity<Protocolo>().HasIndex(p => p.Numero).IsUnique();
+        modelBuilder.Entity<Protocolo>().HasOne(p => p.AssuntoProtocolo).WithMany().HasForeignKey(p => p.AssuntoProtocoloId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Protocolo>().HasOne(p => p.Responsavel).WithMany().HasForeignKey(p => p.ResponsavelId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Protocolo>().HasOne(p => p.Jazigo).WithMany().HasForeignKey(p => p.JazigoId).OnDelete(DeleteBehavior.Restrict);
+
+        // TipoDocumento: índice único em Codigo
+        modelBuilder.Entity<TipoDocumento>().HasIndex(t => t.Codigo).IsUnique();
+
+        // NumeroRegistro: índices únicos (Chave, EntidadeTipo, EntidadeId) e (Chave, Ano, Sequencia)
+        modelBuilder.Entity<NumeroRegistro>().HasIndex(n => new { n.Chave, n.EntidadeTipo, n.EntidadeId }).IsUnique();
+        modelBuilder.Entity<NumeroRegistro>().HasIndex(n => new { n.Chave, n.Ano, n.Sequencia }).IsUnique();
+
+        // DocumentoEmitido: índice (TipoDocumentoId, EntidadeTipo, EntidadeId)
+        modelBuilder.Entity<DocumentoEmitido>().HasIndex(d => new { d.TipoDocumentoId, d.EntidadeTipo, d.EntidadeId });
+        modelBuilder.Entity<DocumentoEmitido>().HasOne(d => d.TipoDocumento).WithMany().HasForeignKey(d => d.TipoDocumentoId).OnDelete(DeleteBehavior.Restrict);
+
+        // ValorMetroQuadrado: índice único em Exercicio
+        modelBuilder.Entity<ValorMetroQuadrado>().HasIndex(v => v.Exercicio).IsUnique();
+        modelBuilder.Entity<ValorMetroQuadrado>().Property(v => v.Valor).HasPrecision(10, 2);
+
+        // LancamentoFinanceiro
+        modelBuilder.Entity<LancamentoFinanceiro>().HasOne(l => l.Jazigo).WithMany().HasForeignKey(l => l.JazigoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<LancamentoFinanceiro>().Property(l => l.Valor).HasPrecision(10, 2);
+        modelBuilder.Entity<LancamentoFinanceiro>().Property(l => l.Tipo).HasConversion<string>();
+
+        // Jazigo: dimensões e novas FKs
+        modelBuilder.Entity<Jazigo>().Property(j => j.Largura).HasPrecision(10, 2);
+        modelBuilder.Entity<Jazigo>().Property(j => j.Comprimento).HasPrecision(10, 2);
+        modelBuilder.Entity<Jazigo>().HasOne(j => j.Cemiterio).WithMany().HasForeignKey(j => j.CemiterioId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Jazigo>().HasOne(j => j.ClassificacaoEspaco).WithMany().HasForeignKey(j => j.ClassificacaoEspacoId).OnDelete(DeleteBehavior.Restrict);
+
+        // GavetaPublica: novas FKs
+        modelBuilder.Entity<GavetaPublica>().HasOne(g => g.Cemiterio).WithMany().HasForeignKey(g => g.CemiterioId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<GavetaPublica>().HasOne(g => g.ClassificacaoEspaco).WithMany().HasForeignKey(g => g.ClassificacaoEspacoId).OnDelete(DeleteBehavior.Restrict);
+
+        // Atendimento: EmpresaExecutora (FK explícita para evitar ambiguidade com FunerariaId)
+        modelBuilder.Entity<Atendimento>().HasOne(a => a.EmpresaExecutora).WithMany().HasForeignKey(a => a.EmpresaExecutoraId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Atendimento>().Property(a => a.TipoAtendimento).HasConversion<string>();
     }
 }

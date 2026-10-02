@@ -69,6 +69,9 @@
             <MudIconButton Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Warning"
                            Size="Size.Small" Title="Ver Documentos"
                            OnClick="@(() => OpenDocumentos(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Description" Color="Color.Primary"
+                           Size="Size.Small" Title="Emitir Documentos"
+                           OnClick="@(() => AbrirEmissaoDocumentos(context))" />
             <MudIconButton Icon="@Icons.Material.Filled.HomeWork" Color="Color.Info"
                            Size="Size.Small" Title="Vincular a Jazigo"
                            OnClick="@(() => OpenVincularJazigo(context))" />
@@ -540,6 +543,19 @@
         };
         var opt = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         await DialogService.ShowAsync<DocumentosResponsavelDialog>("Documentos do Responsável", param, opt);
+    }
+
+    private async Task AbrirEmissaoDocumentos(ResponsavelVm vm)
+    {
+        var parameters = new DialogParameters
+        {
+            ["EntidadeTipo"] = "Responsavel",
+            ["EntidadeId"] = vm.Id,
+            ["Descricao"] = vm.Nome,
+            ["ResponsavelId"] = vm.Id
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<EmitirDocumentosDialog>("Emitir Documentos", parameters, options);
     }
 
     private async Task OpenVincularJazigo(ResponsavelVm vm)

@@ -64,6 +64,28 @@ public class FileStorageService
     }
 
     /// <summary>
+    /// Salva bytes de um documento gerado pelo sistema (PDF) no armazenamento seguro.
+    /// Reaproveita a validação de conteúdo e a proteção contra path traversal.
+    /// </summary>
+    public async Task<string> SalvarBytesAsync(string categoria, int entityId, byte[] bytes)
+    {
+        if (!IsPdfContent(bytes))
+        {
+            _logger.LogWarning("Gravação rejeitada — conteúdo não é PDF válido: {Categoria}/{EntityId}", categoria, entityId);
+            throw new InvalidOperationException("O conteúdo gerado não é um PDF válido.");
+        }
+
+        var nomeEmDisco = $"{Guid.NewGuid():N}";
+        var subPasta = Path.Combine(_baseStoragePath, categoria, entityId.ToString());
+        Directory.CreateDirectory(subPasta);
+
+        var caminhoFisico = Path.Combine(subPasta, nomeEmDisco);
+        await File.WriteAllBytesAsync(caminhoFisico, bytes);
+
+        return $"secure-uploads/{categoria}/{entityId}/{nomeEmDisco}";
+    }
+
+    /// <summary>
     /// Resolve o caminho físico absoluto a partir do caminho relativo armazenado no banco.
     /// CRIT-02: Garante que o caminho resolvido está dentro do diretório de uploads seguros (previne path traversal).
     /// </summary>

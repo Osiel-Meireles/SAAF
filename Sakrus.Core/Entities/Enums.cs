@@ -46,3 +46,9 @@ public enum TipoDocumentoAnexo
     DocumentoJazigo,
     Outro
 }
+
+public enum NaturezaEspaco { Jazigo, Sepultura, Gaveta }
+
+public enum TipoLancamento { Concessao, Manutencao }
+
+public enum TipoAtendimentoFunerario { Particular, AuxilioFuneral, Assistencia, Associado, PlanoFuneral }

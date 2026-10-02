@@ -9,9 +9,17 @@ namespace Sakrus.Services;
 
 public class PdfGeneratorService
 {
+    private static readonly byte[]? Brasao = CarregarBrasao();
+
     public PdfGeneratorService()
     {
         QuestPDF.Settings.License = LicenseType.Community;
+    }
+
+    private static byte[]? CarregarBrasao()
+    {
+        var caminho = Path.Combine(AppContext.BaseDirectory, "Assets", "brasao.png");
+        return File.Exists(caminho) ? File.ReadAllBytes(caminho) : null;
     }
 
     public byte[] GerarTermoConcessaoPdf(Jazigo jazigo, Responsavel responsavel, HistoricoTitularidadeJazigo historico)
@@ -28,16 +36,10 @@ public class PdfGeneratorService
                 // CABEÇALHO
                 page.Header().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(10).Row(row =>
                 {
-                    var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "logo1.svg");
-                    if (File.Exists(logoPath))
+                    row.ConstantItem(120).Height(60).Element(c =>
                     {
-                        var svgData = File.ReadAllText(logoPath);
-                        row.ConstantItem(120).Height(60).Svg(svgData);
-                    }
-                    else
-                    {
-                        row.ConstantItem(120).Text("SAAF").FontSize(24).Bold().FontColor(Colors.Blue.Darken2);
-                    }
+                        if (Brasao != null) c.Image(Brasao).FitArea();
+                    });
 
                     row.RelativeItem().AlignRight().Column(col =>
                     {
@@ -161,16 +163,10 @@ public class PdfGeneratorService
 
                 page.Header().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(10).Row(row =>
                 {
-                    var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "logo1.svg");
-                    if (File.Exists(logoPath))
+                    row.ConstantItem(120).Height(60).Element(c =>
                     {
-                        var svgData = File.ReadAllText(logoPath);
-                        row.ConstantItem(120).Height(60).Svg(svgData);
-                    }
-                    else
-                    {
-                        row.ConstantItem(120).Text("SAAF").FontSize(24).Bold().FontColor(Colors.Blue.Darken2);
-                    }
+                        if (Brasao != null) c.Image(Brasao).FitArea();
+                    });
 
                     row.RelativeItem().AlignRight().Column(col =>
                     {

@@ -15,6 +15,9 @@ public class GavetaPublica
     [MaxLength(50)]
     public string Quadra { get; set; } = string.Empty;
     
+    [MaxLength(50)]
+    public string? Ala { get; set; }
+    
     [Required]
     [MaxLength(50)]
     public string Lote { get; set; } = string.Empty;
@@ -29,4 +32,10 @@ public class GavetaPublica
     public Falecido? Falecido { get; set; }
     public DateTime? DataOcupacao { get; set; }
     public DateTime? DataPrevisaoExumacao { get; set; }
+
+    public int? CemiterioId { get; set; }
+    public Cemiterio? Cemiterio { get; set; }
+
+    public int? ClassificacaoEspacoId { get; set; }
+    public ClassificacaoEspaco? ClassificacaoEspaco { get; set; }
 }

@@ -12,6 +12,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
       <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="8.0.*" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">

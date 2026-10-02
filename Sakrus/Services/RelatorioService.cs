@@ -3,17 +3,29 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using Sakrus.Core.Entities;
 using Sakrus.Infrastructure.Data;
+using Sakrus.Services.Documentos;
 using Microsoft.EntityFrameworkCore;
 
 namespace Sakrus.Services;
 
 public partial class RelatorioService
 {
+    // Altura do espaço reservado acima da linha de assinatura no rodapé.
+    private const float AlturaRodapeAssinatura = 48;
+
+    private static readonly byte[]? Brasao = CarregarBrasao();
+
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
     public RelatorioService(IDbContextFactory<ApplicationDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
+    }
+
+    private static byte[]? CarregarBrasao()
+    {
+        var caminho = Path.Combine(AppContext.BaseDirectory, "Assets", "brasao.png");
+        return File.Exists(caminho) ? File.ReadAllBytes(caminho) : null;
     }
     public byte[] GerarPdfOrdemServico(Atendimento atendimento)
     {
@@ -31,16 +43,10 @@ public partial class RelatorioService
                 // CABEÇALHO
                 page.Header().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(10).Row(row =>
                 {
-                    var logoPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "images", "logo1.svg");
-                    if (System.IO.File.Exists(logoPath))
+                    row.ConstantItem(120).Height(60).Element(c =>
                     {
-                        var svgData = System.IO.File.ReadAllText(logoPath);
-                        row.ConstantItem(120).Height(60).Svg(svgData);
-                    }
-                    else
-                    {
-                        row.ConstantItem(120).Text("SAAF").FontSize(24).Bold().FontColor(Colors.Blue.Darken2);
-                    }
+                        if (Brasao != null) c.Image(Brasao).FitArea();
+                    });
 
                     row.RelativeItem().AlignRight().Column(col =>
                     {
@@ -101,11 +107,13 @@ public partial class RelatorioService
                     footerCol.Item().Row(row =>
                     {
                         row.RelativeItem().Column(c => {
+                            c.Item().ImageAssinaturaResponsavel(AlturaRodapeAssinatura);
                             c.Item().LineHorizontal(1);
                             c.Item().AlignCenter().Text("Assinatura do Responsável");
                         });
                         row.ConstantItem(50);
                         row.RelativeItem().Column(c => {
+                            c.Item().Height(AlturaRodapeAssinatura);
                             c.Item().LineHorizontal(1);
                             c.Item().AlignCenter().Text("Carimbo / Servidor");
                         });
@@ -139,16 +147,10 @@ public partial class RelatorioService
                 // CABEÇALHO
                 page.Header().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(10).Row(row =>
                 {
-                    var logoPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "images", "logo1.svg");
-                    if (System.IO.File.Exists(logoPath))
+                    row.ConstantItem(120).Height(60).Element(c =>
                     {
-                        var svgData = System.IO.File.ReadAllText(logoPath);
-                        row.ConstantItem(120).Height(60).Svg(svgData);
-                    }
-                    else
-                    {
-                        row.ConstantItem(120).Text("SAAF").FontSize(24).Bold().FontColor(Colors.Blue.Darken2);
-                    }
+                        if (Brasao != null) c.Image(Brasao).FitArea();
+                    });
 
                     row.RelativeItem().AlignRight().Column(col =>
                     {
@@ -209,11 +211,13 @@ public partial class RelatorioService
                     footerCol.Item().Row(row =>
                     {
                         row.RelativeItem().Column(c => {
+                            c.Item().ImageAssinaturaResponsavel(AlturaRodapeAssinatura);
                             c.Item().LineHorizontal(1);
                             c.Item().AlignCenter().Text("Assinatura do Responsável");
                         });
                         row.ConstantItem(50);
                         row.RelativeItem().Column(c => {
+                            c.Item().Height(AlturaRodapeAssinatura);
                             c.Item().LineHorizontal(1);
                             c.Item().AlignCenter().Text("Administração do Cemitério");
                         });

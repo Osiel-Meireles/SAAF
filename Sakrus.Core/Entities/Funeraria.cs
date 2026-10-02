@@ -24,4 +24,7 @@ public class Funeraria
 
     /// <summary>Documentos anexados a esta funerária (alvará, contrato etc.).</summary>
     public List<DocumentoAnexo> Documentos { get; set; } = new();
+
+    public bool EhExecutora { get; set; } = false;
+    public bool Ativo { get; set; } = true;
 }

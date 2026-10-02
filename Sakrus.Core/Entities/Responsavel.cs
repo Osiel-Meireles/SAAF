@@ -57,4 +57,7 @@ public class Responsavel
 
     /// <summary>Vínculos de propriedade/uso com jazigos.</summary>
     public List<JazigoProprietario> JazigoProprietarios { get; set; } = new();
+
+    [MaxLength(30)]
+    public string? EstadoCivil { get; set; }
 }

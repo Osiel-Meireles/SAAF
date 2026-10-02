@@ -1,5 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Sakrus.Core.Helpers;
 
 namespace Sakrus.Core.Entities
 {
@@ -52,5 +54,43 @@ namespace Sakrus.Core.Entities
 
         // Documentos PDF anexados a este falecido
         public List<DocumentoAnexo> Documentos { get; set; } = new();
+
+        [MaxLength(30)]
+        public string? EstadoCivil { get; set; }
+
+        [MaxLength(20)]
+        public string? Sexo { get; set; }
+
+        [MaxLength(100)]
+        public string? Profissao { get; set; }
+
+        [MaxLength(250)]
+        public string? Endereco { get; set; }
+
+        [MaxLength(150)]
+        public string? NomePai { get; set; }
+
+        [MaxLength(150)]
+        public string? NomeMae { get; set; }
+
+        [MaxLength(100)]
+        public string? Naturalidade { get; set; }
+
+        [MaxLength(200)]
+        public string? CartorioRegistro { get; set; }
+
+        [MaxLength(100)]
+        public string? MunicipioCartorio { get; set; }
+
+        [MaxLength(50)]
+        public string? MatriculaObito { get; set; }
+
+        [MaxLength(250)]
+        public string? LocalCorpo { get; set; }
+
+        public DateTime? DataSepultamento { get; set; }
+
+        [NotMapped]
+        public int? Idade => RegrasDocumentos.CalcularIdade(DataNascimento, DataFalecimento);
     }
 }

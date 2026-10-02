@@ -1,0 +1,139 @@
+@page "/protocolos"
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Sakrus.Services.Documentos
+@using Microsoft.EntityFrameworkCore
+@inject IProtocoloService ProtocoloService
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Protocolos - Sakrus</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Protocolos Administrativos</MudText>
+
+<MudTable Items="@protocolos" Hover="true" Dense="true" Elevation="2" Loading="@isLoading"
+          Filter="new Func<Protocolo,bool>(FilterFunc)">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Protocolos</MudText>
+        <MudSpacer />
+        <MudSelect T="int?" Label="Ano" Value="@anoSelecionado" ValueChanged="OnAnoChanged" Class="mr-4" Style="width: 130px">
+            <MudSelectItem T="int?" Value="@((int?)null)">Todos</MudSelectItem>
+            @foreach (var ano in anos)
+            {
+                <MudSelectItem T="int?" Value="@ano">@ano</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField @bind-Value="searchString" Placeholder="Buscar por número, responsável ou assunto..."
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0 mr-4" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="AbrirNovoProtocolo">Novo Protocolo</MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Número</MudTh>
+        <MudTh>Data de abertura</MudTh>
+        <MudTh>Assunto</MudTh>
+        <MudTh>Responsável</MudTh>
+        <MudTh>Jazigo</MudTh>
+        <MudTh>Observação</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Número">@context.Numero</MudTd>
+        <MudTd DataLabel="Data de abertura">@context.DataAbertura.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+        <MudTd DataLabel="Assunto">@context.AssuntoProtocolo.Nome</MudTd>
+        <MudTd DataLabel="Responsável">@context.Responsavel.Nome</MudTd>
+        <MudTd DataLabel="Jazigo">
+            @(context.JazigoId.HasValue && jazigoCodigos.TryGetValue(context.JazigoId.Value, out var codigo) ? codigo : "—")
+        </MudTd>
+        <MudTd DataLabel="Observação">@(string.IsNullOrEmpty(context.Observacao) ? "—" : Truncar(context.Observacao))</MudTd>
+        <MudTd DataLabel="Ações">
+            <MudIconButton Icon="@Icons.Material.Filled.Description" Color="Color.Primary" Size="Size.Small"
+                           Title="Documentos do protocolo" OnClick="@(() => AbrirEmissaoDocumentos(context))" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<Protocolo> protocolos = new();
+    private Dictionary<int, string> jazigoCodigos = new();
+    private List<int> anos = new();
+    private int? anoSelecionado;
+    private bool isLoading = true;
+    private string searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var anoAtual = DateTime.Now.Year;
+        anos = Enumerable.Range(anoAtual - 5, 6).Reverse().ToList();
+        anoSelecionado = anoAtual;
+        await Carregar();
+    }
+
+    private async Task Carregar()
+    {
+        isLoading = true;
+        protocolos = await ProtocoloService.ListarAsync(anoSelecionado);
+        await CarregarJazigos();
+        isLoading = false;
+    }
+
+    private async Task OnAnoChanged(int? ano)
+    {
+        anoSelecionado = ano;
+        await Carregar();
+    }
+
+    private async Task CarregarJazigos()
+    {
+        jazigoCodigos = new Dictionary<int, string>();
+        var jazigoIds = protocolos.Where(p => p.JazigoId.HasValue).Select(p => p.JazigoId!.Value).Distinct().ToList();
+        if (jazigoIds.Count == 0) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        jazigoCodigos = await db.Jazigos
+            .Where(j => jazigoIds.Contains(j.Id))
+            .ToDictionaryAsync(j => j.Id, j => j.CodigoIdentificador);
+    }
+
+    private bool FilterFunc(Protocolo p)
+    {
+        if (string.IsNullOrWhiteSpace(searchString)) return true;
+        if (p.Numero.Contains(searchString, StringComparison.OrdinalIgnoreCase)) return true;
+        if (p.Responsavel?.Nome?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true) return true;
+        if (p.AssuntoProtocolo?.Nome?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true) return true;
+        return false;
+    }
+
+    private static string Truncar(string texto, int max = 60)
+        => texto.Length <= max ? texto : texto[..max] + "...";
+
+    private async Task AbrirNovoProtocolo()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<NovoProtocoloDialog>("Novo Protocolo", options: options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await Carregar();
+        }
+    }
+
+    private async Task AbrirEmissaoDocumentos(Protocolo p)
+    {
+        var tipos = await ProtocoloService.DocumentosDoProtocoloAsync(p.Id);
+        var parameters = new DialogParameters
+        {
+            ["EntidadeTipo"] = "Protocolo",
+            ["EntidadeId"] = p.Id,
+            ["Descricao"] = $"Protocolo {p.Numero} — {p.AssuntoProtocolo.Nome}",
+            ["ResponsavelId"] = p.ResponsavelId,
+            ["Tipos"] = tipos
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<EmitirDocumentosDialog>("Emitir Documentos", parameters, options);
+    }
+}

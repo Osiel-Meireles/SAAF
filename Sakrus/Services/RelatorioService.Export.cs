@@ -17,16 +17,10 @@ public partial class RelatorioService
 
         page.Header().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(10).Row(row =>
         {
-            var logoPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "images", "logo1.svg");
-            if (System.IO.File.Exists(logoPath))
+            row.ConstantItem(120).Height(60).Element(c =>
             {
-                var svgData = System.IO.File.ReadAllText(logoPath);
-                row.ConstantItem(120).Height(60).Svg(svgData);
-            }
-            else
-            {
-                row.ConstantItem(120).Text("SAAF").FontSize(24).Bold().FontColor(Colors.Blue.Darken2);
-            }
+                if (Brasao != null) c.Image(Brasao).FitArea();
+            });
 
             row.RelativeItem().AlignRight().Column(col =>
             {

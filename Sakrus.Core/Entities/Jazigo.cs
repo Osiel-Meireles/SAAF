@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Sakrus.Core.Enums;
+using Sakrus.Core.Helpers;
 
 namespace Sakrus.Core.Entities;
 
@@ -44,4 +46,21 @@ public class Jazigo
     /// e possíveis co-usuários ou beneficiários.
     /// </summary>
     public List<JazigoProprietario> Proprietarios { get; set; } = new();
+
+    public int? CemiterioId { get; set; }
+    public Cemiterio? Cemiterio { get; set; }
+
+    public decimal? Largura { get; set; }
+    public decimal? Comprimento { get; set; }
+
+    [MaxLength(150)]
+    public string? Revestimento { get; set; }
+
+    public int? ClassificacaoEspacoId { get; set; }
+    public ClassificacaoEspaco? ClassificacaoEspaco { get; set; }
+
+    public List<Gaveta> Gavetas { get; set; } = new();
+
+    [NotMapped]
+    public decimal? AreaM2 => RegrasDocumentos.CalcularAreaM2(Largura, Comprimento);
 }

@@ -11,6 +11,7 @@ using Sakrus.Endpoints;
 using Sakrus.Data;
 using Sakrus.Infrastructure.Data;
 using Sakrus.Services;
+using Sakrus.Services.Documentos;
 using System.Threading.RateLimiting;
 
 // ConfiguraÃ§Ã£o global do QuestPDF (feita uma Ãºnica vez, aqui, nÃ£o dentro dos mÃ©todos)
@@ -90,6 +91,7 @@ builder.Services.AddScoped<EstoqueService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<Sakrus.Services.AgendaService>();
+builder.Services.AddModuloDocumentos();
 
 // CRIT-02/03: Serviço de armazenamento seguro de arquivos (fora do wwwroot)
 builder.Services.AddSingleton<FileStorageService>();

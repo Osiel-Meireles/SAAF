@@ -67,4 +67,7 @@ public class JazigoProprietario
     /// <summary>Usuário que registrou ou encerrou o vínculo.</summary>
     public int? UsuarioId { get; set; }
     public Usuario? Usuario { get; set; }
+
+    public bool PagamentoConfirmado { get; set; } = false;
+    public DateTime? DataPagamento { get; set; }
 }

@@ -57,4 +57,16 @@ public class Atendimento
     public string? PecaAnatomicaEstadoOrigem { get; set; }
 
     public List<ItemFaturado> ItensFaturados { get; set; } = new();
+
+    public TipoAtendimentoFunerario TipoAtendimento { get; set; } = TipoAtendimentoFunerario.Particular;
+
+    public int? EmpresaExecutoraId { get; set; }
+    public Funeraria? EmpresaExecutora { get; set; }
+
+    [MaxLength(80)]
+    public string? GrauParentesco { get; set; }
+
+    public bool? LiberacaoMunicipal { get; set; }
+
+    public List<AtendimentoServicoAuxilio> ServicosAuxilio { get; set; } = new();
 }

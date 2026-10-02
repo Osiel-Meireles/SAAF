@@ -76,6 +76,11 @@ else
                            StartIcon="@Icons.Material.Filled.Visibility">
                     Detalhes
                 </MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary" Class="ml-2"
+                           OnClick="@(() => AbrirEmissaoDocumentos(context))"
+                           StartIcon="@Icons.Material.Filled.Description">
+                    Documentos
+                </MudButton>
                 @if (context.Titular == null)
                 {
                     <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Class="ml-2"
@@ -180,6 +185,19 @@ else
         {
             await LoadData();
         }
+    }
+
+    private async Task AbrirEmissaoDocumentos(JazigoDto context)
+    {
+        var parameters = new DialogParameters
+        {
+            ["EntidadeTipo"] = "Jazigo",
+            ["EntidadeId"] = context.Jazigo.Id,
+            ["Descricao"] = $"Jazigo {context.Jazigo.CodigoIdentificador}",
+            ["ResponsavelId"] = context.Titular?.Id
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<EmitirDocumentosDialog>("Emitir Documentos", parameters, options);
     }
 
     private class JazigoDto
