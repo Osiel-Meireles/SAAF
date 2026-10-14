@@ -159,6 +159,7 @@ public class DocumentoEmissaoService : IDocumentoEmissaoService
             .Include(d => d.TipoDocumento)
             .Where(d => d.EntidadeTipo == entidadeTipo && d.EntidadeId == entidadeId)
             .OrderByDescending(d => d.EmitidoEm)
+            .ThenByDescending(d => d.Versao)
             .ToListAsync();
     }
 }

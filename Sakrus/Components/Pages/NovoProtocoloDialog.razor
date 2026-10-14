@@ -5,6 +5,7 @@
 @inject IProtocoloService ProtocoloService
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudDialog>
     <TitleContent>
@@ -30,9 +31,16 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudAutocomplete T="Jazigo" Label="Jazigo (opcional)" @bind-Value="jazigo"
-                                     SearchFunc="@PesquisarJazigos" ToStringFunc="@(j => j?.CodigoIdentificador)"
-                                     MinCharacters="2" MaxItems="15" Clearable="true" />
+                    <div class="d-flex align-center gap-2">
+                        <MudAutocomplete T="Jazigo" Label="Jazigo (opcional)" @bind-Value="jazigo"
+                                         SearchFunc="@PesquisarJazigos" ToStringFunc="@(j => j?.CodigoIdentificador)"
+                                         MinCharacters="2" MaxItems="15" Clearable="true" Class="flex-grow-1" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Map"
+                                   OnClick="@SelecionarJazigoNoMapa">
+                            Mapa
+                        </MudButton>
+                    </div>
                 </MudItem>
                 <MudItem xs="12" sm="6">
                     <MudDatePicker Label="Data de abertura" @bind-Date="dataAbertura" />
@@ -135,6 +143,34 @@
         finally
         {
             salvando = false;
+        }
+    }
+
+    private async Task SelecionarJazigoNoMapa()
+    {
+        var parameters = new DialogParameters
+        {
+            ["Titulo"] = "Selecionar Jazigo",
+            ["TipoLocal"] = "Jazigo",
+            ["SomenteLivres"] = false
+        };
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true
+        };
+        var dialog = await DialogService.ShowAsync<SelecionarLocalMapaDialog>(
+            "Selecionar Jazigo", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled
+            && result.Data is SelecionarLocalMapaDialog.ResultadoSelecaoLocal selecionado
+            && selecionado.JazigoId.HasValue)
+        {
+            using var db = await DbFactory.CreateDbContextAsync();
+            jazigo = await db.Jazigos.FindAsync(selecionado.JazigoId.Value);
+            StateHasChanged();
         }
     }
 

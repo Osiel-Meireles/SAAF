@@ -8,6 +8,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudDialog>
     <TitleContent>
@@ -90,6 +91,16 @@
                                             case TipoCampo.SimNao:
                                                 <MudSwitch T="bool" Label="@campo.Rotulo" HelperText="@campo.Ajuda"
                                                            Value="@GetBool(tipo.Codigo, campo.Chave)" ValueChanged="@(v => SetBool(tipo.Codigo, campo.Chave, v))" />
+                                                break;
+                                            case TipoCampo.Selecao when string.Equals(campo.FonteOpcoes, "gavetas", StringComparison.OrdinalIgnoreCase):
+                                                <div class="d-flex align-center gap-2">
+                                                    <MudTextField T="string" Label="@campo.Rotulo" Required="@campo.Obrigatorio" HelperText="@campo.Ajuda" ReadOnly="true" Class="flex-grow-1"
+                                                                  Value="@GetValorDescricao(tipo.Codigo, campo.Chave)" />
+                                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Map"
+                                                               OnClick="@(() => SelecionarGavetaNoMapa(tipo, campo))">
+                                                        Mapa
+                                                    </MudButton>
+                                                </div>
                                                 break;
                                             case TipoCampo.Selecao:
                                                 <MudSelect T="string" Label="@campo.Rotulo" Required="@campo.Obrigatorio" HelperText="@campo.Ajuda"
@@ -180,6 +191,7 @@
     private List<TipoDocumento> tiposSelecionados = new();
     private Dictionary<string, IReadOnlyList<CampoDefinicao>> camposPorTipo = new();
     private Dictionary<string, Dictionary<string, string?>> valoresPorTipo = new();
+    private Dictionary<string, Dictionary<string, string>> descricaoSelecaoPorTipo = new();
     private Dictionary<string, Dictionary<string, List<OpcaoSelecao>>> opcoesSelecaoPorTipo = new();
     private readonly Dictionary<string, List<Funeraria>> cacheEmpresas = new();
     private IReadOnlyList<string>? motivosBloqueio;
@@ -212,6 +224,7 @@
             tiposSelecionados.Remove(tipo);
             camposPorTipo.Remove(tipo.Codigo);
             valoresPorTipo.Remove(tipo.Codigo);
+            descricaoSelecaoPorTipo.Remove(tipo.Codigo);
             opcoesSelecaoPorTipo.Remove(tipo.Codigo);
         }
     }
@@ -241,10 +254,6 @@
             else if (string.Equals(campo.FonteOpcoes, "falecidos", StringComparison.OrdinalIgnoreCase))
             {
                 opcoes[campo.Chave] = await OpcoesFalecidosAsync();
-            }
-            else if (string.Equals(campo.FonteOpcoes, "gavetas", StringComparison.OrdinalIgnoreCase))
-            {
-                opcoes[campo.Chave] = await OpcoesGavetasAsync();
             }
         }
         opcoesSelecaoPorTipo[tipo.Codigo] = opcoes;
@@ -280,14 +289,46 @@
             .ToList();
     }
 
-    private async Task<List<OpcaoSelecao>> OpcoesGavetasAsync()
+    private async Task SelecionarGavetaNoMapa(TipoDocumento tipo, CampoDefinicao campo)
     {
-        var service = new GavetaSelecaoService(DbFactory);
-        var opcoes = await service.ListarOpcoesAsync(ResponsavelId, incluirPublicas: true, somenteLivres: false);
+        int? responsavelFiltro = (tipo.Codigo is "15" or "17") ? null : ResponsavelId;
 
-        return opcoes
-            .Select(o => new OpcaoSelecao(o.Chave, o.Descricao))
-            .ToList();
+        var parameters = new DialogParameters
+        {
+            ["Titulo"] = $"Selecionar {campo.Rotulo}",
+            ["TipoLocal"] = "Ambos",
+            ["SomenteLivres"] = true,
+            ["ResponsavelId"] = responsavelFiltro
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SelecionarLocalMapaDialog>(campo.Rotulo, parameters, options);
+        var result = await dialog.Result;
+
+        if (result == null || result.Canceled || result.Data is not SelecionarLocalMapaDialog.ResultadoSelecaoLocal selecionado)
+            return;
+
+        if (string.IsNullOrEmpty(selecionado.Chave))
+            return;
+
+        SetValor(tipo.Codigo, campo.Chave, selecionado.Chave);
+        if (!descricaoSelecaoPorTipo.TryGetValue(tipo.Codigo, out var descricoes))
+        {
+            descricoes = new Dictionary<string, string>();
+            descricaoSelecaoPorTipo[tipo.Codigo] = descricoes;
+        }
+        descricoes[campo.Chave] = selecionado.Descricao;
+    }
+
+    private string GetValorDescricao(string tipoCodigo, string chave)
+    {
+        if (descricaoSelecaoPorTipo.TryGetValue(tipoCodigo, out var descricoes)
+            && descricoes.TryGetValue(chave, out var descricao)
+            && !string.IsNullOrEmpty(descricao))
+        {
+            return descricao;
+        }
+
+        return GetValor(tipoCodigo, chave) ?? "";
     }
 
     private async Task<List<Funeraria>> OpcoesEmpresasAsync()

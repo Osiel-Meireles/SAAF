@@ -7,6 +7,7 @@
 @implements IDisposable
 @inject ISnackbar Snackbar
 @inject IJazigoService JazigoService
+@inject IDialogService DialogService
 
 <MudDialog>
     <TitleContent>
@@ -70,13 +71,18 @@
                     </MudItem>
 
                     <MudItem xs="12">
-                        <MudSelect T="int?" Label="Selecione Novo Jazigo de Destino (Opcional)" @bind-Value="destinoJazigoId" Clearable="true">
-                            <MudSelectItem T="int?" Value="null">Nenhum</MudSelectItem>
-                            @foreach (var j in jazigosList)
+                        <div class="d-flex align-center gap-2">
+                            <MudTextField T="string" Label="Novo Jazigo de Destino (Opcional)" ReadOnly="true" Class="flex-grow-1"
+                                          Value="@descricaoJazigoDestino" />
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Map"
+                                       OnClick="SelecionarJazigoDestino">
+                                Mapa
+                            </MudButton>
+                            @if (destinoJazigoId.HasValue)
                             {
-                                <MudSelectItem T="int?" Value="@j.Id">Jazigo @j.CodigoIdentificador @(j.Ocupado ? "(Ocupado)" : "(Livre)")</MudSelectItem>
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="LimparJazigoDestino" Title="Remover seleção" />
                             }
-                        </MudSelect>
+                        </div>
                     </MudItem>
 
                     <MudItem xs="12">
@@ -122,11 +128,11 @@
     private ExecutorExumacao executor = ExecutorExumacao.CemiterioMunicipal;
     private int? selectedOssuarioId;
     private int? destinoJazigoId;
+    private string descricaoJazigoDestino = "";
     private string observacoes = "";
     private TipoRestosMortais tipoRestosMortaisSelecionado = TipoRestosMortais.PecaAnatomica;
 
     private List<Ossuario> ossuariosGerais = new();
-    private List<Jazigo> jazigosList = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -166,9 +172,35 @@
         }
 
         ossuariosGerais = await DbContext.Ossuarios.Where(o => o.Tipo == TipoOssuario.Geral).ToListAsync();
-        jazigosList = await DbContext.Jazigos.OrderBy(j => j.CodigoIdentificador).ToListAsync();
 
         isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task SelecionarJazigoDestino()
+    {
+        var parameters = new DialogParameters
+        {
+            ["Titulo"] = "Selecionar Jazigo de Destino",
+            ["TipoLocal"] = "Jazigo",
+            ["SomenteLivres"] = false
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SelecionarLocalMapaDialog>("Selecionar Jazigo", parameters, options);
+        var result = await dialog.Result;
+
+        if (result.Canceled || result.Data is not SelecionarLocalMapaDialog.ResultadoSelecaoLocal selecionado)
+            return;
+
+        destinoJazigoId = selecionado.JazigoId;
+        descricaoJazigoDestino = selecionado.Descricao;
+        StateHasChanged();
+    }
+
+    private void LimparJazigoDestino()
+    {
+        destinoJazigoId = null;
+        descricaoJazigoDestino = "";
         StateHasChanged();
     }
 

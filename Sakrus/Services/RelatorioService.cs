@@ -15,6 +15,11 @@ public partial class RelatorioService
 
     private static readonly byte[]? Brasao = CarregarBrasao();
 
+    static RelatorioService()
+    {
+        QuestPDF.Settings.License = LicenseType.Community;
+    }
+
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
     public RelatorioService(IDbContextFactory<ApplicationDbContext> dbFactory)
@@ -107,7 +112,7 @@ public partial class RelatorioService
                     footerCol.Item().Row(row =>
                     {
                         row.RelativeItem().Column(c => {
-                            c.Item().ImageAssinaturaResponsavel(AlturaRodapeAssinatura);
+                            c.Item().Height(AlturaRodapeAssinatura);
                             c.Item().LineHorizontal(1);
                             c.Item().AlignCenter().Text("Assinatura do Responsável");
                         });
@@ -211,7 +216,7 @@ public partial class RelatorioService
                     footerCol.Item().Row(row =>
                     {
                         row.RelativeItem().Column(c => {
-                            c.Item().ImageAssinaturaResponsavel(AlturaRodapeAssinatura);
+                            c.Item().Height(AlturaRodapeAssinatura);
                             c.Item().LineHorizontal(1);
                             c.Item().AlignCenter().Text("Assinatura do Responsável");
                         });

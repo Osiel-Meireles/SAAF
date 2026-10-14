@@ -152,6 +152,39 @@ public class GavetaSelecaoServiceTests
     }
 
     [Fact]
+    public async Task ResolverAsync_Jazigo_CarregaLocal()
+    {
+        var factory = new TestDbContextFactory("gaveta-selecao-jazigo-" + Guid.NewGuid());
+        using var db = factory.CreateDbContext();
+        var cemiterio = new Cemiterio { Nome = "Bela Vista", Municipio = "Barreiras" };
+        var classificacao = new ClassificacaoEspaco { Nome = "Jazigo Familiar", Natureza = NaturezaEspaco.Jazigo };
+        var jazigo = new Jazigo
+        {
+            CodigoIdentificador = "J-100",
+            Quadra = "4",
+            Ala = "B",
+            NumeroLote = "25",
+            Cemiterio = cemiterio,
+            ClassificacaoEspaco = classificacao
+        };
+        db.AddRange(cemiterio, classificacao, jazigo);
+        await db.SaveChangesAsync();
+
+        var servico = new GavetaSelecaoService(factory);
+        var local = await servico.ResolverAsync($"J:{jazigo.Id}");
+
+        Assert.NotNull(local);
+        Assert.Equal("Particular", local!.Tipo);
+        Assert.Equal("Bela Vista", local.Cemiterio);
+        Assert.Equal("Barreiras", local.Municipio);
+        Assert.Equal("4", local.Quadra);
+        Assert.Equal("B", local.Ala);
+        Assert.Equal("25", local.Lote);
+        Assert.Null(local.Gaveta);
+        Assert.Equal("Jazigo Familiar", local.Classificacao);
+    }
+
+    [Fact]
     public async Task ResolverAsync_ChaveInvalida_RetornaNull()
     {
         var factory = new TestDbContextFactory("gaveta-selecao-" + Guid.NewGuid());

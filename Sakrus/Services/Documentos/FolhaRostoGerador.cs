@@ -78,7 +78,7 @@ public class FolhaRostoGerador : GeradorBase
             foreach (var gaveta in jazigo.Gavetas.OrderBy(g => g.Numero, StringComparer.OrdinalIgnoreCase))
             {
                 var nomeFalecido = gaveta.Falecido?.Nome;
-                var dataSepultamento = gaveta.DataSepultamento;
+                var dataSepultamento = gaveta.DataSepultamento ?? gaveta.Falecido?.DataSepultamento;
 
                 linhas.Add(new LinhaFolhaRosto(
                     gaveta.Numero,

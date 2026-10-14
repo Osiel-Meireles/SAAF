@@ -11,7 +11,7 @@ public static class DocumentoLayout
 {
     private static readonly byte[]? Brasao = CarregarAsset("brasao.png");
 
-    public static readonly byte[]? AssinaturaResponsavel = CarregarAsset("assinatura-saaf.png");
+    public static readonly byte[]? AssinaturaSAAF = CarregarAsset("assinatura-saaf.png");
 
     static DocumentoLayout()
     {
@@ -271,32 +271,23 @@ public static class DocumentoBlocos
     {
         container.Column(c =>
         {
-            if (TemAssinaturaResponsavel(rotulo))
-                c.Item().ImageAssinaturaResponsavel(AlturaSlotComAssinatura);
-            else
-                c.Item().Height(altura);
-
+            c.Item().Height(altura);
             c.Item().LineHorizontal(0.5f);
             c.Item().AlignCenter().Text(rotulo).FontSize(10);
         });
     }
 
-    private static bool TemAssinaturaResponsavel(string rotulo)
-        => rotulo.Contains("respons", StringComparison.OrdinalIgnoreCase);
-
     private static float AlturaSlotAssinatura(params string[] rotulos)
-        => DocumentoLayout.AssinaturaResponsavel != null && rotulos.Any(TemAssinaturaResponsavel)
-            ? AlturaSlotComAssinatura
-            : AlturaSlotSemAssinatura;
+        => AlturaSlotSemAssinatura;
 
     private const float AlturaSlotSemAssinatura = 56;
     public const float AlturaSlotComAssinatura = 90;
 
-    public static void ImageAssinaturaResponsavel(this IContainer container, float altura = AlturaSlotComAssinatura)
+    public static void ImageAssinaturaSAAF(this IContainer container, float altura = AlturaSlotComAssinatura)
     {
-        if (DocumentoLayout.AssinaturaResponsavel != null)
+        if (DocumentoLayout.AssinaturaSAAF != null)
             container.Height(altura).AlignBottom().AlignCenter()
-                .Image(DocumentoLayout.AssinaturaResponsavel).FitArea();
+                .Image(DocumentoLayout.AssinaturaSAAF).FitArea();
     }
 
     public static void AssinaturaCoordenacao(this ColumnDescriptor col, ContextoEmissao ctx)
@@ -309,7 +300,7 @@ public static class DocumentoBlocos
         {
             row.RelativeItem().Column(c =>
             {
-                c.Item().Height(56);
+                c.Item().ImageAssinaturaSAAF(56);
                 c.Item().LineHorizontal(0.5f);
                 c.Item().AlignCenter().Text(nome).SemiBold();
                 c.Item().AlignCenter().Text(ctx.Instituicao.CargoCoordenador).FontSize(10);
@@ -333,7 +324,7 @@ public static class DocumentoBlocos
         {
             row.RelativeItem().Column(c =>
             {
-                c.Item().Height(56);
+                c.Item().ImageAssinaturaSAAF(56);
                 c.Item().LineHorizontal(0.5f);
                 c.Item().AlignCenter().Text(nome).SemiBold();
                 c.Item().AlignCenter().Text(cargo).FontSize(10);

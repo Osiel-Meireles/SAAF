@@ -150,6 +150,29 @@ public class GavetaSelecaoService : IGavetaSelecaoService
                 gaveta.DataOcupacao);
         }
 
+        if (chave.StartsWith("J:", StringComparison.OrdinalIgnoreCase) && int.TryParse(chave.AsSpan(2), out var jazigoId))
+        {
+            var jazigo = await db.Jazigos
+                .Include(j => j.Cemiterio)
+                .Include(j => j.ClassificacaoEspaco)
+                .FirstOrDefaultAsync(j => j.Id == jazigoId);
+
+            if (jazigo == null)
+                return null;
+
+            return new LocalCemiterial(
+                "Particular",
+                jazigo.Id,
+                jazigo.Cemiterio?.Nome ?? "—",
+                jazigo.Cemiterio?.Municipio,
+                jazigo.Quadra,
+                jazigo.Ala,
+                jazigo.NumeroLote,
+                null,
+                jazigo.ClassificacaoEspaco?.Nome,
+                null);
+        }
+
         return null;
     }
 

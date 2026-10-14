@@ -4,6 +4,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudDialog>
     <TitleContent>
@@ -31,12 +32,18 @@
                 @if (ossuario.Tipo == TipoOssuario.Particular)
                 {
                     <MudItem xs="12" sm="6">
-                        <MudSelect T="int?" Label="Jazigo Vinculado" @bind-Value="ossuario.JazigoVinculadoId" Required="true" RequiredError="Jazigo é obrigatório para ossuários particulares" Clearable="true">
-                            @foreach (var j in jazigosList)
+                        <div class="d-flex align-center gap-2">
+                            <MudTextField T="string" Label="Jazigo Vinculado" Required="true" RequiredError="Jazigo é obrigatório para ossuários particulares" ReadOnly="true" Class="flex-grow-1"
+                                          Value="@descricaoJazigoVinculado" />
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Map"
+                                       OnClick="SelecionarJazigoVinculado">
+                                Mapa
+                            </MudButton>
+                            @if (ossuario.JazigoVinculadoId.HasValue)
                             {
-                                <MudSelectItem T="int?" Value="@j.Id">@j.CodigoIdentificador</MudSelectItem>
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="LimparJazigoVinculado" Title="Remover seleção" />
                             }
-                        </MudSelect>
+                        </div>
                     </MudItem>
                 }
             </MudGrid>
@@ -65,7 +72,7 @@
     private MudForm form = null!;
     private bool formValido;
     private Ossuario ossuario = new() { Capacidade = 10 };
-    private List<Jazigo> jazigosList = new();
+    private string descricaoJazigoVinculado = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -82,11 +89,51 @@
                 Capacidade = OssuarioParaEditar.Capacidade,
                 JazigoVinculadoId = OssuarioParaEditar.JazigoVinculadoId
             };
-        }
 
-        jazigosList = await DbContext.Jazigos
-            .OrderBy(j => j.CodigoIdentificador)
-            .ToListAsync();
+            if (ossuario.JazigoVinculadoId.HasValue)
+            {
+                var jazigo = await DbContext.Jazigos.FindAsync(ossuario.JazigoVinculadoId.Value);
+                if (jazigo != null)
+                    descricaoJazigoVinculado = DescricaoJazigo(jazigo);
+            }
+        }
+    }
+
+    private static string DescricaoJazigo(Jazigo jazigo)
+    {
+        var partes = new List<string> { $"Jazigo {jazigo.CodigoIdentificador}" };
+        if (!string.IsNullOrWhiteSpace(jazigo.Quadra))
+            partes.Add($"Quadra {jazigo.Quadra}");
+        if (!string.IsNullOrWhiteSpace(jazigo.Ala))
+            partes.Add($"Ala {jazigo.Ala}");
+        if (!string.IsNullOrWhiteSpace(jazigo.NumeroLote))
+            partes.Add($"Lote {jazigo.NumeroLote}");
+        return string.Join("  |  ", partes);
+    }
+
+    private async Task SelecionarJazigoVinculado()
+    {
+        var parameters = new DialogParameters
+        {
+            ["Titulo"] = "Selecionar Jazigo Vinculado",
+            ["TipoLocal"] = "Jazigo",
+            ["SomenteLivres"] = false
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SelecionarLocalMapaDialog>("Selecionar Jazigo", parameters, options);
+        var result = await dialog.Result;
+
+        if (result.Canceled || result.Data is not SelecionarLocalMapaDialog.ResultadoSelecaoLocal selecionado)
+            return;
+
+        ossuario.JazigoVinculadoId = selecionado.JazigoId;
+        descricaoJazigoVinculado = selecionado.Descricao;
+    }
+
+    private void LimparJazigoVinculado()
+    {
+        ossuario.JazigoVinculadoId = null;
+        descricaoJazigoVinculado = "";
     }
 
     private async Task Salvar()

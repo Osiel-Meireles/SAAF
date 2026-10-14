@@ -61,13 +61,18 @@
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudSelect T="int?" Label="Selecione o Jazigo (se não for Ossuário Geral)" @bind-Value="registro.JazigoId" Clearable="true">
-                        <MudSelectItem T="int?" Value="null">Nenhum</MudSelectItem>
-                        @foreach (var j in jazigosList)
+                    <div class="d-flex align-center gap-2">
+                        <MudTextField T="string" Label="Jazigo de Destino (se não for Ossuário Geral)" ReadOnly="true" Class="flex-grow-1"
+                                      Value="@descricaoJazigoDestino" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Map"
+                                   OnClick="SelecionarJazigoDestino">
+                            Mapa
+                        </MudButton>
+                        @if (registro.JazigoId.HasValue)
                         {
-                            <MudSelectItem T="int?" Value="@j.Id">Jazigo @j.CodigoIdentificador</MudSelectItem>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="LimparJazigoDestino" Title="Remover seleção" />
                         }
-                    </MudSelect>
+                    </div>
                 </MudItem>
 
                 <MudItem xs="12">
@@ -103,7 +108,7 @@
     };
     private DateTime? dataAutorizacaoAux = DateTime.Today;
     private TipoRestosMortais tipoRestosMortais = TipoRestosMortais.PecaAnatomica;
-    private List<Jazigo> jazigosList = new();
+    private string descricaoJazigoDestino = "";
     private List<Ossuario> ossuariosGerais = new();
 
     protected override async Task OnInitializedAsync()
@@ -113,8 +118,32 @@
         // Garante que existe pelo menos um ossuário geral
         await JazigoService.GarantirOssuarioGeralExisteAsync();
 
-        jazigosList = await DbContext.Jazigos.OrderBy(j => j.CodigoIdentificador).ToListAsync();
         ossuariosGerais = await DbContext.Ossuarios.Where(o => o.Tipo == TipoOssuario.Geral).ToListAsync();
+    }
+
+    private async Task SelecionarJazigoDestino()
+    {
+        var parameters = new DialogParameters
+        {
+            ["Titulo"] = "Selecionar Jazigo de Destino",
+            ["TipoLocal"] = "Jazigo",
+            ["SomenteLivres"] = false
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SelecionarLocalMapaDialog>("Selecionar Jazigo", parameters, options);
+        var result = await dialog.Result;
+
+        if (result.Canceled || result.Data is not SelecionarLocalMapaDialog.ResultadoSelecaoLocal selecionado)
+            return;
+
+        registro.JazigoId = selecionado.JazigoId;
+        descricaoJazigoDestino = selecionado.Descricao;
+    }
+
+    private void LimparJazigoDestino()
+    {
+        registro.JazigoId = null;
+        descricaoJazigoDestino = "";
     }
 
     private async Task Confirmar()

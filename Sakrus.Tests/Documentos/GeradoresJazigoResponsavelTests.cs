@@ -70,8 +70,9 @@ public class GeradoresJazigoResponsavelTests
         db.Jazigos.Add(jazigo);
         db.Responsaveis.AddRange(titular, autorizada);
         db.Funerarias.Add(empresa);
-        db.ClassificacaoEspacos.AddRange(classificacao, classificacaoPublica);
+        db.ClassificacoesEspaco.AddRange(classificacao, classificacaoPublica);
         db.ValoresMetroQuadrado.Add(new ValorMetroQuadrado { Exercicio = exercicioValor, Valor = valorM2 });
+        db.ConfiguracoesFinanceiras.Add(new ConfiguracaoFinanceira { ValorMetroQuadrado = valorM2 });
         db.GavetasPublicas.Add(new GavetaPublica
         {
             Setor = "Planta Geral",
@@ -111,7 +112,7 @@ public class GeradoresJazigoResponsavelTests
 
     private static async Task<Jazigo> RecarregarJazigoAsync(Base base_)
     {
-        using var db = await base_.Factory.CreateDbContextAsync();
+        using var db = base_.Factory.CreateDbContext();
         return await db.Jazigos
             .Include(j => j.Cemiterio)
             .Include(j => j.ClassificacaoEspaco)
@@ -141,7 +142,7 @@ public class GeradoresJazigoResponsavelTests
     public async Task Documento11_SemTitularAtivo_Bloqueia()
     {
         var b = await CriarBaseAsync();
-        using (var db = await b.Factory.CreateDbContextAsync())
+        using (var db = b.Factory.CreateDbContext())
         {
             var vinculo = await db.JazigoProprietarios.FirstAsync(p => p.JazigoId == b.JazigoId);
             vinculo.Ativo = false;
@@ -283,28 +284,28 @@ public class GeradoresJazigoResponsavelTests
         AssertPdf(await gerador.GerarAsync(Ctx(b.JazigoId)));
 
         var jazigo = await RecarregarJazigoAsync(b);
-        using var db = await b.Factory.CreateDbContextAsync();
+        using var db = b.Factory.CreateDbContext();
         var linhas = await FinanceiroJazigoComum.MontarLancamentosAsync(db, jazigo, new DateTime(2024, 1, 15), DataEmissao);
 
         // 2024 (concessão + manutenção), 2025 e 2026 (manutenção).
         Assert.Equal(4, linhas.Count);
         Assert.Equal(1, linhas.Count(l => l.Tipo == TipoLancamento.Concessao));
         Assert.Equal(600m, linhas.Single(l => l.Tipo == TipoLancamento.Manutencao && l.Exercicio == 2024).ValorDevido);
-        Assert.Equal(600m, linhas.Single(l => l.Tipo == TipoLancamento.Concessao).ValorM2 / 6m);
+        Assert.Equal(600m, linhas.Single(l => l.Tipo == TipoLancamento.Concessao).ValorDevido);
     }
 
     [Fact]
     public async Task Documento19_PreservaValorHistoricoDoExercicio()
     {
         var b = await CriarBaseAsync(exercicioValor: 2024, valorM2: 100m);
-        using (var db = await b.Factory.CreateDbContextAsync())
+        using (var db = b.Factory.CreateDbContext())
         {
             db.ValoresMetroQuadrado.Add(new ValorMetroQuadrado { Exercicio = 2025, Valor = 120m });
             await db.SaveChangesAsync();
         }
 
         var jazigo = await RecarregarJazigoAsync(b);
-        using var dbLeitura = await b.Factory.CreateDbContextAsync();
+        using var dbLeitura = b.Factory.CreateDbContext();
         var linhas = await FinanceiroJazigoComum.MontarLancamentosAsync(dbLeitura, jazigo, new DateTime(2024, 1, 15), DataEmissao);
 
         Assert.Equal(100m, linhas.Single(l => l.Tipo == TipoLancamento.Manutencao && l.Exercicio == 2024).ValorM2);
@@ -316,7 +317,7 @@ public class GeradoresJazigoResponsavelTests
     public async Task Documento19_LancamentoPago_NaoGeraSaldo()
     {
         var b = await CriarBaseAsync(exercicioValor: DataEmissao.Year, valorM2: 100m);
-        using (var db = await b.Factory.CreateDbContextAsync())
+        using (var db = b.Factory.CreateDbContext())
         {
             db.LancamentosFinanceiros.Add(new LancamentoFinanceiro
             {
@@ -332,7 +333,7 @@ public class GeradoresJazigoResponsavelTests
         }
 
         var jazigo = await RecarregarJazigoAsync(b);
-        using var dbLeitura = await b.Factory.CreateDbContextAsync();
+        using var dbLeitura = b.Factory.CreateDbContext();
         var linhas = await FinanceiroJazigoComum.MontarLancamentosAsync(dbLeitura, jazigo, DataEmissao, DataEmissao);
 
         var manutencao = linhas.Single(l => l.Tipo == TipoLancamento.Manutencao);
@@ -346,7 +347,7 @@ public class GeradoresJazigoResponsavelTests
     public async Task Documento19_SemArea_Bloqueia()
     {
         var b = await CriarBaseAsync(largura: 0m, comprimento: 0m);
-        using (var db = await b.Factory.CreateDbContextAsync())
+        using (var db = b.Factory.CreateDbContext())
         {
             var jazigo = await db.Jazigos.FirstAsync(j => j.Id == b.JazigoId);
             jazigo.Largura = null;
@@ -367,7 +368,7 @@ public class GeradoresJazigoResponsavelTests
         AssertPdf(await gerador.GerarAsync(Ctx(b.JazigoId)));
 
         var jazigo = await RecarregarJazigoAsync(b);
-        using var db = await b.Factory.CreateDbContextAsync();
+        using var db = b.Factory.CreateDbContext();
         var linhas = await FinanceiroJazigoComum.MontarLancamentosAsync(db, jazigo, new DateTime(2024, 1, 15), DataEmissao);
 
         var area = jazigo.AreaM2!.Value;
@@ -385,7 +386,7 @@ public class GeradoresJazigoResponsavelTests
 
         var totalManutencoes = FinanceiroJazigoComum.FiltrarTipo(linhas, TipoLancamento.Manutencao).Sum(l => l.ValorDevido);
         Assert.Equal(1800m, totalManutencoes);
-        Assert.Equal(taxaConcessao + totalManutencoes, 2400m);
+        Assert.Equal(2400m, taxaConcessao + totalManutencoes);
     }
 
     [Fact]
