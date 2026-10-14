@@ -198,6 +198,21 @@
                     <MudTextField @bind-Value="currentResp.OrgaoEmissor" Label="Órgão Emissor" Required="true" />
                 </MudItem>
                 <MudItem xs="12" sm="3">
+                    <MudSelect T="string" Label="Estado Civil" @bind-Value="currentResp.EstadoCivil">
+                        <MudSelectItem Value="@("Solteiro(a)")">Solteiro(a)</MudSelectItem>
+                        <MudSelectItem Value="@("Casado(a)")">Casado(a)</MudSelectItem>
+                        <MudSelectItem Value="@("Divorciado(a)")">Divorciado(a)</MudSelectItem>
+                        <MudSelectItem Value="@("Viúvo(a)")">Viúvo(a)</MudSelectItem>
+                        <MudSelectItem Value="@("União Estável")">União Estável</MudSelectItem>
+                        <MudSelectItem Value="@("Separado(a)")">Separado(a)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudAutocomplete T="string" Label="Parentesco" @bind-Value="currentResp.Parentesco"
+                                     SearchFunc="@PesquisarParentesco" CoerceText="true" CoerceValue="true"
+                                     ResetValueOnEmptyText="false" Placeholder="Ex: Filho(a), Esposa..." />
+                </MudItem>
+                <MudItem xs="12" sm="3">
                     <MudTextField @bind-Value="currentResp.Profissao" Label="Profissão" />
                 </MudItem>
                 <MudItem xs="12" sm="3">
@@ -208,9 +223,20 @@
                     <MudTextField @bind-Value="currentResp.Email" Label="E-mail" InputType="InputType.Email"
                                   HelperText="Futuramente usado para login GOV.br" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="currentResp.Endereco" Label="Endereço Completo"
-                                  Required="true" />
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="currentResp.Endereco" Label="Endereço (Rua/Avenida)" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudTextField @bind-Value="currentResp.Numero" Label="Nº" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudTextField @bind-Value="currentResp.Bairro" Label="Bairro" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.Municipio" Label="Município" />
+                </MudItem>
+                <MudItem xs="12" sm="1">
+                    <MudTextField @bind-Value="currentResp.Uf" Label="UF" MaxLength="2" />
                 </MudItem>
 
                 @* Upload de documentos — obrigatório apenas na criação *@
@@ -361,6 +387,19 @@
         showForm = true;
     }
 
+    private static readonly string[] OpcoesParentesco = new[]
+    {
+        "Filho(a)", "Cônjuge/Esposo(a)", "Pai", "Mãe", "Irmão(ã)",
+        "Neto(a)", "Sobrinho(a)", "Tio(a)", "Genro/Nora", "Sogro(a)", "Outro/Declarante"
+    };
+
+    private Task<IEnumerable<string>> PesquisarParentesco(string valor, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+            return Task.FromResult<IEnumerable<string>>(OpcoesParentesco);
+        return Task.FromResult(OpcoesParentesco.Where(p => p.Contains(valor, StringComparison.OrdinalIgnoreCase)));
+    }
+
     private async Task OpenEditForm(ResponsavelVm vm)
     {
         var resp = await DbContext.Responsaveis.FindAsync(vm.Id);
@@ -370,6 +409,9 @@
             Id = resp.Id, Nome = resp.Nome, CPF = resp.CPF, RG = resp.RG,
             OrgaoEmissor = resp.OrgaoEmissor, Profissao = resp.Profissao,
             Telefone = resp.Telefone, Endereco = resp.Endereco,
+            Numero = resp.Numero, Bairro = resp.Bairro,
+            Municipio = resp.Municipio, Uf = resp.Uf,
+            EstadoCivil = resp.EstadoCivil, Parentesco = resp.Parentesco,
             Email = resp.Email, EhProprietario = resp.EhProprietario
         };
         dataNascimentoForm = resp.DataNascimento;
@@ -435,7 +477,10 @@
                     r.Nome = currentResp.Nome; r.CPF = currentResp.CPF;
                     r.RG = currentResp.RG; r.OrgaoEmissor = currentResp.OrgaoEmissor;
                     r.Profissao = currentResp.Profissao; r.Telefone = currentResp.Telefone;
-                    r.Endereco = currentResp.Endereco; r.Email = currentResp.Email;
+                    r.Endereco = currentResp.Endereco; r.Numero = currentResp.Numero;
+                    r.Bairro = currentResp.Bairro; r.Municipio = currentResp.Municipio; r.Uf = currentResp.Uf;
+                    r.EstadoCivil = currentResp.EstadoCivil; r.Parentesco = currentResp.Parentesco;
+                    r.Email = currentResp.Email;
                     r.DataNascimento = currentResp.DataNascimento;
                     DbContext.Responsaveis.Update(r);
                 }

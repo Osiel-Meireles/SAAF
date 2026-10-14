@@ -604,6 +604,10 @@ namespace Sakrus.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Bairro")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("CartorioRegistro")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -650,6 +654,10 @@ namespace Sakrus.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("Municipio")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("MunicipioCartorio")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -671,6 +679,10 @@ namespace Sakrus.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<string>("Numero")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int?>("OssuarioId")
                         .HasColumnType("integer");
 
@@ -689,6 +701,10 @@ namespace Sakrus.Infrastructure.Migrations
                     b.Property<string>("TipoRestosMortais")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("Uf")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
 
                     b.HasKey("Id");
 
@@ -1376,6 +1392,10 @@ namespace Sakrus.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Bairro")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("CPF")
                         .HasColumnType("text");
 
@@ -1398,13 +1418,25 @@ namespace Sakrus.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<string>("Municipio")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<string>("Numero")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("OrgaoEmissor")
                         .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Parentesco")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
@@ -1422,6 +1454,10 @@ namespace Sakrus.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Uf")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
 
                     b.HasKey("Id");
 

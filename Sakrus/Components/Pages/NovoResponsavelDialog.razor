@@ -41,6 +41,21 @@
                     <MudTextField @bind-Value="currentResp.OrgaoEmissor" Label="Órgão Emissor" Required="true" />
                 </MudItem>
                 <MudItem xs="12" sm="3">
+                    <MudSelect T="string" Label="Estado Civil" @bind-Value="currentResp.EstadoCivil">
+                        <MudSelectItem Value="@("Solteiro(a)")">Solteiro(a)</MudSelectItem>
+                        <MudSelectItem Value="@("Casado(a)")">Casado(a)</MudSelectItem>
+                        <MudSelectItem Value="@("Divorciado(a)")">Divorciado(a)</MudSelectItem>
+                        <MudSelectItem Value="@("Viúvo(a)")">Viúvo(a)</MudSelectItem>
+                        <MudSelectItem Value="@("União Estável")">União Estável</MudSelectItem>
+                        <MudSelectItem Value="@("Separado(a)")">Separado(a)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudAutocomplete T="string" Label="Parentesco" @bind-Value="currentResp.Parentesco"
+                                     SearchFunc="@PesquisarParentesco" CoerceText="true" CoerceValue="true"
+                                     ResetValueOnEmptyText="false" Placeholder="Ex: Filho(a), Esposa..." />
+                </MudItem>
+                <MudItem xs="12" sm="3">
                     <MudTextField @bind-Value="currentResp.Profissao" Label="Profissão" />
                 </MudItem>
                 <MudItem xs="12" sm="3">
@@ -49,8 +64,20 @@
                 <MudItem xs="12" sm="6">
                     <MudTextField @bind-Value="currentResp.Email" Label="E-mail" InputType="InputType.Email" HelperText="Futuramente usado para login GOV.br" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="currentResp.Endereco" Label="Endereço Completo" Required="true" />
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="currentResp.Endereco" Label="Endereço (Rua/Avenida)" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudTextField @bind-Value="currentResp.Numero" Label="Nº" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudTextField @bind-Value="currentResp.Bairro" Label="Bairro" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="currentResp.Municipio" Label="Município" />
+                </MudItem>
+                <MudItem xs="12" sm="1">
+                    <MudTextField @bind-Value="currentResp.Uf" Label="UF" MaxLength="2" />
                 </MudItem>
 
                 @* Upload de documentos *@
@@ -121,6 +148,19 @@
     private bool isSaving;
     private Responsavel currentResp = new();
     private DateTime? dataNascimentoForm;
+
+    private static readonly string[] OpcoesParentesco = new[]
+    {
+        "Filho(a)", "Cônjuge/Esposo(a)", "Pai", "Mãe", "Irmão(ã)",
+        "Neto(a)", "Sobrinho(a)", "Tio(a)", "Genro/Nora", "Sogro(a)", "Outro/Declarante"
+    };
+
+    private Task<IEnumerable<string>> PesquisarParentesco(string valor, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+            return Task.FromResult<IEnumerable<string>>(OpcoesParentesco);
+        return Task.FromResult(OpcoesParentesco.Where(p => p.Contains(valor, StringComparison.OrdinalIgnoreCase)));
+    }
 
     // Upload
     private sealed record ArquivoBuffer(string Name, long Size, byte[] Bytes);

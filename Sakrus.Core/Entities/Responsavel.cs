@@ -58,6 +58,26 @@ public class Responsavel
     /// <summary>Vínculos de propriedade/uso com jazigos.</summary>
     public List<JazigoProprietario> JazigoProprietarios { get; set; } = new();
 
+    [MaxLength(20)]
+    public string? Numero { get; set; }
+
+    [MaxLength(100)]
+    public string? Bairro { get; set; }
+
+    [MaxLength(100)]
+    public string? Municipio { get; set; }
+
+    [MaxLength(2)]
+    public string? Uf { get; set; }
+
+    [MaxLength(50)]
+    public string? Parentesco { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string? MunicipioUf => !string.IsNullOrWhiteSpace(Municipio) && !string.IsNullOrWhiteSpace(Uf)
+        ? $"{Municipio}/{Uf}"
+        : (Municipio ?? Uf);
+
     [MaxLength(30)]
     public string? EstadoCivil { get; set; }
 }

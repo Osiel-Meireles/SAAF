@@ -13,7 +13,10 @@ public record PessoaQualificacao(
     string? Endereco,
     string? Profissao,
     string? EstadoCivil,
-    string? Parentesco);
+    string? Parentesco,
+    string? Numero = null,
+    string? Bairro = null,
+    string? MunicipioUf = null);
 
 public record FalecidoQualificacao(
     string Nome,
@@ -33,7 +36,10 @@ public record FalecidoQualificacao(
     string? Cartorio,
     string? MunicipioCartorio,
     string? MatriculaObito,
-    DateTime? DataSepultamento);
+    DateTime? DataSepultamento,
+    string? Numero = null,
+    string? Bairro = null,
+    string? MunicipioUf = null);
 
 public record LocalCemiterial(
     string Tipo,
@@ -64,7 +70,10 @@ public static class DadosComuns
             string.IsNullOrWhiteSpace(responsavel.Endereco) ? null : responsavel.Endereco,
             string.IsNullOrWhiteSpace(responsavel.Profissao) ? null : responsavel.Profissao,
             string.IsNullOrWhiteSpace(responsavel.EstadoCivil) ? null : responsavel.EstadoCivil,
-            parentesco);
+            parentesco ?? (string.IsNullOrWhiteSpace(responsavel.Parentesco) ? null : responsavel.Parentesco),
+            string.IsNullOrWhiteSpace(responsavel.Numero) ? null : responsavel.Numero,
+            string.IsNullOrWhiteSpace(responsavel.Bairro) ? null : responsavel.Bairro,
+            string.IsNullOrWhiteSpace(responsavel.MunicipioUf) ? null : responsavel.MunicipioUf);
     }
 
     public static async Task<FalecidoQualificacao> FalecidoAsync(ApplicationDbContext db, int falecidoId)
@@ -91,7 +100,10 @@ public static class DadosComuns
             string.IsNullOrWhiteSpace(falecido.CartorioRegistro) ? null : falecido.CartorioRegistro,
             string.IsNullOrWhiteSpace(falecido.MunicipioCartorio) ? null : falecido.MunicipioCartorio,
             string.IsNullOrWhiteSpace(falecido.MatriculaObito) ? null : falecido.MatriculaObito,
-            falecido.DataSepultamento);
+            falecido.DataSepultamento,
+            string.IsNullOrWhiteSpace(falecido.Numero) ? null : falecido.Numero,
+            string.IsNullOrWhiteSpace(falecido.Bairro) ? null : falecido.Bairro,
+            string.IsNullOrWhiteSpace(falecido.MunicipioUf) ? null : falecido.MunicipioUf);
     }
 
     public static async Task<Jazigo> JazigoCompletoAsync(ApplicationDbContext db, int id)

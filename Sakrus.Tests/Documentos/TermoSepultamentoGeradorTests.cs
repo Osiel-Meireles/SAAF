@@ -20,9 +20,14 @@ public class TermoSepultamentoGeradorTests
             RG = "1234567",
             OrgaoEmissor = "SSP/BA",
             Telefone = "77999999999",
-            Endereco = "Rua A, 10",
+            Endereco = "Rua A",
+            Numero = "10",
+            Bairro = "Centro",
+            Municipio = "Vitória da Conquista",
+            Uf = "BA",
             Profissao = "Comerciante",
-            EstadoCivil = "Casado(a)"
+            EstadoCivil = "Casado(a)",
+            Parentesco = "Filho(a)"
         };
         var falecido = new Falecido
         {
@@ -31,7 +36,13 @@ public class TermoSepultamentoGeradorTests
             EstadoCivil = "Casada",
             Sexo = "Feminino",
             LocalCorpo = "Hospital Municipal",
-            CausaMorte = CausaMorte.Natural
+            CausaMorte = CausaMorte.Natural,
+            Profissao = "Aposentada",
+            Endereco = "Rua B",
+            Numero = "200",
+            Bairro = "Candeias",
+            Municipio = "Vitória da Conquista",
+            Uf = "BA"
         };
         var funeraria = new Funeraria { Nome = "Funerária X" };
         var jazigo = new Jazigo { CodigoIdentificador = "J1", Quadra = "3", Ala = "A", NumeroLote = "12", Cemiterio = cemiterio };
@@ -109,5 +120,29 @@ public class TermoSepultamentoGeradorTests
             () => gerador.GerarAsync(CriarContexto(999, new ConfiguracaoInstitucional())));
 
         Assert.Contains("Atendimento", ex.Message);
+    }
+
+    [Fact]
+    public async Task Qualificacao_PreencheCamposEnderecoEParentesco()
+    {
+        var (factory, atendimentoId, _) = await CriarBaseAsync();
+        using var db = factory.CreateDbContext();
+
+        var atendimento = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstAsync(db.Atendimentos, a => a.Id == atendimentoId);
+        var resp = await DadosComuns.ResponsavelAsync(db, atendimento.ResponsavelId, atendimento.GrauParentesco);
+        var fal = await DadosComuns.FalecidoAsync(db, atendimento.FalecidoId);
+
+        Assert.Equal("10", resp.Numero);
+        Assert.Equal("Centro", resp.Bairro);
+        Assert.Equal("Vitória da Conquista/BA", resp.MunicipioUf);
+        Assert.Equal("Filho(a)", resp.Parentesco);
+        Assert.Equal("Casado(a)", resp.EstadoCivil);
+
+        Assert.Equal("200", fal.Numero);
+        Assert.Equal("Candeias", fal.Bairro);
+        Assert.Equal("Vitória da Conquista/BA", fal.MunicipioUf);
+        Assert.Equal("Aposentada", fal.Profissao);
+        Assert.Equal("Feminino", fal.Sexo);
+        Assert.Equal("Casada", fal.EstadoCivil);
     }
 }

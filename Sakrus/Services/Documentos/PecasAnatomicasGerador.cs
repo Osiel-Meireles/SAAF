@@ -63,8 +63,8 @@ public class PecasAnatomicasGerador : GeradorBase
                 },
                 new (string, string?, int)[]
                 {
-                    ("Endereço", falecido.Endereco, 5), ("Nº", null, 1), ("Bairro", null, 2),
-                    ("Município/UF", null, 2), ("Data da cirurgia", atendimento.PecaAnatomicaDataCirurgia?.ToString("dd/MM/yyyy"), 2)
+                    ("Endereço", falecido.Endereco, 5), ("Nº", falecido.Numero, 1), ("Bairro", falecido.Bairro, 2),
+                    ("Município/UF", falecido.MunicipioUf, 2), ("Data da cirurgia", atendimento.PecaAnatomicaDataCirurgia?.ToString("dd/MM/yyyy"), 2)
                 });
 
             col.TituloBloco("DADOS DO RESPONSÁVEL");
@@ -77,7 +77,7 @@ public class PecasAnatomicasGerador : GeradorBase
                 },
                 new (string, string?, int)[]
                 {
-                    ("Endereço", responsavel.Endereco, 5), ("Nº", null, 1), ("Bairro", null, 3), ("Município/UF", null, 3)
+                    ("Endereço", responsavel.Endereco, 5), ("Nº", responsavel.Numero, 1), ("Bairro", responsavel.Bairro, 3), ("Município/UF", responsavel.MunicipioUf, 3)
                 },
                 new (string, string?, int)[]
                 {

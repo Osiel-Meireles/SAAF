@@ -44,9 +44,10 @@
                     <MudDivider Class="mb-3" />
                 </MudItem>
 
-                <MudItem xs="12" sm="9">
+                <MudItem xs="12" sm="6">
                     <MudAutocomplete T="Responsavel" Label="Pesquisar Responsável (Nome ou CPF)"
-                                     @bind-Value="responsavelSelecionado"
+                                     Value="responsavelSelecionado"
+                                     ValueChanged="@OnResponsavelSelecionado"
                                      SearchFunc="@PesquisarResponsavel"
                                      ToStringFunc="@(r => r == null ? null : $"{r.Nome} (CPF: {r.CPF})")"
                                      Required="true" RequiredError="Selecione ou cadastre um responsável"
@@ -55,6 +56,14 @@
                                      CoerceText="false" CoerceValue="false"
                                      Immediate="true"
                                      DebounceInterval="300" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudAutocomplete T="string" Label="Parentesco com o Falecido"
+                                     @bind-Value="novoAtendimento.GrauParentesco"
+                                     SearchFunc="@PesquisarParentesco"
+                                     CoerceText="true" CoerceValue="true"
+                                     ResetValueOnEmptyText="false"
+                                     Placeholder="Ex: Filho(a), Cônjuge..." />
                 </MudItem>
                 <MudItem xs="12" sm="3" Class="d-flex align-end pb-2">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovoResponsavelDialog">
@@ -81,12 +90,54 @@
                 <MudItem xs="12" sm="3">
                     <MudDatePicker Label="Data de Nascimento" @bind-Date="dataNascimento" Editable="true" HelperText="Opcional — usado para regra de jazigo infantil" />
                 </MudItem>
-            }
 
-            @* Data e Local do Falecimento — sempre visíveis *@
-            <MudItem xs="12" sm="@(EhIndigente ? 6 : 3)">
-                <MudDatePicker Label="Data de Falecimento" @bind-Date="dataFalecimento" Required="true" RequiredError="Data obrigatória" />
-            </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="string" Label="Sexo" @bind-Value="novoAtendimento.Falecido.Sexo">
+                        <MudSelectItem Value="@("Masculino")">Masculino</MudSelectItem>
+                        <MudSelectItem Value="@("Feminino")">Feminino</MudSelectItem>
+                        <MudSelectItem Value="@("Outro")">Outro</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="string" Label="Estado Civil" @bind-Value="novoAtendimento.Falecido.EstadoCivil">
+                        <MudSelectItem Value="@("Solteiro(a)")">Solteiro(a)</MudSelectItem>
+                        <MudSelectItem Value="@("Casado(a)")">Casado(a)</MudSelectItem>
+                        <MudSelectItem Value="@("Divorciado(a)")">Divorciado(a)</MudSelectItem>
+                        <MudSelectItem Value="@("Viúvo(a)")">Viúvo(a)</MudSelectItem>
+                        <MudSelectItem Value="@("União Estável")">União Estável</MudSelectItem>
+                        <MudSelectItem Value="@("Separado(a)")">Separado(a)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="novoAtendimento.Falecido.Profissao" Label="Profissão" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudDatePicker Label="Data de Falecimento" @bind-Date="dataFalecimento" Required="true" RequiredError="Data obrigatória" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="novoAtendimento.Falecido.Endereco" Label="Endereço (Rua/Avenida)" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudTextField @bind-Value="novoAtendimento.Falecido.Numero" Label="Nº" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudTextField @bind-Value="novoAtendimento.Falecido.Bairro" Label="Bairro" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="novoAtendimento.Falecido.Municipio" Label="Município" />
+                </MudItem>
+                <MudItem xs="12" sm="1">
+                    <MudTextField @bind-Value="novoAtendimento.Falecido.Uf" Label="UF" MaxLength="2" />
+                </MudItem>
+            }
+            else
+            {
+                @* Data de Falecimento para Indigente *@
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Data de Falecimento" @bind-Date="dataFalecimento" Required="true" RequiredError="Data obrigatória" />
+                </MudItem>
+            }
             
             @if (!EhIndigente)
             {
@@ -324,6 +375,28 @@
         return Task.FromResult(resultado);
     }
 
+    private static readonly string[] OpcoesParentesco = new[]
+    {
+        "Filho(a)", "Cônjuge/Esposo(a)", "Pai", "Mãe", "Irmão(ã)",
+        "Neto(a)", "Sobrinho(a)", "Tio(a)", "Genro/Nora", "Sogro(a)", "Outro/Declarante"
+    };
+
+    private Task<IEnumerable<string>> PesquisarParentesco(string valor, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+            return Task.FromResult<IEnumerable<string>>(OpcoesParentesco);
+        return Task.FromResult(OpcoesParentesco.Where(p => p.Contains(valor, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private void OnResponsavelSelecionado(Responsavel? r)
+    {
+        responsavelSelecionado = r;
+        if (r != null && !string.IsNullOrWhiteSpace(r.Parentesco) && string.IsNullOrWhiteSpace(novoAtendimento.GrauParentesco))
+        {
+            novoAtendimento.GrauParentesco = r.Parentesco;
+        }
+    }
+
     private async Task AbrirNovoResponsavelDialog()
     {
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
@@ -333,6 +406,10 @@
         if (result != null && !result.Canceled && result.Data is Responsavel novoResp)
         {
             responsavelSelecionado = novoResp;
+            if (!string.IsNullOrWhiteSpace(novoResp.Parentesco) && string.IsNullOrWhiteSpace(novoAtendimento.GrauParentesco))
+            {
+                novoAtendimento.GrauParentesco = novoResp.Parentesco;
+            }
         }
     }
 
