@@ -10,7 +10,7 @@ public class ConfiguracaoInstitucional
     public string NomeCoordenador { get; set; } = "";
 
     [MaxLength(100)]
-    public string CargoCoordenador { get; set; } = "Coordenador(a) da CAAFE";
+    public string CargoCoordenador { get; set; } = "Coordenador(a) do CAAFE";
 
     [MaxLength(150)]
     public string NomePresidenteConselho { get; set; } = "";

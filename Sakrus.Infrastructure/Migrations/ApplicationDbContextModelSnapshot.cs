@@ -616,6 +616,10 @@ namespace Sakrus.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("CausaMorteDescricao")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
                     b.Property<string>("CodigoIndigente")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");

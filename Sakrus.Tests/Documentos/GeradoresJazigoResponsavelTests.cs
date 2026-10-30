@@ -110,6 +110,21 @@ public class GeradoresJazigoResponsavelTests
     private static void AssertPdf(byte[] pdf)
         => Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
 
+    private static int ContarPaginas(byte[] pdf)
+    {
+        var ascii = Encoding.ASCII.GetString(pdf);
+        int count = 0;
+        int idx = 0;
+        while ((idx = ascii.IndexOf("/Type /Page", idx, StringComparison.Ordinal)) >= 0)
+        {
+            int after = idx + "/Type /Page".Length;
+            if (after >= ascii.Length || ascii[after] != 's')
+                count++;
+            idx = after;
+        }
+        return count == 0 ? 1 : count;
+    }
+
     private static async Task<Jazigo> RecarregarJazigoAsync(Base base_)
     {
         using var db = base_.Factory.CreateDbContext();
@@ -178,6 +193,7 @@ public class GeradoresJazigoResponsavelTests
             ("documentacao", "RG, CPF e comprovante de residência")));
 
         AssertPdf(pdf);
+        Assert.Equal(1, ContarPaginas(pdf));
     }
 
     [Fact]
@@ -255,9 +271,13 @@ public class GeradoresJazigoResponsavelTests
         var gerador = new InformacaoDisponibilidadeGerador(b.Factory);
 
         var pdf = await gerador.GerarAsync(Ctx(b.TitularId,
-            ("falecidoId", b.FalecidoId.ToString()),
-            ("gavetaEscolhida", "U:" + b.GavetaPublicaId),
-            ("dataSepultamento", "2026-11-02")));
+            ("nomeFalecido", "Falecido de Teste"),
+            ("cemiterio", "Cemitério Municipal Teste"),
+            ("municipio", "Luís Eduardo Magalhães"),
+            ("quadra", "A"),
+            ("lote", "10"),
+            ("gaveta", "05"),
+            ("finalidade", "Sepultamento de despojos")));
 
         AssertPdf(pdf);
     }
@@ -269,9 +289,9 @@ public class GeradoresJazigoResponsavelTests
         var gerador = new InformacaoDisponibilidadeGerador(b.Factory);
 
         var ex = await Assert.ThrowsAsync<DocumentoBloqueadoException>(() => gerador.GerarAsync(Ctx(b.TitularId,
-            ("gavetaEscolhida", "U:" + b.GavetaPublicaId))));
+            ("cemiterio", "Cemitério Municipal Teste"))));
 
-        Assert.Contains("Falecido", ex.Message);
+        Assert.Contains("Nome do falecido", ex.Message);
     }
 
     [Fact]

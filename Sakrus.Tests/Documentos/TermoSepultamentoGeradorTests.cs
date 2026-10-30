@@ -75,6 +75,21 @@ public class TermoSepultamentoGeradorTests
     private static ContextoEmissao CriarContexto(int atendimentoId, ConfiguracaoInstitucional instituicao)
         => new(atendimentoId, new CamposValores(), instituicao, null, new DateTime(2026, 4, 8, 10, 0, 0));
 
+    private static int ContarPaginas(byte[] pdf)
+    {
+        var ascii = Encoding.ASCII.GetString(pdf);
+        int count = 0;
+        int idx = 0;
+        while ((idx = ascii.IndexOf("/Type /Page", idx, StringComparison.Ordinal)) >= 0)
+        {
+            int after = idx + "/Type /Page".Length;
+            if (after >= ascii.Length || ascii[after] != 's')
+                count++;
+            idx = after;
+        }
+        return count == 0 ? 1 : count;
+    }
+
     [Fact]
     public async Task GeraPdf_Valido()
     {
@@ -84,6 +99,37 @@ public class TermoSepultamentoGeradorTests
         var pdf = await gerador.GerarAsync(CriarContexto(atendimentoId, instituicao));
 
         Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
+        Assert.Equal(1, ContarPaginas(pdf));
+    }
+
+    [Fact]
+    public async Task GavetaPublica_GeraPdfComDeclaracao()
+    {
+        var (factory, atendimentoId, instituicao) = await CriarBaseAsync();
+
+        using (var db = factory.CreateDbContext())
+        {
+            var falecidoId = db.Atendimentos.Where(a => a.Id == atendimentoId).Select(a => a.FalecidoId).First();
+            db.GavetasPublicas.Add(new GavetaPublica
+            {
+                Setor = "Setor A",
+                Quadra = "1",
+                Ala = "A",
+                Lote = "10",
+                NumeroGaveta = "05",
+                Ocupada = true,
+                FalecidoId = falecidoId,
+                DataOcupacao = new DateTime(2026, 4, 8),
+                Cemiterio = new Cemiterio { Nome = "Cemitério Público", Municipio = "Luís Eduardo Magalhães" }
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var gerador = new TermoSepultamentoGerador(factory);
+        var pdf = await gerador.GerarAsync(CriarContexto(atendimentoId, instituicao));
+
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
+        Assert.Equal(1, ContarPaginas(pdf));
     }
 
     [Fact]

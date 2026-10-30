@@ -52,7 +52,7 @@ public class GavetaPublicaService : IGavetaPublicaService
                 FalecidoId = gaveta.FalecidoId.Value,
                 GavetaPublicaId = gaveta.Id,
                 DataAutorizacao = DateTime.UtcNow, // A data de autorização idealmente vem de um fluxo anterior do CAAF
-                SetorAutorizador = "CAAF",
+                SetorAutorizador = "CAAFE",
                 DataExecucao = DateTime.UtcNow, // Momento da efetivação real
                 Executor = executor,
                 Observacoes = observacoes

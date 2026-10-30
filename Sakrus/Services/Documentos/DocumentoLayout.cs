@@ -108,7 +108,7 @@ public static class DocumentoBlocos
 
     public static void TituloBloco(this ColumnDescriptor col, string titulo)
     {
-        col.Item().PaddingTop(8).Border(0.5f).Background(Colors.Grey.Lighten3).Padding(3).Text(titulo).Bold();
+        col.Item().PaddingTop(6).Border(0.5f).Background(Colors.Grey.Lighten3).Padding(2).Text(titulo).Bold();
     }
 
     public static void BlocoTipoAtendimento(this ColumnDescriptor col, TipoAtendimentoFunerario? tipo, string? funeraria)
@@ -143,7 +143,7 @@ public static class DocumentoBlocos
             {
                 foreach (var (rotulo, valor, span) in linha)
                 {
-                    table.Cell().ColumnSpan((uint)Math.Clamp(span, 1, 12)).Border(0.5f).Padding(3).Text(t =>
+                    table.Cell().ColumnSpan((uint)Math.Clamp(span, 1, 12)).Border(0.5f).Padding(2).Text(t =>
                     {
                         t.Span(rotulo.ToUpperInvariant() + ": ").Bold().FontSize(9);
                         t.Span(valor ?? string.Empty);
@@ -170,14 +170,82 @@ public static class DocumentoBlocos
         col.BlocoAssinaturas(rotuloEsq, rotuloDir);
     }
 
+    /// <summary>
+    /// Fecho com assinaturas do Responsável/Funerária e, logo abaixo, do Presidente do Conselho
+    /// e da Coordenação da CAAFE (com imagem de assinatura), dispostos lado a lado para caber
+    /// em uma única página.
+    /// </summary>
+    public static void FechoComDiretoria(this ColumnDescriptor col, ContextoEmissao ctx, string rotuloEsq, string rotuloDir)
+    {
+        var data = ctx.DataEmissao.ToString("dd 'de' MMMM 'de' yyyy", new CultureInfo("pt-BR"));
+        col.Item().PaddingTop(6).Text($"Luís Eduardo Magalhães, {data}");
+
+        col.Item().PaddingTop(6).Table(table =>
+        {
+            table.ColumnsDefinition(c => { c.RelativeColumn(); c.RelativeColumn(); });
+            table.Cell().Padding(3).Column(c =>
+            {
+                c.Item().Height(18);
+                c.Item().LineHorizontal(0.5f);
+                c.Item().AlignCenter().Text(rotuloEsq).FontSize(8);
+            });
+            table.Cell().Padding(3).Column(c =>
+            {
+                c.Item().Height(18);
+                c.Item().LineHorizontal(0.5f);
+                c.Item().AlignCenter().Text(rotuloDir).FontSize(8);
+            });
+        });
+
+        col.AssinaturasDiretoria(ctx);
+    }
+
+    /// <summary>
+    /// Presidente do Conselho e Coordenação da CAAFE lado a lado, com a imagem de assinatura.
+    /// </summary>
+    public static void AssinaturasDiretoria(this ColumnDescriptor col, ContextoEmissao ctx)
+    {
+        const string cargoPresidente = "Presidente do Conselho Municipal Deliberativo dos Serviços Funerários";
+        var cargoCoordenador = string.IsNullOrWhiteSpace(ctx.Instituicao.CargoCoordenador)
+            ? "Coordenador(a) do CAAFE"
+            : ctx.Instituicao.CargoCoordenador;
+
+        col.Item().ShowEntire().PaddingTop(6).Row(row =>
+        {
+            row.RelativeItem().Column(c =>
+            {
+                c.Item().ImageAssinaturaSAAF(26);
+                c.Item().LineHorizontal(0.5f);
+                c.Item().AlignCenter().Text(cargoPresidente).SemiBold().FontSize(8);
+            });
+            row.ConstantItem(16);
+            row.RelativeItem().Column(c =>
+            {
+                c.Item().Height(26);
+                c.Item().LineHorizontal(0.5f);
+                c.Item().AlignCenter().Text(cargoCoordenador).SemiBold().FontSize(8);
+            });
+        });
+    }
+
+    /// <summary>
+    /// Fecho com uma única assinatura (sem a assinatura da CAAFE/Coordenação).
+    /// </summary>
+    public static void FechoSimples(this ColumnDescriptor col, ContextoEmissao ctx, string rotulo)
+    {
+        var data = ctx.DataEmissao.ToString("dd 'de' MMMM 'de' yyyy", new CultureInfo("pt-BR"));
+        col.Item().PaddingTop(14).Text($"Luís Eduardo Magalhães, {data}");
+        col.BlocoAssinaturas(rotulo);
+    }
+
     public static void Secao(this ColumnDescriptor col, string titulo)
     {
-        col.Item().PaddingTop(8).Background(Colors.Grey.Lighten3).Padding(4).Text(titulo).Bold();
+        col.Item().PaddingTop(4).Background(Colors.Grey.Lighten3).Padding(3).Text(titulo).Bold();
     }
 
     public static void Paragrafo(this ColumnDescriptor col, string texto, bool justificado = true)
     {
-        col.Item().PaddingTop(6).Text(t =>
+        col.Item().PaddingTop(3).Text(t =>
         {
             t.Span(texto);
             if (justificado)
@@ -292,18 +360,17 @@ public static class DocumentoBlocos
 
     public static void AssinaturaCoordenacao(this ColumnDescriptor col, ContextoEmissao ctx)
     {
-        var nome = string.IsNullOrWhiteSpace(ctx.Instituicao.NomeCoordenador)
-            ? "[NOME DO(A) COORDENADOR(A)]"
-            : ctx.Instituicao.NomeCoordenador;
+        var cargo = string.IsNullOrWhiteSpace(ctx.Instituicao.CargoCoordenador)
+            ? "Coordenador(a) do CAAFE"
+            : ctx.Instituicao.CargoCoordenador;
 
         col.Item().ShowEntire().PaddingTop(16).Row(row =>
         {
             row.RelativeItem().Column(c =>
             {
-                c.Item().ImageAssinaturaSAAF(56);
+                c.Item().Height(56);
                 c.Item().LineHorizontal(0.5f);
-                c.Item().AlignCenter().Text(nome).SemiBold();
-                c.Item().AlignCenter().Text(ctx.Instituicao.CargoCoordenador).FontSize(10);
+                c.Item().AlignCenter().Text(cargo).FontSize(10);
             });
             row.ConstantItem(30);
             row.ConstantItem(140).Height(70).Border(0.5f).Column(c =>
@@ -316,9 +383,6 @@ public static class DocumentoBlocos
     public static void AssinaturaPresidenteConselho(this ColumnDescriptor col, ContextoEmissao ctx)
     {
         const string cargo = "Presidente do Conselho Municipal Deliberativo dos Serviços Funerários";
-        var nome = string.IsNullOrWhiteSpace(ctx.Instituicao.NomePresidenteConselho)
-            ? "[NOME DO PRESIDENTE]"
-            : ctx.Instituicao.NomePresidenteConselho;
 
         col.Item().ShowEntire().PaddingTop(16).Row(row =>
         {
@@ -326,7 +390,6 @@ public static class DocumentoBlocos
             {
                 c.Item().ImageAssinaturaSAAF(56);
                 c.Item().LineHorizontal(0.5f);
-                c.Item().AlignCenter().Text(nome).SemiBold();
                 c.Item().AlignCenter().Text(cargo).FontSize(10);
             });
             row.ConstantItem(30);

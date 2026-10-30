@@ -78,7 +78,7 @@ public class DispensaCapelaGerador : GeradorBase
                 new (string, string?, int)[] { ("Local do velório", string.IsNullOrWhiteSpace(localVelorio) ? null : localVelorio, 12) });
 
             col.Declaracao(TextosPadrao.DispensaCapelaDeclaracao);
-            col.FechoModelo(ctx, "Assinatura do Responsável", "Assinatura da CAAFE");
+            col.FechoSimples(ctx, "Assinatura do Responsável");
         });
     }
 }

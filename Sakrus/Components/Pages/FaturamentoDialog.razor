@@ -9,6 +9,9 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 @inject RelatorioService RelatorioService
+@inject IDialogService DialogService
+@inject IAuthService AuthService
+@inject IAuditService AuditService
 
 <MudDialog>
     <DialogContent>
@@ -94,6 +97,10 @@
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small" OnClick="@(() => IniciarEdicaoItem(context))" Title="Editar" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoverItem(context.Id))" Title="Remover" />
                             }
+                            else
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Lock" Color="Color.Info" Size="Size.Small" OnClick="@(() => IniciarEdicaoItemComSenha(context))" Title="Editar item da OS finalizada (requer senha)" />
+                            }
                         </MudTd>
                     }
                 </RowTemplate>
@@ -145,6 +152,8 @@
     private int? itemEditandoId;
     private string editCategoria = "urna padrão";
     private decimal editQuantidade = 1;
+    private string? itemEditandoAntigoCategoria;
+    private decimal itemEditandoAntigoQtd;
 
     protected override async Task OnInitializedAsync()
     {
@@ -214,12 +223,46 @@
         itemEditandoId = null;
     }
 
+    private async Task IniciarEdicaoItemComSenha(ItemFaturado item)
+    {
+        var parameters = new DialogParameters
+        {
+            ["TituloOperacao"] = "Editar item de OS finalizada",
+            ["MensagemConfirmacao"] = "A Ordem de Serviço já foi finalizada. Para editar um item, confirme sua identidade."
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", parameters, options);
+        var result = await dialog.Result;
+        if (result == null || result.Canceled) return;
+
+        itemEditandoAntigoCategoria = item.CategoriaItem;
+        itemEditandoAntigoQtd = item.QuantidadeOuKm;
+        IniciarEdicaoItem(item);
+    }
+
     private async Task SalvarEdicaoItem()
     {
         if (!itemEditandoId.HasValue) return;
         try
         {
             await FaturamentoService.EditarItemFaturadoAsync(itemEditandoId.Value, editCategoria, editQuantidade);
+
+            if (atendimento?.OsFinalizada == true)
+            {
+                var usuario = await AuthService.GetUsuarioAtualAsync();
+                if (usuario != null)
+                {
+                    await AuditService.LogAcaoAsync(
+                        usuario.Id,
+                        usuario.Nome,
+                        "EDICAO_ITEM_OS_FINALIZADA",
+                        "ItemFaturado",
+                        itemEditandoId.Value.ToString(),
+                        $"Categoria: {itemEditandoAntigoCategoria}, Qtd: {itemEditandoAntigoQtd}",
+                        $"Categoria: {editCategoria}, Qtd: {editQuantidade}");
+                }
+            }
+
             Snackbar.Add("Item atualizado!", Severity.Success);
             itemEditandoId = null;
             await CarregarAtendimento();

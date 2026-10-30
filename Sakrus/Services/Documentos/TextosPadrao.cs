@@ -8,6 +8,9 @@ public static class TextosPadrao
     public const string TermoSepultamentoAutorizacaoEmpresa =
         "Fica autorizada a empresa {{empresa.nome}} a realizar o sepultamento acima descrito.";
 
+    public const string GavetaPublicaDeclaracao =
+        "Estou ciente de que o sepultamento em jazigo rotativo público tem o prazo de 5 anos (Lei Municipal 877/2019) e que a exumação e transferência para o ossuário ocorrerão na data prevista, sem aviso prévio.";
+
     public const string PecasAnatomicasDeclaracao =
         "O responsável declara possuir legitimidade para autorizar as providências relacionadas ao sepultamento da peça anatômica identificada neste termo e autoriza a realização dos serviços necessários. Declara, ainda, sob as penas da lei, que todas as informações prestadas são verdadeiras, assumindo integral responsabilidade por sua veracidade e exatidão.";
 
@@ -54,7 +57,7 @@ public static class TextosPadrao
         "Fica autorizado o translado dos despojos do falecido acima identificado, provenientes do cemitério e município de origem informados neste documento, com destino ao Município de Luís Eduardo Magalhães - BA, para posterior sepultamento no local autorizado pela CAAFE.";
 
     public const string TermoResponsabilidadeAssuntosTexto =
-        "O(A) titular acima qualificado(a), na condição de concessionário(a) do espaço cemiterial identificado neste termo, autoriza a pessoa também acima qualificada a tratarem os assuntos funerários a ele relacionados perante a CAAFE e os cemitérios públicos do Município, podendo requerer informações, assinar documentos, acompanhar serviços e retirar autorizações, limitada a presente autorização ao espaço acima descrito e às providências dele decorrentes.";
+        "O(A) titular acima qualificado(a), na condição de concessionário(a) do espaço cemiterial identificado neste termo, autoriza a pessoa também acima qualificada a tratar dos assuntos funerários a ele relacionados perante a CAAFE e os cemitérios públicos do Município, podendo requerer informações, assinar documentos, acompanhar serviços e retirar autorizações, limitada a presente autorização ao espaço acima descrito e às providências dele decorrentes.";
 
     public const string TermoResponsabilidadeRevogacao =
         "A presente autorização vigora até que seja revogada por escrito pelo(a) titular, hipótese em que deverá ser devolvido ou inutilizado o presente termo.";

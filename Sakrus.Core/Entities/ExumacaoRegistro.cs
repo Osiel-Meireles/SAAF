@@ -21,7 +21,7 @@ public class ExumacaoRegistro
     public DateTime DataAutorizacao { get; set; }
     
     [MaxLength(50)]
-    public string SetorAutorizador { get; set; } = "CAAF";
+    public string SetorAutorizador { get; set; } = "CAAFE";
     
     public DateTime? DataExecucao { get; set; }
     public TimeSpan? HorarioExecucao { get; set; }

@@ -75,7 +75,7 @@ public partial class RelatorioService
                     // usamos o NumeroOsAuxilio ou uma propriedade de identificação do Atendimento
                     x.Item().Text($"Protocolo: {atendimento.NumeroOsAuxilio ?? "Não Gerado"}");
                     x.Item().Text($"Responsável: {atendimento.Responsavel?.Nome ?? "Não Informado"}");
-                    x.Item().Text($"Causa da Morte: {atendimento.Falecido?.CausaMorte}");
+                    x.Item().Text($"Causa da Morte: {(!string.IsNullOrWhiteSpace(atendimento.Falecido?.CausaMorteDescricao) ? atendimento.Falecido.CausaMorteDescricao : atendimento.Falecido?.CausaMorte.ToString())}");
 
                     x.Item().PaddingTop(10).Text("ITENS DA ORDEM DE SERVIÇO").SemiBold();
                     
@@ -176,7 +176,7 @@ public partial class RelatorioService
                     x.Item().Text($"Nome: {falecido.Nome}");
                     x.Item().Text($"CPF: {falecido.Cpf}");
                     x.Item().Text($"Data de Falecimento: {falecido.DataFalecimento:dd/MM/yyyy}");
-                    x.Item().Text($"Causa da Morte: {falecido.CausaMorte}");
+                    x.Item().Text($"Causa da Morte: {(!string.IsNullOrWhiteSpace(falecido.CausaMorteDescricao) ? falecido.CausaMorteDescricao : falecido.CausaMorte.ToString())}");
                     if (falecido.TipoRestosMortais == TipoRestosMortais.PecaAnatomica)
                     {
                         x.Item().Text("Trata-se de sepultamento de Peça Anatômica / Membro Amputado.").SemiBold().FontColor(Colors.Red.Medium);

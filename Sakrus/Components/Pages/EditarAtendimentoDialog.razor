@@ -4,6 +4,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject ICapelaService CapelaService
 
 <MudDialog>
     <DialogContent>
@@ -25,10 +26,10 @@
                         <MudTextField @bind-Value="atendimento.Responsavel.Nome" Label="Nome Completo" Required="true" RequiredError="O nome é obrigatório" />
                     </MudItem>
                     <MudItem xs="12" sm="3">
-                        <MudTextField @bind-Value="atendimento.Responsavel.CPF" Label="CPF" Required="true" Mask="@(new PatternMask("000.000.000-00"))" />
+                        <MudTextField @bind-Value="atendimento.Responsavel.CPF" Label="CPF" Required="true" Mask="@MascaraCpf" />
                     </MudItem>
                     <MudItem xs="12" sm="3">
-                        <MudTextField @bind-Value="atendimento.Responsavel.Telefone" Label="Telefone" Mask="@(new PatternMask("(00) 00000-0000"))" />
+                        <MudTextField @bind-Value="atendimento.Responsavel.Telefone" Label="Telefone" Mask="@MascaraTelefone" />
                     </MudItem>
                     <MudItem xs="12">
                         <MudTextField @bind-Value="atendimento.Responsavel.Endereco" Label="Endereço Completo" />
@@ -96,6 +97,9 @@
                         </MudSelect>
                     </MudItem>
                     <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="atendimento.Falecido.CausaMorteDescricao" Label="Causa Detalhada" HelperText="Ex: Acidente automobilístico" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
                         <MudDatePicker @bind-Date="dataFalecimento" Label="Data do Falecimento" />
                     </MudItem>
 
@@ -145,6 +149,71 @@
                     <MudItem xs="12">
                         <MudTextField @bind-Value="atendimento.NumeroDeclaracaoObito" Label="Nº Declaração de Óbito" />
                     </MudItem>
+
+                    @* --- USO DE CAPELA --- *@
+                    <MudItem xs="12" Class="mt-4">
+                        <MudText Typo="Typo.h6" Color="Color.Primary">Uso de Capela</MudText>
+                        <MudDivider Class="mb-3" />
+                    </MudItem>
+                    @if (registroCapela == null)
+                    {
+                        <MudItem xs="12" sm="5">
+                            <MudSelect T="int?" Label="Capela" @bind-Value="capelaSelecionadaId">
+                                <MudSelectItem T="int?" Value="null">Selecione a capela...</MudSelectItem>
+                                @foreach (var c in capelas)
+                                {
+                                    <MudSelectItem T="int?" Value="@((int?)c.Id)">@c.Nome</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="3">
+                            <MudDatePicker @bind-Date="dataCapela" Label="Data de entrada" />
+                        </MudItem>
+                        <MudItem xs="12" sm="2">
+                            <MudTimePicker @bind-Time="horaCapela" Label="Hora" />
+                        </MudItem>
+                        <MudItem xs="12" sm="2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AgendarCapela" Disabled="@(capelaSelecionadaId == null || dataCapela == null)" Class="mt-2">Agendar</MudButton>
+                        </MudItem>
+                    }
+                    else
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Success" Dense="true">
+                                Capela agendada: <strong>@(registroCapela.Capela?.Nome ?? "—")</strong> — Entrada: @registroCapela.HoraEntrada.ToString("dd/MM/yyyy HH:mm")
+                            </MudAlert>
+                        </MudItem>
+                    }
+
+                    @* --- SERVIÇOS DE AUXÍLIO FUNERAL --- *@
+                    <MudItem xs="12" Class="mt-4">
+                        <MudText Typo="Typo.h6" Color="Color.Primary">Serviços de Auxílio Funeral</MudText>
+                        <MudDivider Class="mb-3" />
+                    </MudItem>
+                    @if (atendimento.ServicosAuxilio?.Any() == true)
+                    {
+                        <MudItem xs="12">
+                            @foreach (var s in atendimento.ServicosAuxilio)
+                            {
+                                <div class="d-flex align-center justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">@(s.ServicoAuxilio?.Descricao ?? "—")</MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoverServicoAuxilio(s))" />
+                                </div>
+                            }
+                        </MudItem>
+                    }
+                    <MudItem xs="12" sm="8">
+                        <MudSelect T="int?" Label="Adicionar serviço de auxílio" @bind-Value="servicoAuxilioSelecionadoId">
+                            <MudSelectItem T="int?" Value="null">Selecione o serviço...</MudSelectItem>
+                            @foreach (var s in servicosAuxilioCatalogo)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)s.Id)">@s.Descricao</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AdicionarServicoAuxilio" Disabled="@(servicoAuxilioSelecionadoId == null)" Class="mt-2">Adicionar</MudButton>
+                    </MudItem>
                 </MudGrid>
             </MudForm>
         }
@@ -171,11 +240,22 @@
     private MudForm form = null!;
     private bool sucesso;
     private List<Funeraria> funerarias = new();
+    private static readonly PatternMask MascaraCpf = new("000.000.000-00");
+    private static readonly PatternMask MascaraTelefone = new("(00) 00000-0000");
+    private List<Capela> capelas = new();
+    private List<ServicoAuxilio> servicosAuxilioCatalogo = new();
+    private RegistroCapela? registroCapela;
+    private int? capelaSelecionadaId;
+    private DateTime? dataCapela;
+    private TimeSpan? horaCapela;
+    private int? servicoAuxilioSelecionadoId;
 
     protected override async Task OnInitializedAsync()
     {
         DbContext = DbFactory.CreateDbContext();
         funerarias = await DbContext.Funerarias.OrderBy(f => f.Nome).ToListAsync();
+        capelas = await DbContext.Capelas.OrderBy(c => c.Nome).ToListAsync();
+        servicosAuxilioCatalogo = await DbContext.ServicosAuxilio.OrderBy(s => s.Descricao).ToListAsync();
         await CarregarAtendimento();
     }
 
@@ -184,11 +264,82 @@
         atendimento = await DbContext.Atendimentos
             .Include(a => a.Responsavel)
             .Include(a => a.Falecido)
+            .Include(a => a.ServicosAuxilio).ThenInclude(s => s.ServicoAuxilio)
             .FirstOrDefaultAsync(a => a.Id == AtendimentoId);
 
         if (atendimento?.Falecido != null)
         {
             dataFalecimento = atendimento.Falecido.DataFalecimento;
+        }
+
+        registroCapela = await DbContext.RegistrosCapela
+            .Include(r => r.Capela)
+            .FirstOrDefaultAsync(r => r.AtendimentoId == AtendimentoId);
+    }
+
+    private async Task AgendarCapela()
+    {
+        if (atendimento == null || capelaSelecionadaId == null || dataCapela == null) return;
+        try
+        {
+            var entrada = dataCapela.Value.Date.Add(horaCapela ?? TimeSpan.Zero);
+            var novo = await CapelaService.AgendarCapelaAsync(capelaSelecionadaId.Value, atendimento.Id, entrada, null);
+            registroCapela = await DbContext.RegistrosCapela
+                .Include(r => r.Capela)
+                .FirstOrDefaultAsync(r => r.Id == novo.Id);
+            Snackbar.Add("Capela agendada com sucesso!", Severity.Success);
+            capelaSelecionadaId = null;
+            dataCapela = null;
+            horaCapela = null;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task AdicionarServicoAuxilio()
+    {
+        if (atendimento == null || servicoAuxilioSelecionadoId == null) return;
+        try
+        {
+            if (atendimento.ServicosAuxilio == null)
+                atendimento.ServicosAuxilio = new List<AtendimentoServicoAuxilio>();
+
+            if (atendimento.ServicosAuxilio.Any(s => s.ServicoAuxilioId == servicoAuxilioSelecionadoId.Value))
+            {
+                Snackbar.Add("Serviço já adicionado.", Severity.Warning);
+                return;
+            }
+
+            DbContext.AtendimentosServicosAuxilio.Add(new AtendimentoServicoAuxilio
+            {
+                AtendimentoId = atendimento.Id,
+                ServicoAuxilioId = servicoAuxilioSelecionadoId.Value
+            });
+            await DbContext.SaveChangesAsync();
+            servicoAuxilioSelecionadoId = null;
+            await CarregarAtendimento();
+            Snackbar.Add("Serviço adicionado.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task RemoverServicoAuxilio(AtendimentoServicoAuxilio servico)
+    {
+        try
+        {
+            DbContext.AtendimentosServicosAuxilio.Remove(servico);
+            await DbContext.SaveChangesAsync();
+            await CarregarAtendimento();
+            Snackbar.Add("Serviço removido.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
         }
     }
 

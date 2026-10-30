@@ -111,6 +111,7 @@ public class GeradoresAtendimentoTests
         var pdf = await gerador.GerarAsync(CriarContexto(atendimentoId, instituicao));
 
         Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
+        Assert.Equal(1, ContarPaginas(pdf));
     }
 
     [Fact]
@@ -138,11 +139,10 @@ public class GeradoresAtendimentoTests
             c["destinoMunicipio"] = "Barreiras";
             c["destinoUf"] = "BA";
             c["destinoLocal"] = "Cemitério São João";
-            c["dataSaida"] = "2026-04-08";
-            c["horaSaida"] = "14:00";
         }));
 
         Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
+        Assert.Equal(1, ContarPaginas(pdf));
     }
 
     [Fact]
@@ -193,6 +193,7 @@ public class GeradoresAtendimentoTests
         var pdf = await gerador.GerarAsync(CriarContexto(atendimentoId, instituicao, c => c["localVelorio"] = "Residência da família"));
 
         Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
+        Assert.Equal(1, ContarPaginas(pdf));
     }
 
     [Fact]
@@ -294,5 +295,20 @@ public class GeradoresAtendimentoTests
         }
 
         return texto.ToString();
+    }
+
+    private static int ContarPaginas(byte[] pdf)
+    {
+        var ascii = Encoding.ASCII.GetString(pdf);
+        int count = 0;
+        int idx = 0;
+        while ((idx = ascii.IndexOf("/Type /Page", idx, StringComparison.Ordinal)) >= 0)
+        {
+            int after = idx + "/Type /Page".Length;
+            if (after >= ascii.Length || ascii[after] != 's')
+                count++;
+            idx = after;
+        }
+        return count == 0 ? 1 : count;
     }
 }

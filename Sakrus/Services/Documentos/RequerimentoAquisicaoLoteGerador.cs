@@ -121,8 +121,10 @@ public class RequerimentoAquisicaoLoteGerador : GeradorBase
             col.Paragrafo(TextosPadrao.RequerimentoLoteDecisao);
 
             col.LocalEData(ctx);
-            col.BlocoAssinaturas("Assinatura do Responsável (Requerente)", "Coordenador(a) da CAAFE");
-            col.AssinaturaCoordenacao(ctx);
+            var cargoCoordenador = string.IsNullOrWhiteSpace(ctx.Instituicao.CargoCoordenador)
+                ? "Coordenador(a) do CAAFE"
+                : ctx.Instituicao.CargoCoordenador;
+            col.BlocoAssinaturas("Assinatura do Responsável (Requerente)", cargoCoordenador);
         });
     }
 

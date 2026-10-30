@@ -218,7 +218,7 @@ public class JazigoService : IJazigoService
                 FalecidoId = falecido.Id,
                 JazigoId = jazigo.Id,
                 DataAutorizacao = DateTime.UtcNow,
-                SetorAutorizador = "CAAF",
+                SetorAutorizador = "CAAFE",
                 DataExecucao = DateTime.UtcNow,
                 Executor = executor,
                 Observacoes = observacoes

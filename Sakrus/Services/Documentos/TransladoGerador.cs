@@ -17,10 +17,7 @@ public class TransladoGerador : GeradorBase
     {
         new CampoDefinicao("destinoMunicipio", "Município de destino", TipoCampo.Texto, Obrigatorio: true),
         new CampoDefinicao("destinoUf", "UF de destino", TipoCampo.Texto, Obrigatorio: true),
-        new CampoDefinicao("destinoLocal", "Cemitério/endereço de destino", TipoCampo.Texto, Obrigatorio: true),
-        new CampoDefinicao("empresaExecutoraId", "Empresa executora", TipoCampo.Selecao, FonteOpcoes: "empresas"),
-        new CampoDefinicao("dataSaida", "Data de saída", TipoCampo.Data),
-        new CampoDefinicao("horaSaida", "Horário de saída", TipoCampo.Hora)
+        new CampoDefinicao("destinoLocal", "Cemitério/endereço de destino", TipoCampo.Texto, Obrigatorio: true)
     };
 
     public override async Task<byte[]> GerarAsync(ContextoEmissao ctx)
@@ -38,26 +35,6 @@ public class TransladoGerador : GeradorBase
             ("Município de destino", destinoMunicipio),
             ("UF de destino", destinoUf),
             ("Cemitério/endereço de destino", destinoLocal));
-
-        var empresaExecutoraId = ctx.Campos.GetInt("empresaExecutoraId") ?? atendimento.EmpresaExecutoraId;
-        if (empresaExecutoraId == null)
-            throw new DocumentoBloqueadoException("Translado exige empresa executora");
-
-        var empresa = await db.Funerarias.FindAsync(empresaExecutoraId.Value);
-        if (empresa == null)
-            throw new DocumentoBloqueadoException("Empresa executora não encontrada");
-
-        var dataSaida = ctx.Campos.GetData("dataSaida");
-        var horaSaida = ctx.Campos.GetHora("horaSaida");
-        if (dataSaida == null && horaSaida == null)
-            throw new DocumentoBloqueadoException("Informe a data e o horário de saída");
-
-        var pt = new System.Globalization.CultureInfo("pt-BR");
-        var dataHoraSaida = dataSaida.HasValue
-            ? dataSaida.Value.ToString("dd 'DE' MMMM 'DE' yyyy", pt).ToUpper(pt)
-            : string.Empty;
-        if (horaSaida.HasValue)
-            dataHoraSaida += (dataHoraSaida.Length > 0 ? " - " : "") + $"{horaSaida.Value.Hours:00}:{horaSaida.Value.Minutes:00} HORAS";
 
         var municipioUfDestino = string.Join(" - ", new[]
         {
@@ -119,18 +96,10 @@ public class TransladoGerador : GeradorBase
                 new (string, string?, int)[]
                 {
                     ("Cemitério/endereço de destino", string.IsNullOrWhiteSpace(destinoLocal) ? null : destinoLocal, 12)
-                },
-                new (string, string?, int)[]
-                {
-                    ("Data e hora de saída", string.IsNullOrWhiteSpace(dataHoraSaida) ? null : dataHoraSaida, 12)
-                },
-                new (string, string?, int)[]
-                {
-                    ("Funerária executora", empresa.Nome, 12)
                 });
 
             col.Declaracao(TextosPadrao.TransladoDeclaracao);
-            col.FechoModelo(ctx, "Assinatura do Responsável", "Assinatura da Funerária");
+            col.FechoComDiretoria(ctx, "Assinatura do Responsável", "Assinatura da Funerária");
         });
     }
 }

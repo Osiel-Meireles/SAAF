@@ -101,7 +101,7 @@ public class PecasAnatomicasGerador : GeradorBase
                 });
 
             col.Declaracao(TextosPadrao.PecasAnatomicasDeclaracao);
-            col.FechoModelo(ctx, "Assinatura do Responsável", "Assinatura da Funerária");
+            col.FechoComDiretoria(ctx, "Assinatura do Responsável", "Assinatura da Funerária");
         });
     }
 }

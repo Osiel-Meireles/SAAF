@@ -55,6 +55,57 @@ public record LocalCemiterial(
 
 public static class DadosComuns
 {
+    public static async Task<(Falecido Falecido, Atendimento? Atendimento, Responsavel? Responsavel, string LocalAtual)> ResolverFalecidoEOrigemAsync(ApplicationDbContext db, int entidadeId)
+    {
+        Falecido? falecido = await db.Falecidos
+            .Include(f => f.Jazigo).ThenInclude(j => j.Cemiterio)
+            .Include(f => f.Jazigo).ThenInclude(j => j.ClassificacaoEspaco)
+            .FirstOrDefaultAsync(f => f.Id == entidadeId);
+
+        Atendimento? atendimento = null;
+        if (falecido != null)
+        {
+            atendimento = await db.Atendimentos
+                .Include(a => a.Responsavel)
+                .Include(a => a.Funeraria)
+                .Include(a => a.EmpresaExecutora)
+                .FirstOrDefaultAsync(a => a.FalecidoId == falecido.Id);
+        }
+        else
+        {
+            atendimento = await db.Atendimentos
+                .Include(a => a.Responsavel)
+                .Include(a => a.Funeraria)
+                .Include(a => a.EmpresaExecutora)
+                .Include(a => a.Falecido).ThenInclude(f => f.Jazigo).ThenInclude(j => j.Cemiterio)
+                .Include(a => a.Falecido).ThenInclude(f => f.Jazigo).ThenInclude(j => j.ClassificacaoEspaco)
+                .FirstOrDefaultAsync(a => a.Id == entidadeId);
+            falecido = atendimento?.Falecido;
+        }
+
+        if (falecido == null)
+            throw new DocumentoBloqueadoException("Falecido não encontrado");
+
+        string localAtual = "Local não identificado";
+        if (falecido.Jazigo != null)
+        {
+            var gaveta = await db.Gavetas.FirstOrDefaultAsync(g => g.FalecidoId == falecido.Id);
+            localAtual = FormatarLocalJazigo(falecido.Jazigo, gaveta?.Numero);
+        }
+        else
+        {
+            var gavetaPublica = await db.GavetasPublicas.FirstOrDefaultAsync(g => g.FalecidoId == falecido.Id);
+            if (gavetaPublica != null)
+            {
+                localAtual = $"Gaveta Pública nº {gavetaPublica.NumeroGaveta} (Quadra {gavetaPublica.Quadra}, Lote {gavetaPublica.Lote})";
+            }
+        }
+
+        Responsavel? responsavel = atendimento?.Responsavel;
+
+        return (falecido, atendimento, responsavel, localAtual);
+    }
+
     public static async Task<PessoaQualificacao> ResponsavelAsync(ApplicationDbContext db, int responsavelId, string? parentesco = null)
     {
         var responsavel = await db.Responsaveis.FindAsync(responsavelId);
@@ -96,7 +147,7 @@ public static class DadosComuns
             string.IsNullOrWhiteSpace(falecido.NomePai) ? null : falecido.NomePai,
             string.IsNullOrWhiteSpace(falecido.NomeMae) ? null : falecido.NomeMae,
             string.IsNullOrWhiteSpace(falecido.Naturalidade) ? null : falecido.Naturalidade,
-            CausaMorteTexto(falecido.CausaMorte),
+            CausaMorteTexto(falecido.CausaMorte, falecido.CausaMorteDescricao),
             string.IsNullOrWhiteSpace(falecido.CartorioRegistro) ? null : falecido.CartorioRegistro,
             string.IsNullOrWhiteSpace(falecido.MunicipioCartorio) ? null : falecido.MunicipioCartorio,
             string.IsNullOrWhiteSpace(falecido.MatriculaObito) ? null : falecido.MatriculaObito,
@@ -208,8 +259,12 @@ public static class DadosComuns
         return $"{digitos[..3]}.{digitos.Substring(3, 3)}.{digitos.Substring(6, 3)}-{digitos[9..]}";
     }
 
-    public static string CausaMorteTexto(CausaMorte causa)
-        => causa switch
+    public static string CausaMorteTexto(CausaMorte causa, string? descricao = null)
+    {
+        if (!string.IsNullOrWhiteSpace(descricao))
+            return descricao;
+
+        return causa switch
         {
             CausaMorte.Natural => "Natural",
             CausaMorte.Acidente => "Acidente",
@@ -218,6 +273,7 @@ public static class DadosComuns
             CausaMorte.Desconhecida => "Desconhecida",
             _ => causa.ToString()
         };
+    }
 
     public static string TipoAtendimentoTexto(TipoAtendimentoFunerario tipo)
         => tipo switch

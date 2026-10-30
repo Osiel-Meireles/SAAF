@@ -52,6 +52,22 @@ public class DocumentoEmissaoService : IDocumentoEmissaoService
     {
         using var db = await _dbFactory.CreateDbContextAsync();
 
+        if (string.Equals(entidadeTipo, "Atendimento", StringComparison.OrdinalIgnoreCase))
+        {
+            return await db.TiposDocumento
+                .Where(t => t.Ativo && (t.EntidadeTipo == "Atendimento" || t.EntidadeTipo == "Falecido"))
+                .OrderBy(t => t.Ordem)
+                .ToListAsync();
+        }
+
+        if (string.Equals(entidadeTipo, "Jazigo", StringComparison.OrdinalIgnoreCase))
+        {
+            return await db.TiposDocumento
+                .Where(t => t.Ativo && (t.EntidadeTipo == "Jazigo" || t.EntidadeTipo == "Concessao"))
+                .OrderBy(t => t.Ordem)
+                .ToListAsync();
+        }
+
         return await db.TiposDocumento
             .Where(t => t.Ativo && t.EntidadeTipo == entidadeTipo)
             .OrderBy(t => t.Ordem)

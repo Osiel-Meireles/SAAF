@@ -32,7 +32,7 @@
                                       Label="Data do Sepultamento"
                                       Placeholder="dd/mm/aaaa"
                                       Required="true" RequiredError="Data é obrigatória"
-                                      Mask="@(new PatternMask("00/00/0000"))"
+                                      Mask="@MascaraData"
                                       HelperText="Formato: dd/mm/aaaa"
                                       Immediate="true"
                                       @onblur="ParseDataSepultamento" />
@@ -41,7 +41,7 @@
                         <MudTextField @bind-Value="horarioSepultamentoTexto"
                                       Label="Horário do Sepultamento"
                                       Placeholder="hh:mm"
-                                      Mask="@(new PatternMask("00:00"))"
+                                      Mask="@MascaraHora"
                                       HelperText="Formato: hh:mm"
                                       Immediate="true"
                                       @onblur="ParseHorarioSepultamento" />
@@ -142,6 +142,8 @@
 
 @code {
     private ApplicationDbContext DbContext = default!;
+    private static readonly PatternMask MascaraData = new("00/00/0000");
+    private static readonly PatternMask MascaraHora = new("00:00");
 
     public void Dispose()
     {

@@ -106,6 +106,9 @@
                                     </MudSelect>
                                 </MudItem>
                                 <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="novoFalecido.CausaMorteDescricao" Label="Causa Detalhada" HelperText="Ex: Acidente automobilístico" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
                                     <MudSelect T="TipoRestosMortais" Label="Tipo de Restos Mortais" @bind-Value="novoFalecido.TipoRestosMortais" Required="true">
                                         @foreach (TipoRestosMortais tipo in Enum.GetValues(typeof(TipoRestosMortais)))
                                         {

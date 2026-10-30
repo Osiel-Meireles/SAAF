@@ -20,9 +20,15 @@ public class InformacaoDisponibilidadeGerador : GeradorBase
 
     public override IReadOnlyList<CampoDefinicao> Campos => new[]
     {
-        new CampoDefinicao("falecidoId", "Falecido", TipoCampo.Selecao, Obrigatorio: true, FonteOpcoes: "falecidos"),
-        new CampoDefinicao("gavetaEscolhida", "Local do sepultamento", TipoCampo.Selecao, Obrigatorio: true, FonteOpcoes: "gavetas"),
-        new CampoDefinicao("dataSepultamento", "Data prevista do sepultamento", TipoCampo.Data),
+        new CampoDefinicao("nomeFalecido", "Nome do falecido", TipoCampo.Texto, Obrigatorio: true),
+        new CampoDefinicao("dataObito", "Data do óbito", TipoCampo.Data),
+        new CampoDefinicao("cemiterio", "Cemitério", TipoCampo.Texto, Obrigatorio: true),
+        new CampoDefinicao("municipio", "Município", TipoCampo.Texto),
+        new CampoDefinicao("quadra", "Quadra", TipoCampo.Texto),
+        new CampoDefinicao("ala", "Ala", TipoCampo.Texto),
+        new CampoDefinicao("lote", "Lote", TipoCampo.Texto),
+        new CampoDefinicao("gaveta", "Gaveta", TipoCampo.Texto),
+        new CampoDefinicao("classificacao", "Tipo/classificação de sepultura/jazigo", TipoCampo.Texto),
         new CampoDefinicao("finalidade", "Finalidade da informação", TipoCampo.Texto)
     };
 
@@ -34,16 +40,19 @@ public class InformacaoDisponibilidadeGerador : GeradorBase
         if (string.IsNullOrWhiteSpace(requerente.Nome))
             throw new DocumentoBloqueadoException("Responsável não encontrado");
 
-        var falecidoId = ctx.Campos.GetInt("falecidoId")
-            ?? throw new DocumentoBloqueadoException("Campo obrigatório não informado: Falecido");
-        var falecido = await DadosComuns.FalecidoAsync(db, falecidoId);
+        var nomeFalecido = ctx.Campos.Get("nomeFalecido");
+        Exigir(("Nome do falecido", nomeFalecido));
 
-        var chaveLocal = ctx.Campos.Get("gavetaEscolhida");
-        Exigir(("Local do sepultamento", chaveLocal));
-        var local = await GavetaSelecaoService.ResolverLocalAsync(db, chaveLocal!)
-            ?? throw new DocumentoBloqueadoException("Local do sepultamento não encontrado");
+        var cemiterio = Tr(ctx.Campos.Get("cemiterio"));
+        Exigir(("Cemitério", cemiterio));
 
-        var dataSepultamento = ctx.Campos.GetData("dataSepultamento");
+        var dataObito = ctx.Campos.GetData("dataObito");
+        var municipio = Tr(ctx.Campos.Get("municipio"));
+        var quadra = Tr(ctx.Campos.Get("quadra"));
+        var ala = Tr(ctx.Campos.Get("ala"));
+        var lote = Tr(ctx.Campos.Get("lote"));
+        var gaveta = Tr(ctx.Campos.Get("gaveta"));
+        var classificacao = Tr(ctx.Campos.Get("classificacao"));
         var finalidade = Tr(ctx.Campos.Get("finalidade"));
 
         return Pdf(ctx, "INFORMAÇÃO DE DISPONIBILIDADE E LOCALIZAÇÃO PARA SEPULTAMENTO DE DESPOJOS", col =>
@@ -59,24 +68,18 @@ public class InformacaoDisponibilidadeGerador : GeradorBase
 
             col.Secao("Dados do falecido");
             col.Campos(
-                ("Nome", falecido.Nome),
-                ("Data do óbito", falecido.DataObito?.ToString("dd/MM/yyyy")),
-                ("Local de sepultamento/gaveta", GavetaSelecaoService.DescricaoLocal(local)),
-                ("Naturalidade", falecido.Naturalidade),
-                ("Nome do pai", falecido.NomePai),
-                ("Nome da mãe", falecido.NomeMae));
+                ("Nome", nomeFalecido),
+                ("Data do óbito", dataObito?.ToString("dd/MM/yyyy")));
 
             col.Secao("Disponibilidade e localização do espaço");
             col.Campos(
-                ("Cemitério", local.Cemiterio),
-                ("Município", local.Municipio),
-                ("Quadra", local.Quadra),
-                ("Ala", local.Ala),
-                ("Lote", local.Lote),
-                ("Gaveta", local.Gaveta),
-                ("Tipo/classificação de sepultura/jazigo", local.Classificacao),
-                ("Natureza do espaço", local.Tipo == "Particular" ? "Particular" : "Pública"),
-                ("Data prevista do sepultamento", dataSepultamento?.ToString("dd/MM/yyyy")),
+                ("Cemitério", cemiterio),
+                ("Município", municipio),
+                ("Quadra", quadra),
+                ("Ala", ala),
+                ("Lote", lote),
+                ("Gaveta", gaveta),
+                ("Tipo/classificação de sepultura/jazigo", classificacao),
                 ("Finalidade da informação", finalidade));
 
             col.Paragrafo(TextosPadrao.InformacaoDisponibilidadeRequerente);

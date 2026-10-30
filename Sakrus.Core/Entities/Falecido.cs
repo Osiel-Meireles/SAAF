@@ -35,6 +35,9 @@ namespace Sakrus.Core.Entities
         // Propriedade padronizada usando o seu tipo CausaMorte
         public CausaMorte CausaMorte { get; set; }
         
+        [MaxLength(250)]
+        public string? CausaMorteDescricao { get; set; }
+        
         // Tipo dos restos mortais
         public TipoRestosMortais TipoRestosMortais { get; set; } = TipoRestosMortais.CorpoInteiro;
 

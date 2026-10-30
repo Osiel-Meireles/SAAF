@@ -291,7 +291,7 @@
 
     private async Task SelecionarGavetaNoMapa(TipoDocumento tipo, CampoDefinicao campo)
     {
-        int? responsavelFiltro = (tipo.Codigo is "15" or "17") ? null : ResponsavelId;
+        int? responsavelFiltro = tipo.Codigo is "17" ? null : ResponsavelId;
 
         var parameters = new DialogParameters
         {
@@ -337,7 +337,6 @@
         {
             using var db = await DbFactory.CreateDbContextAsync();
             opcoes = await db.Funerarias
-                .Where(f => f.Ativo && f.EhExecutora)
                 .OrderBy(f => f.Nome)
                 .ToListAsync();
             cacheEmpresas["empresas"] = opcoes;

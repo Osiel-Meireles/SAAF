@@ -92,7 +92,11 @@ public class TermoSepultamentoGerador : GeradorBase
                 });
 
             col.Declaracao(TextosPadrao.TermoSepultamentoDeclaracao);
-            col.FechoModelo(ctx, "Assinatura do Responsável", "Assinatura da Funerária");
+
+            if (local.Tipo == "Publica")
+                col.Paragrafo(TextosPadrao.GavetaPublicaDeclaracao);
+
+            col.FechoComDiretoria(ctx, "Assinatura do Responsável", "Assinatura da Funerária");
         });
     }
 }
