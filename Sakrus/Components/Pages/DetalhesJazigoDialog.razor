@@ -56,7 +56,12 @@
                 {
                     <MudItem xs="12" Class="mt-2">
                         <div class="d-flex align-center justify-space-between">
-                            <MudText Typo="Typo.subtitle1" Color="Color.Primary"><b>Proprietários / Co-usuários</b></MudText>
+                            <MudText Typo="Typo.subtitle1" Color="Color.Primary"><b>Proprietários / Pessoas Autorizadas</b></MudText>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                                       OnClick="AbrirAdicionarAutorizado">
+                                Adicionar Autorizado
+                            </MudButton>
                         </div>
                         <MudDivider Class="mb-2" />
                         <MudList T="object" Dense="true">
@@ -69,9 +74,17 @@
                                             <strong>@v.Responsavel.Nome</strong>
                                             <MudText Inline="true" Typo="Typo.caption" Color="Color.Secondary"> — @VinculoLabel(v.TipoVinculo)</MudText>
                                         </div>
-                                        <MudText Typo="Typo.caption" Color="@(v.Ativo ? Color.Success : Color.Default)">
-                                            @(v.Ativo ? "Ativo" : "Inativo")
-                                        </MudText>
+                                        <div class="d-flex align-center">
+                                            @if (v.TipoVinculo == TipoVinculoJazigo.Autorizado && titularAtivo != null)
+                                            {
+                                                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Info"
+                                                           StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                                                           OnClick="() => GerarContratoAutorizacao(v)">Contrato</MudButton>
+                                            }
+                                            <MudText Typo="Typo.caption" Color="@(v.Ativo ? Color.Success : Color.Default)">
+                                                @(v.Ativo ? "Ativo" : "Inativo")
+                                            </MudText>
+                                        </div>
                                     </div>
                                     @if (!string.IsNullOrEmpty(v.Observacao))
                                     {
@@ -122,6 +135,7 @@
         {
             <MudButton Color="Color.Success" Variant="Variant.Outlined" OnClick="AbrirDocumentos" StartIcon="@Icons.Material.Filled.FolderOpen">Doc. Titular</MudButton>
             <MudButton Color="Color.Info" Variant="Variant.Text" OnClick="GerarTermo" StartIcon="@Icons.Material.Filled.PictureAsPdf">Termo de Concessão</MudButton>
+            <MudButton Color="Color.Tertiary" Variant="Variant.Outlined" OnClick="AbrirAdicionarAutorizado" StartIcon="@Icons.Material.Filled.PersonAdd">Adicionar Autorizado</MudButton>
             <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AbrirTransferencia">Transferir Titularidade</MudButton>
         }
         else
@@ -218,6 +232,24 @@
         var pdfBytes = PdfGeneratorService.GerarTermoConcessaoPdf(jazigo, responsavelAtual, hist);
         var base64 = Convert.ToBase64String(pdfBytes);
         await JS.InvokeVoidAsync("downloadFileFromBase64", $"TermoConcessao_Jazigo_{jazigo.CodigoIdentificador}.pdf", base64);
+    }
+
+    private async Task GerarContratoAutorizacao(JazigoProprietario vinculo)
+    {
+        if (jazigo == null || titularAtivo?.Responsavel == null || vinculo.Responsavel == null) return;
+        try
+        {
+            var completo = await DbContext.Jazigos
+                .Include(j => j.Cemiterio)
+                .Include(j => j.ClassificacaoEspaco)
+                .FirstAsync(j => j.Id == JazigoId);
+            var pdf = PdfGeneratorService.GerarContratoAutorizacaoJazigoPdf(completo, titularAtivo.Responsavel, vinculo.Responsavel);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", $"ContratoAutorizacao_{vinculo.Responsavel.Nome}.pdf", Convert.ToBase64String(pdf));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao gerar contrato: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task AbrirTransferencia()
@@ -342,6 +374,7 @@
     private static string VinculoLabel(TipoVinculoJazigo v) => v switch
     {
         TipoVinculoJazigo.Titular    => "Titular",
+        TipoVinculoJazigo.Autorizado => "Pessoa Autorizada",
         TipoVinculoJazigo.CoUsuario  => "Co-usuário",
         TipoVinculoJazigo.Beneficiario => "Beneficiário",
         TipoVinculoJazigo.Herdeiro   => "Herdeiro indicado",
@@ -360,6 +393,7 @@
     private static string VinculoIcon(TipoVinculoJazigo v) => v switch
     {
         TipoVinculoJazigo.Titular    => Icons.Material.Filled.Star,
+        TipoVinculoJazigo.Autorizado => Icons.Material.Filled.VerifiedUser,
         TipoVinculoJazigo.CoUsuario  => Icons.Material.Filled.People,
         TipoVinculoJazigo.Beneficiario => Icons.Material.Filled.PersonAdd,
         TipoVinculoJazigo.Herdeiro   => Icons.Material.Filled.AccountTree,
@@ -369,8 +403,25 @@
     private static Color VinculoColor(TipoVinculoJazigo v) => v switch
     {
         TipoVinculoJazigo.Titular   => Color.Warning,
+        TipoVinculoJazigo.Autorizado => Color.Success,
         TipoVinculoJazigo.CoUsuario => Color.Info,
         _ => Color.Default
     };
-}
+    private async Task AbrirAdicionarAutorizado()
+    {
+        var parameters = new DialogParameters
+        {
+            ["JazigoId"] = JazigoId,
+            ["CodigoJazigo"] = jazigo?.CodigoIdentificador ?? string.Empty
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<VincularResponsavelDialog>("Adicionar Pessoa Autorizada / Co-usuário", parameters, options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
+            StateHasChanged();
+        }
+    }
 
+}

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using QuestPDF.Fluent;
 using Sakrus.Core.Entities;
+using Sakrus.Core.Helpers;
 using Sakrus.Infrastructure.Data;
 
 namespace Sakrus.Services.Documentos;
@@ -20,7 +22,8 @@ public class FolhaFinanceiraGerador : GeradorBase
 
     public override IReadOnlyList<CampoDefinicao> Campos => new[]
     {
-        new CampoDefinicao("gavetaRelacionada", "Gaveta relacionada", TipoCampo.Texto),
+        new CampoDefinicao("gavetaRelacionada", "Gaveta relacionada", TipoCampo.Selecao, FonteOpcoes: "gavetasJazigo",
+            Ajuda: "Opcional. Gavetas cadastradas neste jazigo."),
         new CampoDefinicao("dataBase", "Data-base (sepultamento ou compra do jazigo)", TipoCampo.Data,
             Ajuda: "O mês desta data é o mês de referência do vencimento anual. Em branco, usa a aquisição do titular.")
     };
@@ -48,56 +51,75 @@ public class FolhaFinanceiraGerador : GeradorBase
         var concessoes = FinanceiroJazigoComum.FiltrarTipo(linhas, TipoLancamento.Concessao);
         var manutencoes = FinanceiroJazigoComum.FiltrarTipo(linhas, TipoLancamento.Manutencao);
 
-        var gavetaFalecido = jazigo.Gavetas
+        var falecidos = jazigo.Gavetas
             .Where(g => g.Falecido != null)
-            .OrderBy(g => g.DataSepultamento)
-            .FirstOrDefault();
-        var falecido = gavetaFalecido?.Falecido;
+            .OrderBy(g => g.Numero)
+            .ToList();
 
-        return Pdf(ctx, "FOLHA FINANCEIRA", col =>
+        var cultura = new System.Globalization.CultureInfo("pt-BR");
+        var mesBase = cultura.TextInfo.ToUpper(dataBase.ToString("MMMM", cultura));
+
+        return Pdf(ctx, "FOLHA DE ROSTO FINANCEIRA", col =>
         {
-            col.Paragrafo(TextosPadrao.FolhaFinanceiraFinalidade);
-
-            col.Secao("Dados do concessionário");
+            col.Secao("Nome do Concessionário(a)");
+            col.Item().PaddingTop(3).Text(Tr(concessionario.Nome) ?? "—").Bold();
             col.Campos(
-                ("Nome", Tr(concessionario.Nome)),
                 ("CPF", concessionario.Cpf),
                 ("RG", concessionario.Rg),
                 ("Órgão emissor", concessionario.OrgaoEmissor),
-                ("Endereço", concessionario.Endereco),
-                ("Telefone", concessionario.Telefone));
+                ("Telefone", concessionario.Telefone),
+                ("Endereço", concessionario.Endereco));
 
-            FinanceiroJazigoComum.RenderIdentificacaoLote(col, jazigo, Tr(ctx.Campos.Get("gavetaRelacionada")));
-
-            if (falecido != null)
-            {
-                col.Secao("Falecido relacionado");
-                col.Campos(
-                    ("Nome", falecido.Nome),
-                    ("Local de sepultamento/gaveta", DadosComuns.FormatarLocalJazigo(jazigo, gavetaFalecido!.Numero)),
-                    ("Data do óbito", DadosComuns.FormatarData(falecido.DataFalecimento)));
-            }
-
-            col.Secao("Cálculo da área");
+            col.Secao("IDENTIFICAÇÃO E LOCALIZAÇÃO DO LOTE CEMITERIAL");
             col.Campos(
-                ("Largura", jazigo.Largura.HasValue ? $"{jazigo.Largura.Value.ToString("0.##")} m" : null),
-                ("Comprimento", jazigo.Comprimento.HasValue ? $"{jazigo.Comprimento.Value.ToString("0.##")} m" : null),
-                ("Área total (largura × comprimento)", DadosComuns.FormatarArea(jazigo.AreaM2)));
+                ("Quadra", jazigo.Quadra),
+                ("Ala", jazigo.Ala),
+                ("Lote", jazigo.NumeroLote),
+                ("Gaveta", Tr(ctx.Campos.Get("gavetaRelacionada"))),
+                ("Tipo de sepultura", jazigo.ModeloJazigo?.Nome),
+                ("Nº gavetas", jazigo.Gavetas.Count > 0 ? jazigo.Gavetas.Count.ToString("00") : null));
 
-            col.Secao("Data-base e mês de referência");
-            col.Campos(
-                ("Data-base", DadosComuns.FormatarData(dataBase)),
-                ("Mês de referência do vencimento anual", dataBase.ToString("MM/yyyy")));
-
-            col.Secao("Taxa de concessão");
+            var tipoRevestimento = string.Join(" - ", new[] { jazigo.ClassificacaoEspaco?.Nome, jazigo.Revestimento }
+                .Where(v => !string.IsNullOrWhiteSpace(v)));
             col.Tabela(
-                new[] { "Exercício", "Valor m²", "Área", "Valor da concessão", "Valor pago", "Saldo", "Nº documento", "Data pagamento" },
-                concessoes.Select(LinhaDe));
+                new[] { "Largura", "Comprimento", "Total m²", "Tipo jazigo / revestimento" },
+                new[]
+                {
+                    (IReadOnlyList<string>)new[]
+                    {
+                        jazigo.Largura?.ToString("0.000", cultura) ?? "—",
+                        jazigo.Comprimento?.ToString("0.000", cultura) ?? "—",
+                        jazigo.AreaM2?.ToString("0.000", cultura) ?? "—",
+                        tipoRevestimento.Length > 0 ? tipoRevestimento : "—"
+                    }
+                });
 
-            col.Secao("Taxas anuais de manutenção");
+            col.Secao("TAXA DE CONCESSÃO");
             col.Tabela(
-                new[] { "Ano", "Valor m²", "Área", "Valor manutenção", "Valor pago", "Saldo", "Nº documento", "Data pagamento" },
-                manutencoes.Select(LinhaDe));
+                new[] { "Valor m²", "Valor da concessão", "Valor pago", "Nº documento", "Data pagamento" },
+                concessoes.Select(l => (IReadOnlyList<string>)new[]
+                {
+                    DadosComuns.FormatarMoeda(l.ValorM2),
+                    DadosComuns.FormatarMoeda(l.ValorDevido),
+                    DadosComuns.FormatarMoeda(l.ValorPago),
+                    l.Documento ?? "",
+                    l.DataPagamento.HasValue ? DadosComuns.FormatarData(l.DataPagamento) : ""
+                }));
+
+            col.Item().PaddingTop(4).Text($"DATA BASE PARA VENCIMENTO: {mesBase}").Bold();
+
+            col.Secao("TAXA ANUAL MANUTENÇÃO");
+            col.Tabela(
+                new[] { "Ano", "Valor m²", "Valor manutenção", "Valor pago", "Nº documento", "Data pagamento" },
+                manutencoes.Select(l => (IReadOnlyList<string>)new[]
+                {
+                    l.Exercicio.ToString(),
+                    DadosComuns.FormatarMoeda(l.ValorM2),
+                    DadosComuns.FormatarMoeda(l.ValorDevido),
+                    l.ValorPago > 0m ? DadosComuns.FormatarMoeda(l.ValorPago) : "",
+                    l.Documento ?? "",
+                    l.DataPagamento.HasValue ? DadosComuns.FormatarData(l.DataPagamento) : ""
+                }));
 
             var totalDevido = linhas.Sum(l => l.ValorDevido);
             var totalPago = linhas.Sum(l => l.ValorPago);
@@ -110,26 +132,26 @@ public class FolhaFinanceiraGerador : GeradorBase
                 ("Saldo em aberto", DadosComuns.FormatarMoeda(totalSaldo)),
                 ("Exercícios em aberto", manutencoes.Where(l => l.EmAberto).Select(l => l.Exercicio.ToString()).DefaultIfEmpty("—").Aggregate((a, b) => $"{a}, {b}")));
 
-            col.Paragrafo("Não são calculados juros ou multas automaticamente nesta folha; eventuais acréscimos decorrem de lançamento manual.");
+            col.Secao("Falecido(s)");
+            col.Tabela(
+                new[] { "Falecido(a)", "QD", "Ala", "LT", "G", "Óbito", "Exumação" },
+                falecidos.Count == 0
+                    ? new[] { (IReadOnlyList<string>)new[] { "—", "", "", "", "", "", "" } }
+                    : falecidos.Select(g => (IReadOnlyList<string>)new[]
+                    {
+                        g.Falecido!.Nome,
+                        jazigo.Quadra ?? "",
+                        jazigo.Ala ?? "",
+                        jazigo.NumeroLote ?? "",
+                        g.Numero.ToString().PadLeft(2, '0'),
+                        DadosComuns.FormatarData(g.Falecido.DataFalecimento),
+                        DadosComuns.FormatarData(RegrasDocumentos.DataLiberacaoExumacao(g.DataSepultamento ?? g.Falecido.DataFalecimento))
+                    }));
 
             col.LocalEData(ctx);
-            col.BlocoAssinaturas("Assinatura do Responsável (Concessionário)", "Assinatura da CAAFE");
             col.AssinaturaCoordenacao(ctx);
         });
     }
-
-    private static IReadOnlyList<string> LinhaDe(LinhaFinanceira l)
-        => new[]
-        {
-            l.Exercicio.ToString(),
-            DadosComuns.FormatarMoeda(l.ValorM2),
-            DadosComuns.FormatarArea(l.AreaM2),
-            DadosComuns.FormatarMoeda(l.ValorDevido),
-            DadosComuns.FormatarMoeda(l.ValorPago),
-            DadosComuns.FormatarMoeda(l.Saldo),
-            l.Documento ?? "—",
-            DadosComuns.FormatarData(l.DataPagamento)
-        };
 
     private static string? Tr(string? valor)
         => string.IsNullOrWhiteSpace(valor) ? null : valor;

@@ -1,0 +1,137 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Sakrus.Services.Documentos
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IProtocoloService ProtocoloService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog Style="max-height: 90vh;">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.FolderShared" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Protocolos e Documentos — @ResponsavelNome</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex align-center justify-space-between mb-3">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Gerencie os protocolos e emita os documentos vinculados a este responsável.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="AbrirNovoProtocolo">
+                Novo Protocolo
+            </MudButton>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center pa-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (protocolos.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="my-3">
+                Nenhum protocolo cadastrado para este responsável. Clique em <strong>Novo Protocolo</strong> para abrir um protocolo e emitir seus documentos.
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@protocolos" Hover="true" Dense="true" Elevation="1">
+                <HeaderContent>
+                    <MudTh>Número</MudTh>
+                    <MudTh>Data</MudTh>
+                    <MudTh>Assunto</MudTh>
+                    <MudTh>Jazigo</MudTh>
+                    <MudTh>Observação</MudTh>
+                    <MudTh Style="text-align:right">Ações</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Número"><strong>@context.Numero</strong></MudTd>
+                    <MudTd DataLabel="Data">@context.DataAbertura.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+                    <MudTd DataLabel="Assunto">@context.AssuntoProtocolo.Nome</MudTd>
+                    <MudTd DataLabel="Jazigo">
+                        @(context.Jazigo != null ? context.Jazigo.CodigoIdentificador : "—")
+                    </MudTd>
+                    <MudTd DataLabel="Observação">@(string.IsNullOrEmpty(context.Observacao) ? "—" : Truncar(context.Observacao))</MudTd>
+                    <MudTd DataLabel="Ações" Style="text-align:right">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Description"
+                                   OnClick="@(() => EmitirDocumentos(context))">
+                            Emitir Documentos
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Fechar">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int ResponsavelId { get; set; }
+    [Parameter] public string ResponsavelNome { get; set; } = string.Empty;
+
+    private List<Protocolo> protocolos = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Carregar();
+    }
+
+    private async Task Carregar()
+    {
+        isLoading = true;
+        using var db = await DbFactory.CreateDbContextAsync();
+        protocolos = await db.Protocolos
+            .Include(p => p.AssuntoProtocolo)
+            .Include(p => p.Jazigo)
+            .Where(p => p.ResponsavelId == ResponsavelId)
+            .OrderByDescending(p => p.DataAbertura)
+            .ToListAsync();
+        isLoading = false;
+    }
+
+    private async Task AbrirNovoProtocolo()
+    {
+        var parameters = new DialogParameters
+        {
+            ["ResponsavelId"] = ResponsavelId
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<NovoProtocoloDialog>("Novo Protocolo", parameters, options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await Carregar();
+        }
+    }
+
+    private async Task EmitirDocumentos(Protocolo p)
+    {
+        var tipos = await ProtocoloService.DocumentosDoProtocoloAsync(p.Id);
+        var parameters = new DialogParameters
+        {
+            ["EntidadeTipo"] = "Protocolo",
+            ["EntidadeId"] = p.Id,
+            ["Descricao"] = $"Protocolo {p.Numero} — {p.AssuntoProtocolo.Nome}",
+            ["ResponsavelId"] = ResponsavelId,
+            ["Tipos"] = tipos
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<EmitirDocumentosDialog>("Emitir Documentos", parameters, options);
+    }
+
+    private static string Truncar(string texto, int max = 50)
+        => texto.Length <= max ? texto : texto[..max] + "...";
+
+    private void Fechar() => MudDialog.Close();
+}
+

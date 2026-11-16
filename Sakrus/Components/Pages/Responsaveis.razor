@@ -69,6 +69,9 @@
             <MudIconButton Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Warning"
                            Size="Size.Small" Title="Ver Documentos"
                            OnClick="@(() => OpenDocumentos(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.FolderShared" Color="Color.Tertiary"
+                           Size="Size.Small" Title="Protocolos e Documentos"
+                           OnClick="@(() => OpenProtocolos(context))" />
             <MudIconButton Icon="@Icons.Material.Filled.Description" Color="Color.Primary"
                            Size="Size.Small" Title="Emitir Documentos"
                            OnClick="@(() => AbrirEmissaoDocumentos(context))" />
@@ -770,4 +773,15 @@
             StateHasChanged();
         }
     }
+    private async Task OpenProtocolos(ResponsavelVm vm)
+    {
+        var param = new DialogParameters
+        {
+            ["ResponsavelId"] = vm.Id,
+            ["ResponsavelNome"] = vm.Nome
+        };
+        var opt = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        await DialogService.ShowAsync<ProtocolosResponsavelDialog>("Protocolos e Documentos", param, opt);
+    }
+
 }

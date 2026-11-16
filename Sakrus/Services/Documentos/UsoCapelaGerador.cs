@@ -13,6 +13,13 @@ public class UsoCapelaGerador : GeradorBase
 
     public override string Codigo => "4";
 
+    public override IReadOnlyList<CampoDefinicao> Campos => new[]
+    {
+        new CampoDefinicao("capelaNome", "Nome da capela", TipoCampo.Texto, Ajuda: "Opcional; se em branco, usa a capela agendada ou padrão."),
+        new CampoDefinicao("horaEntrada", "Data/hora de entrada", TipoCampo.Data, Ajuda: "Opcional; se em branco, usa a data do atendimento."),
+        new CampoDefinicao("horaSaida", "Data/hora de saída", TipoCampo.Data, Ajuda: "Opcional.")
+    };
+
     public override async Task<byte[]> GerarAsync(ContextoEmissao ctx)
     {
         using var db = await DbFactory.CreateDbContextAsync();
@@ -24,8 +31,19 @@ public class UsoCapelaGerador : GeradorBase
         var registro = await db.RegistrosCapela
             .Include(r => r.Capela)
             .FirstOrDefaultAsync(r => r.AtendimentoId == atendimento.Id);
-        if (registro == null)
-            throw new DocumentoBloqueadoException("Atendimento não possui registro de uso de capela");
+
+        var nomeCapela = registro?.Capela?.Nome
+            ?? Tr(ctx.Campos.Get("capelaNome"))
+            ?? (await db.Capelas.Where(c => c.Status != "Manutenção").OrderBy(c => c.Nome).Select(c => c.Nome).FirstOrDefaultAsync())
+            ?? "Capela Municipal";
+
+        var horaEntrada = registro?.HoraEntrada
+            ?? ctx.Campos.GetData("horaEntrada")
+            ?? atendimento.DataSepultamento
+            ?? ctx.DataEmissao;
+
+        var horaSaida = registro?.HoraSaida
+            ?? ctx.Campos.GetData("horaSaida");
 
         return Pdf(ctx, "TERMO DE USO DE CAPELA", col =>
         {
@@ -74,11 +92,11 @@ public class UsoCapelaGerador : GeradorBase
 
             col.TituloBloco("DADOS DA CAPELA");
             col.TabelaModelo(
-                new (string, string?, int)[] { ("Capela", registro.Capela?.Nome, 12) },
+                new (string, string?, int)[] { ("Capela", nomeCapela, 12) },
                 new (string, string?, int)[]
                 {
-                    ("Hora de entrada", registro.HoraEntrada.ToString("dd/MM/yyyy HH:mm"), 6),
-                    ("Hora de saída", registro.HoraSaida?.ToString("dd/MM/yyyy HH:mm"), 6)
+                    ("Hora de entrada", horaEntrada.ToString("dd/MM/yyyy HH:mm"), 6),
+                    ("Hora de saída", horaSaida.HasValue ? horaSaida.Value.ToString("dd/MM/yyyy HH:mm") : "—", 6)
                 });
 
             col.Declaracao(TextosPadrao.UsoCapelaDeclaracao);
@@ -89,4 +107,7 @@ public class UsoCapelaGerador : GeradorBase
             col.FechoModelo(ctx, "Assinatura do Responsável", "Assinatura da CAAFE");
         });
     }
+
+    private static string? Tr(string? valor)
+        => string.IsNullOrWhiteSpace(valor) ? null : valor;
 }

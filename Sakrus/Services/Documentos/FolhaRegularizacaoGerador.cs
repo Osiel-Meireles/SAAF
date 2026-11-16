@@ -22,7 +22,8 @@ public class FolhaRegularizacaoGerador : GeradorBase
 
     public override IReadOnlyList<CampoDefinicao> Campos => new[]
     {
-        new CampoDefinicao("gavetaRelacionada", "Gaveta relacionada", TipoCampo.Texto),
+        new CampoDefinicao("gavetaRelacionada", "Gaveta relacionada", TipoCampo.Selecao, FonteOpcoes: "gavetasJazigo",
+            Ajuda: "Opcional. Gavetas cadastradas neste jazigo."),
         new CampoDefinicao("dataBase", "Data-base (sepultamento ou compra do jazigo)", TipoCampo.Data,
             Ajuda: "Define o primeiro exercício a ser considerado. Em branco, usa a aquisição do titular."),
         new CampoDefinicao("parcelas", "Número de parcelas da concessão", TipoCampo.Numero,

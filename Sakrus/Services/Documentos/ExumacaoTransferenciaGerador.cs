@@ -22,7 +22,6 @@ public class ExumacaoTransferenciaGerador : GeradorBase
         new CampoDefinicao("destinoTipo", "Tipo de destino", TipoCampo.Texto, Obrigatorio: true, Ajuda: "Ex: Ossuário, Gaveta, Jazigo"),
         new CampoDefinicao("destinoDescricao", "Identificação/local de destino", TipoCampo.Texto, Obrigatorio: true),
         new CampoDefinicao("dataExumacao", "Data da exumação", TipoCampo.Data),
-        new CampoDefinicao("horarioExumacao", "Horário da exumação", TipoCampo.Hora),
         new CampoDefinicao("responsavelId", "Responsável / Requerente", TipoCampo.Selecao, FonteOpcoes: "responsaveis")
     };
 
@@ -49,11 +48,7 @@ public class ExumacaoTransferenciaGerador : GeradorBase
             ("Tipo de destino", destinoTipo),
             ("Identificação/local de destino", destinoDescricao));
 
-        var dataExumacao = ctx.Campos.GetData("dataExumacao") ?? ctx.DataEmissao;
-        var horaExumacao = ctx.Campos.GetHora("horarioExumacao");
-        var dataHoraExumacao = horaExumacao.HasValue
-            ? $"{dataExumacao:dd/MM/yyyy} às {horaExumacao.Value:hh\\:mm}"
-            : dataExumacao.ToString("dd/MM/yyyy");
+        var dataExumacao = (ctx.Campos.GetData("dataExumacao") ?? ctx.DataEmissao).ToString("dd/MM/yyyy");
 
         var falecidoDados = await DadosComuns.FalecidoAsync(db, falecido.Id);
 
@@ -99,7 +94,7 @@ public class ExumacaoTransferenciaGerador : GeradorBase
                 },
                 new (string, string?, int)[]
                 {
-                    ("Data e horário da exumação", dataHoraExumacao, 6),
+                    ("Data da exumação", dataExumacao, 6),
                     ("Empresa executora", empresa?.Nome, 6)
                 });
 

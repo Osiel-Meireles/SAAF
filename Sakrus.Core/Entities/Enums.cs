@@ -25,7 +25,7 @@ public enum TipoMovimentacaoEstoque { Entrada, Saida }
 /// - Beneficiario: pessoa designada pelo titular para sepultamento futuro.
 /// - Herdeiro: indicado como sucessor da titularidade (para módulo jurídico futuro).
 /// </summary>
-public enum TipoVinculoJazigo { Titular, CoUsuario, Beneficiario, Herdeiro }
+public enum TipoVinculoJazigo { Titular, CoUsuario, Beneficiario, Herdeiro, Autorizado }
 
 /// <summary>
 /// Instrumento jurídico pelo qual o responsável detém o direito sobre o jazigo.

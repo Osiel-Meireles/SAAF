@@ -395,6 +395,7 @@
     private static string VinculoLabel(TipoVinculoJazigo v) => v switch
     {
         TipoVinculoJazigo.Titular    => "Titular (responsável legal)",
+        TipoVinculoJazigo.Autorizado => "Pessoa Autorizada (gerenciar jazigo)",
         TipoVinculoJazigo.CoUsuario  => "Co-usuário",
         TipoVinculoJazigo.Beneficiario => "Beneficiário",
         TipoVinculoJazigo.Herdeiro   => "Herdeiro indicado",

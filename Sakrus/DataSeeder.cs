@@ -7,6 +7,45 @@ namespace Sakrus;
 
 public static class DataSeeder
 {
+    private static readonly (string Quadra, string Ala, int Quantidade)[] QuadrasGavetasParticulares =
+    {
+        ("05 - PAFIR", "05", 200),
+        ("05.04 - Santo Antônio", "GAV", 200),
+        ("Santa Clara", "01", 120),
+        ("Santa Clara II", "01", 100),
+        ("São Cristóvão", "01", 200)
+    };
+
+    public static async Task MoverGavetasParaParticularAsync(ApplicationDbContext context)
+    {
+        var modelo = await context.ModelosJazigos.FirstOrDefaultAsync(m => m.Nome == "Padrão");
+        if (modelo == null) return;
+
+        foreach (var (quadra, ala, qtd) in QuadrasGavetasParticulares)
+        {
+            if (await context.Jazigos.AnyAsync(j => j.Quadra == quadra)) continue;
+            if (await context.GavetasPublicas.AnyAsync(g => g.Quadra == quadra && (g.Ocupada || g.FalecidoId != null))) continue;
+
+            var antigas = await context.GavetasPublicas.Where(g => g.Quadra == quadra).ToListAsync();
+            context.GavetasPublicas.RemoveRange(antigas);
+
+            var prefixo = quadra.Replace(" ", "");
+            for (int i = 1; i <= qtd; i++)
+            {
+                context.Jazigos.Add(new Jazigo
+                {
+                    CodigoIdentificador = $"JAZ-Q{prefixo}-A{ala}-L{i:D3}",
+                    Quadra = quadra,
+                    Ala = ala,
+                    NumeroLote = i.ToString("D3"),
+                    ModeloJazigoId = modelo.Id,
+                    Ocupado = false
+                });
+            }
+            await context.SaveChangesAsync();
+        }
+    }
+
     public static async Task SeedLotesAsync(ApplicationDbContext context)
     {
         // Limpar dados anteriores de Jazigos, Gavetas e Ossuarios gerados pelo seed incorreto
@@ -182,6 +221,9 @@ public static class DataSeeder
         AddJazigos("Bela Vista", "01", 20);
         AddJazigos("Muriçoca", "01", 20);
 
+        foreach (var (quadra, ala, qtd) in QuadrasGavetasParticulares)
+            AddJazigos(quadra, ala, qtd);
+
 
         // Salvar Jazigos em Lotes
         int chunkSize = 500;
@@ -218,13 +260,8 @@ public static class DataSeeder
         AddGavetas("Jazigo Temporário Público QD 05", "01", 256);
 
         // Permanentes
-        AddGavetas("05 - PAFIR", "05", 200);
-        AddGavetas("05.04 - Santo Antônio", "GAV", 200);
         AddGavetas("Gaveta Infantil Q 01 Ala 12", "INF", 300);
-        AddGavetas("Santa Clara", "01", 120);
-        AddGavetas("Santa Clara II", "01", 100);
         AddGavetas("Santo Antônio", "01", 100);
-        AddGavetas("São Cristóvão", "01", 200);
 
         for (int i = 0; i < gavetasParaInserir.Count; i += chunkSize)
         {

@@ -117,6 +117,24 @@
                             </MudGrid>
                         }
 
+                        @if (ExigeMedidas)
+                        {
+                            <MudDivider Class="my-3" />
+                            <MudText Typo="Typo.subtitle1" Class="mb-2">Medidas do lote</MudText>
+                            <MudGrid>
+                                <MudItem xs="12" sm="4">
+                                    <MudNumericField T="decimal?" Label="Largura (m)" Format="0.##" Min="0" Step="0.1m" @bind-Value="largura" />
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudNumericField T="decimal?" Label="Comprimento (m)" Format="0.##" Min="0" Step="0.1m" @bind-Value="comprimento" />
+                                </MudItem>
+                                <MudItem xs="12" sm="4" Class="d-flex align-center">
+                                    <MudText Typo="Typo.body2" Class="mr-3">Área: @(largura > 0 && comprimento > 0 ? $"{largura * comprimento:0.00} m²" : "—")</MudText>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="SalvarMedidasAsync">Salvar medidas</MudButton>
+                                </MudItem>
+                            </MudGrid>
+                        }
+
                         @if (motivosBloqueio != null)
                         {
                             @foreach (var motivo in motivosBloqueio)
@@ -195,6 +213,9 @@
     private Dictionary<string, Dictionary<string, List<OpcaoSelecao>>> opcoesSelecaoPorTipo = new();
     private readonly Dictionary<string, List<Funeraria>> cacheEmpresas = new();
     private IReadOnlyList<string>? motivosBloqueio;
+    private decimal? largura;
+    private decimal? comprimento;
+    private bool medidasCarregadas;
     private bool isLoading = true;
     private bool ocupado;
 
@@ -217,6 +238,7 @@
             {
                 tiposSelecionados.Add(tipo);
                 await CarregarCamposTipo(tipo);
+                await CarregarMedidasAsync();
             }
         }
         else
@@ -251,6 +273,10 @@
             {
                 opcoes[campo.Chave] = await OpcoesResponsaveisAsync();
             }
+            else if (string.Equals(campo.FonteOpcoes, "gavetasJazigo", StringComparison.OrdinalIgnoreCase))
+            {
+                opcoes[campo.Chave] = await OpcoesGavetasJazigoAsync();
+            }
             else if (string.Equals(campo.FonteOpcoes, "falecidos", StringComparison.OrdinalIgnoreCase))
             {
                 opcoes[campo.Chave] = await OpcoesFalecidosAsync();
@@ -274,6 +300,55 @@
             .ToList();
     }
 
+    private async Task<List<OpcaoSelecao>> OpcoesGavetasJazigoAsync()
+    {
+        if (!string.Equals(EntidadeTipo, "Jazigo", StringComparison.OrdinalIgnoreCase))
+            return new List<OpcaoSelecao>();
+
+        using var db = await DbFactory.CreateDbContextAsync();
+        var itens = await db.Gavetas
+            .Where(g => g.JazigoId == EntidadeId)
+            .Select(g => new { g.Numero, Falecido = g.Falecido != null ? g.Falecido.Nome : null })
+            .ToListAsync();
+
+        return itens
+            .OrderBy(g => int.TryParse(g.Numero, out var n) ? n : int.MaxValue)
+            .ThenBy(g => g.Numero)
+            .Select(g => new OpcaoSelecao(g.Numero, g.Falecido == null ? $"Gaveta {g.Numero} — livre" : $"Gaveta {g.Numero} — {g.Falecido}"))
+            .ToList();
+    }
+
+    private bool ExigeMedidas => string.Equals(EntidadeTipo, "Jazigo", StringComparison.OrdinalIgnoreCase)
+        && tiposSelecionados.Any(t => t.Codigo is "19" or "20");
+
+    private async Task CarregarMedidasAsync()
+    {
+        if (!string.Equals(EntidadeTipo, "Jazigo", StringComparison.OrdinalIgnoreCase) || medidasCarregadas)
+            return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var j = await db.Jazigos.AsNoTracking().FirstOrDefaultAsync(x => x.Id == EntidadeId);
+        largura = j?.Largura;
+        comprimento = j?.Comprimento;
+        medidasCarregadas = true;
+    }
+
+    private async Task SalvarMedidasAsync()
+    {
+        if (largura is not > 0 || comprimento is not > 0)
+        {
+            Snackbar.Add("Informe largura e comprimento maiores que zero.", Severity.Warning);
+            return;
+        }
+        using var db = await DbFactory.CreateDbContextAsync();
+        var j = await db.Jazigos.FirstOrDefaultAsync(x => x.Id == EntidadeId);
+        if (j == null) return;
+        j.Largura = largura;
+        j.Comprimento = comprimento;
+        await db.SaveChangesAsync();
+        motivosBloqueio = null;
+        Snackbar.Add($"Medidas salvas. Área: {j.AreaM2:0.00} m².", Severity.Success);
+    }
+
     private async Task<List<OpcaoSelecao>> OpcoesFalecidosAsync()
     {
         using var db = await DbFactory.CreateDbContextAsync();
@@ -291,14 +366,12 @@
 
     private async Task SelecionarGavetaNoMapa(TipoDocumento tipo, CampoDefinicao campo)
     {
-        int? responsavelFiltro = tipo.Codigo is "17" ? null : ResponsavelId;
-
         var parameters = new DialogParameters
         {
             ["Titulo"] = $"Selecionar {campo.Rotulo}",
-            ["TipoLocal"] = "Ambos",
+            ["TipoLocal"] = ResponsavelId.HasValue ? "Gaveta" : "Ambos",
             ["SomenteLivres"] = true,
-            ["ResponsavelId"] = responsavelFiltro
+            ["ResponsavelId"] = ResponsavelId
         };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
         var dialog = await DialogService.ShowAsync<SelecionarLocalMapaDialog>(campo.Rotulo, parameters, options);
@@ -337,6 +410,7 @@
         {
             using var db = await DbFactory.CreateDbContextAsync();
             opcoes = await db.Funerarias
+                .Where(f => f.Ativo)
                 .OrderBy(f => f.Nome)
                 .ToListAsync();
             cacheEmpresas["empresas"] = opcoes;
@@ -357,9 +431,12 @@
     private async Task Emitir()
     {
         if (tiposSelecionados.Count == 0) return;
+        if (ExigeMedidas && largura is > 0 && comprimento is > 0)
+            await SalvarMedidasAsync();
         ocupado = true;
         motivosBloqueio = null;
         var emitidos = 0;
+        var pdfs = new List<byte[]>();
         var bloqueados = new List<string>();
         try
         {
@@ -378,8 +455,7 @@
                 try
                 {
                     var resultado = await EmissaoService.EmitirAsync(tipo.Codigo, EntidadeId, camposValores);
-                    var nomeArquivo = SanitizarNomeArquivo($"{tipo.Codigo}_{EntidadeTipo}_{EntidadeId}_v{resultado.Versao}") + ".pdf";
-                    await JSRuntime.InvokeVoidAsync("downloadFileFromBase64", nomeArquivo, Convert.ToBase64String(resultado.Pdf));
+                    pdfs.Add(resultado.Pdf);
                     emitidos++;
                 }
                 catch (DocumentoBloqueadoException ex)
@@ -387,6 +463,9 @@
                     bloqueados.Add($"{tipo.Codigo} — {tipo.Nome}: {string.Join("; ", ex.Motivos)}");
                 }
             }
+
+            if (pdfs.Count > 0)
+                await JSRuntime.InvokeVoidAsync("openPdfInNewTab", Convert.ToBase64String(PdfMerger.Mesclar(pdfs)));
 
             if (emitidos > 0)
                 Snackbar.Add(emitidos == 1 ? "Documento emitido com sucesso!" : $"{emitidos} documentos emitidos com sucesso!", Severity.Success);
@@ -415,7 +494,7 @@
                 return;
             }
             var nomeArquivo = SanitizarNomeArquivo($"{doc.TipoDocumento.Codigo}_{doc.EntidadeTipo}_{doc.EntidadeId}_v{doc.Versao}") + ".pdf";
-            await JSRuntime.InvokeVoidAsync("downloadFileFromBase64", nomeArquivo, Convert.ToBase64String(bytes));
+            await JSRuntime.InvokeVoidAsync("openPdfInNewTab", Convert.ToBase64String(bytes));
         }
         catch (Exception ex)
         {

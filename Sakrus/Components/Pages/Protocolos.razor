@@ -37,7 +37,6 @@
         <MudTh>Responsável</MudTh>
         <MudTh>Jazigo</MudTh>
         <MudTh>Observação</MudTh>
-        <MudTh>Ações</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="Número">@context.Numero</MudTd>
@@ -48,10 +47,6 @@
             @(context.JazigoId.HasValue && jazigoCodigos.TryGetValue(context.JazigoId.Value, out var codigo) ? codigo : "—")
         </MudTd>
         <MudTd DataLabel="Observação">@(string.IsNullOrEmpty(context.Observacao) ? "—" : Truncar(context.Observacao))</MudTd>
-        <MudTd DataLabel="Ações">
-            <MudIconButton Icon="@Icons.Material.Filled.Description" Color="Color.Primary" Size="Size.Small"
-                           Title="Documentos do protocolo" OnClick="@(() => AbrirEmissaoDocumentos(context))" />
-        </MudTd>
     </RowTemplate>
     <PagerContent>
         <MudTablePager />
@@ -122,18 +117,5 @@
         }
     }
 
-    private async Task AbrirEmissaoDocumentos(Protocolo p)
-    {
-        var tipos = await ProtocoloService.DocumentosDoProtocoloAsync(p.Id);
-        var parameters = new DialogParameters
-        {
-            ["EntidadeTipo"] = "Protocolo",
-            ["EntidadeId"] = p.Id,
-            ["Descricao"] = $"Protocolo {p.Numero} — {p.AssuntoProtocolo.Nome}",
-            ["ResponsavelId"] = p.ResponsavelId,
-            ["Tipos"] = tipos
-        };
-        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        await DialogService.ShowAsync<EmitirDocumentosDialog>("Emitir Documentos", parameters, options);
-    }
+
 }

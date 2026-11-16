@@ -1,0 +1,461 @@
+@page "/guia"
+@attribute [Authorize]
+
+<PageTitle>Guia do Usuário — Sakrus</PageTitle>
+
+<style>
+    .guia-fluxo { display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: 8px; }
+    .guia-etapa { flex: 1 1 150px; max-width: 190px; min-width: 150px; border-radius: 12px; padding: 12px 10px; text-align: center;
+                  border: 2px solid var(--mud-palette-primary); background: var(--mud-palette-surface); position: relative; }
+    .guia-etapa .num { width: 28px; height: 28px; line-height: 28px; border-radius: 50%; margin: 0 auto 6px; font-weight: 700;
+                       background: var(--mud-palette-primary); color: var(--mud-palette-primary-text); }
+    .guia-etapa.opcional { border-style: dashed; border-color: var(--mud-palette-secondary); }
+    .guia-etapa.opcional .num { background: var(--mud-palette-secondary); color: var(--mud-palette-secondary-text); }
+    .guia-etapa.fim { border-color: var(--mud-palette-success); }
+    .guia-etapa.fim .num { background: var(--mud-palette-success); color: var(--mud-palette-success-text); }
+    .guia-seta { display: flex; align-items: center; font-size: 1.6rem; color: var(--mud-palette-text-secondary); }
+    .guia-faixa { border-left: 6px solid var(--mud-palette-primary); border-radius: 8px; }
+    .guia-passos { margin: 0; padding-left: 1.2rem; }
+    .guia-passos li { margin-bottom: 6px; }
+    @@media (max-width: 600px) { .guia-seta { transform: rotate(90deg); width: 100%; justify-content: center; } .guia-etapa { max-width: none; } }
+</style>
+
+<div class="mb-4">
+    <MudText Typo="Typo.h4" Style="font-weight:700;">Guia do Usuário</MudText>
+    <MudText Typo="Typo.body1" Color="Color.Secondary">
+        Aprenda como o Sakrus organiza o trabalho da CAAFE e como executar cada processo, passo a passo.
+    </MudText>
+</div>
+
+@* ── 1. Antes de começar ── *@
+<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
+    <b>Regra de ouro:</b> cadastre cada informação <b>uma única vez</b>. Os dados do responsável, do falecido, do jazigo e da
+    funerária são reaproveitados automaticamente nos documentos. Por isso, o sistema <b>não pede para digitar de novo</b>
+    o que já existe — basta selecionar. Os documentos <b>só são gerados quando você clica</b> em emitir e a numeração
+    (protocolo, contrato, guia) <b>nunca muda</b> ao reimprimir.
+</MudAlert>
+
+@* ── 2. Diagrama geral ── *@
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" Class="mb-1">Visão geral: do atendimento ao arquivo</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        Siga as caixas da esquerda para a direita. Caixas com borda tracejada são etapas que só acontecem em alguns casos.
+    </MudText>
+
+    <div class="guia-fluxo">
+        <div class="guia-etapa">
+            <div class="num">1</div>
+            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2">Novo Atendimento</MudText>
+            <MudText Typo="Typo.caption">Registra o responsável e o falecido</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa">
+            <div class="num">2</div>
+            <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2">Faturamento / OS</MudText>
+            <MudText Typo="Typo.caption">Itens cobrados e número da guia</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa opcional">
+            <div class="num">3</div>
+            <MudIcon Icon="@Icons.Material.Filled.Church" Color="Color.Secondary" />
+            <MudText Typo="Typo.subtitle2">Capela</MudText>
+            <MudText Typo="Typo.caption">Velório, se houver (termo de uso ou dispensa)</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa">
+            <div class="num">4</div>
+            <MudIcon Icon="@Icons.Material.Filled.ArrowDownward" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2">Sepultamento</MudText>
+            <MudText Typo="Typo.caption">Escolhe a gaveta e registra data e hora</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa">
+            <div class="num">5</div>
+            <MudIcon Icon="@Icons.Material.Filled.Description" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2">Documentos</MudText>
+            <MudText Typo="Typo.caption">Termo e guia de sepultamento</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa opcional">
+            <div class="num">6</div>
+            <MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Color="Color.Secondary" />
+            <MudText Typo="Typo.subtitle2">Exumação</MudText>
+            <MudText Typo="Typo.caption">Possível 5 anos após o sepultamento</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa fim">
+            <div class="num">7</div>
+            <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Success" />
+            <MudText Typo="Typo.subtitle2">Relatórios</MudText>
+            <MudText Typo="Typo.caption">Acompanhamento e prestação de contas</MudText>
+        </div>
+    </div>
+
+    <MudDivider Class="my-5" />
+
+    <MudText Typo="Typo.h6" Class="mb-1">Fluxo do jazigo particular (concessão)</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        Para famílias que possuem ou desejam um lote próprio, o caminho é este:
+    </MudText>
+    <div class="guia-fluxo">
+        <div class="guia-etapa">
+            <div class="num">A</div>
+            <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2">Responsável</MudText>
+            <MudText Typo="Typo.caption">Cadastre o concessionário</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa">
+            <div class="num">B</div>
+            <MudIcon Icon="@Icons.Material.Filled.FolderShared" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2">Protocolo</MudText>
+            <MudText Typo="Typo.caption">Abra o processo (aquisição, regularização, construção)</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa">
+            <div class="num">C</div>
+            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2">Vincular ao jazigo</MudText>
+            <MudText Typo="Typo.caption">Titular do lote escolhido</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa">
+            <div class="num">D</div>
+            <MudIcon Icon="@Icons.Material.Filled.Gavel" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2">Contrato e Termo</MudText>
+            <MudText Typo="Typo.caption">Concessão do lote</MudText>
+        </div>
+        <div class="guia-seta">➜</div>
+        <div class="guia-etapa fim">
+            <div class="num">E</div>
+            <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Success" />
+            <MudText Typo="Typo.subtitle2">Folha Financeira</MudText>
+            <MudText Typo="Typo.caption">Histórico de taxas e pagamentos</MudText>
+        </div>
+    </div>
+</MudPaper>
+
+@* ── 3. Passo a passo ── *@
+<MudText Typo="Typo.h5" Class="mb-2">Como fazer cada processo</MudText>
+<MudExpansionPanels MultiExpansion="true" Class="mb-6">
+    @foreach (var p in _processos)
+    {
+        <MudExpansionPanel @key="p.Id">
+            <TitleContent>
+                <div class="d-flex align-center gap-3">
+                    <MudIcon Icon="@p.Icone" Color="Color.Primary" />
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600;">@p.Titulo</MudText>
+                </div>
+            </TitleContent>
+            <ChildContent>
+                <MudText Typo="Typo.body2" Class="mb-2"><b>Para que serve:</b> @p.Objetivo</MudText>
+                <MudText Typo="Typo.body2" Class="mb-1"><b>Onde fica:</b> @p.Onde</MudText>
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Passo a passo</MudText>
+                <ol class="guia-passos">
+                    @foreach (var passo in p.Passos)
+                    {
+                        <li><MudText Typo="Typo.body2" Inline="true">@((MarkupString)passo)</MudText></li>
+                    }
+                </ol>
+                @if (p.Dicas.Length > 0)
+                {
+                    <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-3">
+                        @foreach (var d in p.Dicas)
+                        {
+                            <div>💡 @((MarkupString)d)</div>
+                        }
+                    </MudAlert>
+                }
+                @if (!string.IsNullOrEmpty(p.Rota))
+                {
+                    <MudButton Href="@p.Rota" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Class="mt-3"
+                               EndIcon="@Icons.Material.Filled.OpenInNew">Ir para @p.Titulo</MudButton>
+                }
+            </ChildContent>
+        </MudExpansionPanel>
+    }
+</MudExpansionPanels>
+
+@* ── 4. Glossário e dúvidas ── *@
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 h-100">
+            <MudText Typo="Typo.h6" Class="mb-2">Glossário</MudText>
+            @foreach (var (termo, significado) in _glossario)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2"><b>@termo:</b> @significado</MudText>
+            }
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 h-100">
+            <MudText Typo="Typo.h6" Class="mb-2">Dúvidas frequentes</MudText>
+            <MudExpansionPanels Elevation="0" Dense="true">
+                @foreach (var (pergunta, resposta) in _faq)
+                {
+                    <MudExpansionPanel Text="@pergunta">
+                        <MudText Typo="Typo.body2">@((MarkupString)resposta)</MudText>
+                    </MudExpansionPanel>
+                }
+            </MudExpansionPanels>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private record Processo(string Id, string Titulo, string Icone, string? Rota, string Objetivo, string Onde,
+        string[] Passos, string[] Dicas);
+
+    private static readonly Processo[] _processos =
+    {
+        new("atendimento", "Registrar um novo atendimento", Icons.Material.Filled.AddCircle, "/novo-atendimento",
+            "Abrir o registro de um falecido e do seu responsável. É sempre o primeiro passo.",
+            "Menu lateral → Novo Atendimento.",
+            new[]
+            {
+                "Em <b>Dados do Responsável</b>, pesquise pelo nome ou CPF. Se a pessoa ainda não existe, clique em <b>Novo Responsável</b> e preencha o cadastro.",
+                "Informe o <b>parentesco</b> do responsável com o falecido.",
+                "Em <b>Dados do Falecido</b>, preencha nome, CPF, data do falecimento, causa da morte, nº da Declaração de Óbito e local do falecimento.",
+                "Em <b>Classificação do Atendimento</b>, escolha o <b>perfil</b>, a <b>origem/convênio</b> (ex.: Auxílio Funeral, Particular, IML) e o <b>procedimento</b> (ex.: Sepultamento, Peça Anatômica).",
+                "Se houver funerária envolvida, selecione-a em <b>Funerária Credenciada</b>.",
+                "Anexe os documentos em PDF (declaração de óbito, documentos pessoais), se tiver.",
+                "Clique em <b>Salvar Atendimento</b>."
+            },
+            new[]
+            {
+                "Falecido sem documentos? Ligue a chave <b>Modo Indigente</b>: os dados pessoais são ocultados e o sistema gera um código único.",
+                "Campos marcados como obrigatórios impedem o salvamento até serem preenchidos."
+            }),
+
+        new("acompanhar", "Acompanhar e gerenciar atendimentos", Icons.Material.Filled.Person, "/obitos",
+            "Ver todos os atendimentos, em que fase estão e executar as ações de cada um.",
+            "Menu lateral → Cadastros → Óbitos.",
+            new[]
+            {
+                "Use a busca no topo da tabela (por responsável, falecido ou OS) para localizar o atendimento.",
+                "Veja a coluna <b>Status</b>: <i>Aguardando Sepultamento</i>, <i>Sepultado</i> ou <i>Exumado</i>.",
+                "A coluna <b>Protocolo</b> mostra o número da guia/OS ou <i>Pendente</i>.",
+                "Na coluna <b>Ações</b>, passe o mouse sobre cada ícone para ver o nome: ficha do falecido, editar, faturamento/OS, guia de sepultamento, emitir documentos, documentos anexos, sepultar ou exumar."
+            },
+            new[] { "O ícone de sepultar só aparece enquanto o falecido está aguardando; o de exumar só aparece depois que ele foi sepultado." }),
+
+        new("faturamento", "Faturamento e número da guia (OS)", Icons.Material.Filled.Receipt, "/obitos",
+            "Registrar os produtos e serviços do atendimento (urna, translado, preparo etc.) e gerar o número da guia do Auxílio.",
+            "Óbitos → ícone de recibo (Faturamento/OS) na linha do atendimento.",
+            new[]
+            {
+                "Escolha a <b>categoria do item</b> e a <b>quantidade</b> (ou quilômetros, no caso de translado).",
+                "O valor total é calculado automaticamente com base nos preços da <b>Configuração Financeira</b>.",
+                "Para corrigir ou remover um item, use os ícones de editar e excluir na lista. Alguns itens pedem a senha de confirmação.",
+                "Informe o <b>nº da Guia do Auxílio (CAAFE)</b>. Se deixar em branco, o sistema gera um número sozinho.",
+                "Confirme para salvar. O número aparece na coluna Protocolo da lista de óbitos."
+            },
+            new[] { "Os preços unitários são definidos pelo administrador em Sistema → Configuração Financeira." }),
+
+        new("capela", "Capelas e velório", Icons.Material.Filled.Church, "/capelas",
+            "Cadastrar as capelas disponíveis e controlar o uso para o velório.",
+            "Menu lateral → Cadastros → Capelas. Os termos são emitidos em Óbitos → Emitir Documentos.",
+            new[]
+            {
+                "Em <b>Capelas</b>, clique em <b>Nova Capela</b> e informe o nome e a localização.",
+                "Ao atender uma família, abra <b>Emitir Documentos</b> no atendimento e gere o <b>Termo de Uso de Capela</b> ou, se não houver velório, o <b>Termo de Dispensa de Uso da Capela</b>.",
+                "A ocupação das capelas aparece no painel da página Início."
+            },
+            new[] { "Capelas só podem ser excluídas pelo ícone da lixeira; confirme antes, pois a ação não pode ser desfeita." }),
+
+        new("sepultamento", "Realizar um sepultamento", Icons.Material.Filled.ArrowDownward, "/obitos",
+            "Registrar o enterro, escolhendo a gaveta pública ou o jazigo particular onde o falecido ficará.",
+            "Óbitos → ícone de seta para baixo (Realizar Sepultamento).",
+            new[]
+            {
+                "Informe a <b>data</b> e o <b>horário</b> do sepultamento.",
+                "Escolha o <b>tipo de gaveta</b> (adulto ou infantil).",
+                "Selecione o <b>local</b> no mapa: uma gaveta pública livre ou uma gaveta de jazigo particular. O sistema só mostra gavetas particulares vinculadas ao cadastro do responsável.",
+                "Em gaveta pública, defina os <b>anos de permanência</b> (a previsão de exumação é calculada).",
+                "Confirme. O status do falecido muda para <b>Sepultado</b> e o evento aparece na Agenda."
+            },
+            new[]
+            {
+                "Se o responsável tiver mais de uma gaveta particular, o sistema <b>não escolhe sozinho</b> — você precisa selecionar.",
+                "Para visualizar quais locais estão livres, consulte o <b>Mapa do Cemitério</b> (verde = livre, vermelho = ocupado)."
+            }),
+
+        new("documentos", "Emitir documentos", Icons.Material.Filled.Description, "/obitos",
+            "Gerar em PDF os termos, guias e folhas exigidos em cada situação.",
+            "Atendimentos: Óbitos → ícone de documento. Jazigos: Jazigos → botão Documentos. Responsáveis: ícone Emitir Documentos.",
+            new[]
+            {
+                "Abra a tela <b>Emitir Documentos</b> a partir do atendimento, do jazigo ou do responsável.",
+                "Escolha o documento desejado na lista. Só aparecem os que fazem sentido para aquele caso.",
+                "Se o sistema pedir algum campo extra (ex.: gaveta relacionada, data-base), preencha. O resto já vem do cadastro.",
+                "Se faltar uma informação obrigatória, o sistema avisa exatamente qual é — volte ao cadastro, complete e tente de novo.",
+                "Gere o PDF, confira, imprima e colha as assinaturas."
+            },
+            new[]
+            {
+                "Reimprimir <b>não cria nova numeração</b>: o mesmo número é reutilizado.",
+                "O <b>Guia de Sepultamento</b> também tem atalho direto (ícone de PDF) na lista de óbitos, liberado após o sepultamento."
+            }),
+
+        new("responsavel", "Cadastrar e gerenciar responsáveis", Icons.Material.Filled.People, "/responsaveis",
+            "Manter o cadastro das pessoas que respondem pelos atendimentos e pelos jazigos.",
+            "Menu lateral → Cadastros → Responsáveis.",
+            new[]
+            {
+                "Clique para adicionar um novo responsável e preencha nome, CPF, RG, órgão emissor, endereço e telefone (campos obrigatórios).",
+                "Na lista, use os ícones da coluna Ações: ver documentos, protocolos e documentos, emitir documentos, vincular a jazigo e gerenciar falecidos vinculados.",
+                "O ícone de casa ao lado do nome indica que a pessoa é proprietária de jazigo."
+            },
+            new[] { "Procure antes de cadastrar: duplicar uma pessoa gera dados espalhados." }),
+
+        new("protocolo", "Abrir um protocolo administrativo", Icons.Material.Filled.FolderShared, "/protocolos",
+            "Dar início a processos como aquisição de lote, regularização ou autorização para construção.",
+            "Menu lateral → Operacional → Protocolos.",
+            new[]
+            {
+                "Clique em novo protocolo e selecione o <b>responsável</b>.",
+                "Escolha o <b>assunto</b> na lista (não precisa digitar).",
+                "Se o processo depender de um lote já cadastrado, selecione o <b>jazigo</b>.",
+                "Confirme a <b>data de abertura</b> e escreva uma <b>observação</b>, se necessário.",
+                "Salve. O número segue a sequência anual (ex.: 002/2026), comum a todos os assuntos.",
+                "Emita a folha inicial, a folha de despacho e os demais documentos do assunto pelo ícone de documentos do protocolo."
+            },
+            new[] { "Use o filtro de <b>Ano</b> para consultar protocolos de anos anteriores. A numeração recomeça a cada ano." }),
+
+        new("jazigo", "Jazigos, titulares e concessão", Icons.Material.Filled.AccountBalance, "/jazigos",
+            "Consultar lotes particulares, vincular o titular e emitir contrato e termo de concessão.",
+            "Menu lateral → Cadastros → Jazigos.",
+            new[]
+            {
+                "Localize o jazigo na lista (código, quadra/ala/lote, modelo, status e titular).",
+                "Se ele não tem titular, clique em <b>Vincular</b> e escolha o responsável.",
+                "Clique em <b>Detalhes</b> para ver titular, pessoas autorizadas e falecidos sepultados no local.",
+                "Nos detalhes, emita o <b>Termo de Concessão</b> e o <b>Contrato</b> de autorização de uso, adicione <b>autorizados</b> ou <b>transfira a titularidade</b>.",
+                "Se precisar dividir o lote, use <b>Desmembrar</b> (e <b>Desfazer Divisão</b> para reverter)."
+            },
+            new[] { "A transferência de titularidade mantém o histórico dos titulares anteriores." }),
+
+        new("financeira", "Folha de Rosto Financeira e regularização", Icons.Material.Filled.AttachMoney, "/jazigos",
+            "Mostrar o histórico de taxas de concessão e manutenção do jazigo particular e quanto falta pagar.",
+            "Jazigos → botão Documentos → Folha Financeira (e Folha de Regularização).",
+            new[]
+            {
+                "Confirme que o jazigo tem <b>largura e comprimento</b> cadastrados: a área em m² é a base de todos os cálculos.",
+                "Cadastre, na Configuração Financeira, o <b>valor do m²</b> de cada exercício.",
+                "Abra <b>Documentos</b> no jazigo e escolha <b>Folha Financeira</b>. Informe a <b>data-base</b> (sepultamento ou compra); o mês dela define o vencimento anual.",
+                "A folha lista a concessão e <b>uma linha por ano</b> de manutenção, desde a data-base, com valor, pagamento e saldo.",
+                "Imprima para conferência e assinatura. Para saber o custo total de regularizar o lote, emita a <b>Folha de Regularização</b>."
+            },
+            new[]
+            {
+                "Folha financeira só existe para jazigo <b>particular</b>; espaço público não tem cobrança.",
+                "O sistema <b>não calcula juros nem multa</b>. Valores de anos anteriores nunca mudam quando você cadastra um novo valor de m²."
+            }),
+
+        new("exumacao", "Exumação", Icons.Material.Filled.ArrowUpward, "/exumacoes",
+            "Retirar os restos mortais após o prazo e destiná-los a ossuário ou outro jazigo.",
+            "Gavetas públicas: Cadastros → Óbitos (ícone de seta para cima). Jazigos: Detalhes → Exumar.",
+            new[]
+            {
+                "Verifique o prazo: a exumação é permitida <b>5 anos após o sepultamento</b>. Na lista de gavetas públicas, o status aparece como <i>Em Prazo</i>, <i>Próximo</i> ou <i>Vencido</i>.",
+                "Se quiser marcar uma data futura, use <b>Agendar / Reagendar Exumação</b> e informe a data e o motivo.",
+                "No dia, clique em <b>Executar</b> e preencha data e horário, <b>data e setor autorizador</b> e o <b>executor</b> (cemitério municipal ou funerária parceira).",
+                "Informe o <b>tipo de restos mortais</b> e o <b>destino</b>: ossuário geral ou novo jazigo.",
+                "Confirme. A gaveta é liberada e o falecido passa para <b>Exumado</b>.",
+                "Emita o termo correspondente (transferência, outro cemitério ou mandado judicial) em Emitir Documentos."
+            },
+            new[] { "Consulte tudo o que já foi feito em <b>Operacional → Histórico de Exumações</b>." }),
+
+        new("ossuario", "Ossuários", Icons.Material.Filled.Inventory2, "/ossuarios",
+            "Controlar onde ficam guardados os restos mortais exumados.",
+            "Menu lateral → Cadastros → Ossuários.",
+            new[]
+            {
+                "Veja no topo o total de ossuários e a capacidade livre.",
+                "Filtre por tipo: <b>Geral</b> ou <b>Particular</b> (vinculado a um jazigo).",
+                "Use <b>Ver Detalhes</b> para consultar quem está em cada posição, e editar ou excluir quando necessário.",
+                "Ao exumar, escolha o ossuário de destino na própria tela de exumação."
+            },
+            Array.Empty<string>()),
+
+        new("funerarias", "Funerárias parceiras", Icons.Material.Filled.Store, "/funerarias",
+            "Cadastrar funerárias e empresas executoras para vinculá-las aos atendimentos.",
+            "Menu lateral → Cadastros → Funerárias Parceiras.",
+            new[]
+            {
+                "Clique em nova funerária e preencha nome, CNPJ, telefone e endereço.",
+                "Use o ícone de pasta para ver ou anexar os documentos da empresa.",
+                "No atendimento, selecione a funerária na lista de Funerária Credenciada."
+            },
+            Array.Empty<string>()),
+
+        new("estoque", "Almoxarifado / Estoque", Icons.Material.Filled.Inventory, "/estoque",
+            "Controlar produtos (urnas, materiais) e identificar os de estoque baixo.",
+            "Menu lateral → Operacional → Almoxarifado / Estoque.",
+            new[]
+            {
+                "Cadastre o produto com nome, quantidade, custo e valor de venda.",
+                "Defina o <b>estoque mínimo</b>: abaixo dele o produto aparece em alerta.",
+                "Edite a quantidade sempre que houver entrada de material."
+            },
+            Array.Empty<string>()),
+
+        new("agenda", "Agenda e painel inicial", Icons.Material.Filled.CalendarMonth, "/agenda",
+            "Ver os sepultamentos e exumações do dia e do mês.",
+            "Menu lateral → Agenda e Início.",
+            new[]
+            {
+                "Abra a <b>Agenda</b> para ver os eventos do dia, com horário, falecido e local.",
+                "Troque para a visão mensal para planejar a semana.",
+                "Na página <b>Início</b>, acompanhe indicadores como capelas ocupadas e óbitos do mês."
+            },
+            Array.Empty<string>()),
+
+        new("relatorios", "Relatórios e dashboards", Icons.Material.Filled.PictureAsPdf, "/relatorios",
+            "Gerar listagens em PDF ou TXT e acompanhar os números do cemitério.",
+            "Menu lateral → Gerencial → Relatórios e Dashboards.",
+            new[]
+            {
+                "Escolha o <b>período</b> (ou use os atalhos Últimos 30 dias / Este ano).",
+                "Clique em <b>PDF</b> ou <b>TXT</b> no relatório desejado (Atendimentos, Lotação de Jazigos e outros).",
+                "Nos <b>Dashboards</b>, acompanhe gráficos e indicadores gerenciais."
+            },
+            Array.Empty<string>()),
+
+        new("admin", "Administração (somente Admin)", Icons.Material.Filled.Settings, null,
+            "Configurar valores, usuários e acompanhar o histórico de ações do sistema.",
+            "Menu lateral → Sistema (o acesso às telas exige perfil de administrador).",
+            new[]
+            {
+                "<b>Configuração Financeira:</b> valor por m², taxas base e preços de serviços funerários (urna, translado por km, preparo etc.).",
+                "<b>Usuários:</b> criar, editar e desativar acessos.",
+                "<b>Auditoria:</b> consultar quem fez o quê e quando.",
+                "Para trocar sua senha, use o menu do usuário no canto superior direito → <b>Alterar Senha</b>."
+            },
+            new[] { "Se algum item do menu Sistema não aparece para você, seu perfil não é de administrador e as telas desse grupo ficam bloqueadas." })
+    };
+
+    private static readonly (string, string)[] _glossario =
+    {
+        ("CAAFE", "Coordenação de Administração Funerária e Atendimento à Família Enlutada."),
+        ("Concessionário / Titular", "Pessoa que detém o direito de uso de um jazigo particular."),
+        ("Gaveta pública", "Espaço do cemitério municipal usado por tempo determinado e depois liberado por exumação."),
+        ("Jazigo particular", "Lote com titular e cobrança de taxa de concessão e manutenção anual."),
+        ("Exumação", "Retirada dos restos mortais para liberar a gaveta; permitida 5 anos após o sepultamento."),
+        ("Data-base", "Data de sepultamento ou compra do jazigo; o mês dela define o vencimento anual."),
+        ("Protocolo", "Número sequencial anual que identifica um processo administrativo (ex.: 002/2026)."),
+        ("OS / Guia", "Ordem de serviço do atendimento, com número único gerado pelo sistema.")
+    };
+
+    private static readonly (string, string)[] _faq =
+    {
+        ("Errei um dado do atendimento. Como corrigir?", "Em <b>Óbitos</b>, clique no ícone de lápis (Editar) da linha."),
+        ("O documento não é gerado e aparece um aviso.", "O aviso diz qual informação falta. Complete o cadastro (responsável, falecido ou jazigo) e gere novamente."),
+        ("A gaveta particular não aparece para escolher.", "Ela só aparece se o jazigo estiver <b>vinculado</b> ao responsável. Vincule em Responsáveis ou Jazigos."),
+        ("Reimprimi um documento. O número vai mudar?", "Não. A numeração fica fixa no registro e é reaproveitada."),
+        ("Cadastrei um novo valor de m². Os anos antigos mudam?", "Não. Cada exercício preserva o valor histórico."),
+        ("Não vejo o menu Sistema.", "As telas desse grupo são exclusivas do perfil administrador.")
+    };
+}

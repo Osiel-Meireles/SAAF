@@ -32,17 +32,46 @@ function downloadFile(fileName, base64Content) {
  * Baixa um arquivo PDF em base64 para o navegador.
  * Foi movido do Obitos.razor para organizar o código (Bug B11).
  */
-function downloadFileFromBase64(fileName, base64) {
+function downloadFileFromBase64(fileName, base64, contentType) {
     try {
+        if (!contentType || contentType === 'application/pdf') {
+            openPdfInNewTab(base64);
+            return;
+        }
         var link = document.createElement('a');
         link.download = fileName;
-        link.href = 'data:application/pdf;base64,' + base64;
+        link.href = 'data:' + contentType + ';base64,' + base64;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        console.log(`Arquivo ${fileName} baixado com sucesso`);
     } catch (error) {
         console.error(`Erro ao baixar arquivo: ${error.message}`);
+    }
+}
+
+/**
+ * Abre um arquivo PDF (passado em base64) em uma nova aba do navegador,
+ * permitindo que o usuário visualize, confira e imprima sem forçar o download.
+ *
+ * @param {string} base64 - Conteúdo do PDF codificado em base64
+ */
+function openPdfInNewTab(base64) {
+    try {
+        const byteChars = atob(base64);
+        const byteNums = new Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+            byteNums[i] = byteChars.charCodeAt(i);
+        }
+        const blob = new Blob([new Uint8Array(byteNums)], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const tab = window.open(url, '_blank');
+        if (!tab) {
+            console.warn('[SAAF] Não foi possível abrir nova aba. Verifique se popups estão bloqueados.');
+        }
+        // Libera o object URL após 60 s para evitar vazamento de memória
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+        console.error(`[SAAF] Erro ao abrir PDF: ${error.message}`);
     }
 }
 
@@ -150,4 +179,3 @@ function submitLogoutForm() {
 window.addEventListener('load', () => {
     logSakrus('Sistema SAAF iniciado com sucesso', 'info');
 });
-

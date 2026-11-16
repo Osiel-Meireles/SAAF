@@ -13,6 +13,11 @@ public class AuxilioFuneralGerador : GeradorBase
 
     public override string Codigo => "6";
 
+    public override IReadOnlyList<CampoDefinicao> Campos => new[]
+    {
+        new CampoDefinicao("funerariaNome", "Funerária indicada", TipoCampo.Texto, Ajuda: "Opcional; se em branco, usa a funerária do atendimento.")
+    };
+
     public override async Task<byte[]> GerarAsync(ContextoEmissao ctx)
     {
         using var db = await DbFactory.CreateDbContextAsync();
@@ -21,19 +26,35 @@ public class AuxilioFuneralGerador : GeradorBase
         var falecido = await DadosComuns.FalecidoAsync(db, atendimento.FalecidoId);
         var responsavel = await DadosComuns.ResponsavelAsync(db, atendimento.ResponsavelId, atendimento.GrauParentesco);
 
-        if (atendimento.TipoAtendimento != TipoAtendimentoFunerario.AuxilioFuneral && atendimento.ServicosAuxilio.Count == 0)
-            throw new DocumentoBloqueadoException(
-                "O documento de Auxílio Funeral exige atendimento do tipo Auxílio Funeral ou ao menos um serviço de auxílio cadastrado");
-
         var servicos = atendimento.ServicosAuxilio
             .Select(s => s.ServicoAuxilio?.Descricao)
             .Where(d => !string.IsNullOrWhiteSpace(d))
             .Select(d => d!)
             .ToList();
 
+        if (servicos.Count == 0)
+        {
+            var servicosDb = await db.ServicosAuxilio
+                .OrderBy(s => s.Codigo)
+                .Select(s => s.Descricao)
+                .ToListAsync();
+
+            servicos = servicosDb.Count > 0
+                ? servicosDb
+                : new List<string> { "Liberação", "Urna funerária", "Preparo", "Translado" };
+        }
+
+        var nomeFuneraria = atendimento.Funeraria?.Nome
+            ?? Tr(ctx.Campos.Get("funerariaNome"))
+            ?? "A designar";
+
         return Pdf(ctx, "AUXÍLIO FUNERAL — REQUERIMENTO E ORDEM DE SERVIÇO", col =>
         {
-            col.BlocoTipoAtendimento(atendimento.TipoAtendimento, atendimento.Funeraria?.Nome);
+            col.BlocoTipoAtendimento(
+                atendimento.TipoAtendimento == TipoAtendimentoFunerario.AuxilioFuneral
+                    ? atendimento.TipoAtendimento
+                    : TipoAtendimentoFunerario.AuxilioFuneral,
+                nomeFuneraria);
 
             col.TituloBloco("DADOS DO REQUERENTE");
             col.TabelaModelo(
@@ -75,11 +96,14 @@ public class AuxilioFuneralGerador : GeradorBase
             col.TabelaModelo(
                 new (string, string?, int)[]
                 {
-                    ("Funerária", string.IsNullOrWhiteSpace(atendimento.Funeraria?.Nome) ? null : atendimento.Funeraria.Nome, 12)
+                    ("Funerária", nomeFuneraria, 12)
                 });
 
-            col.BlocoAssinaturas("Requerente", "Funerária");
+            col.BlocoAssinaturas("Requerente", $"Funerária ({nomeFuneraria})");
             col.AssinaturaCoordenacao(ctx);
         });
     }
+
+    private static string? Tr(string? valor)
+        => string.IsNullOrWhiteSpace(valor) ? null : valor;
 }

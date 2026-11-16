@@ -185,13 +185,13 @@ public static class DocumentoBlocos
             table.ColumnsDefinition(c => { c.RelativeColumn(); c.RelativeColumn(); });
             table.Cell().Padding(3).Column(c =>
             {
-                c.Item().Height(18);
+                c.Item().Height(42);
                 c.Item().LineHorizontal(0.5f);
                 c.Item().AlignCenter().Text(rotuloEsq).FontSize(8);
             });
             table.Cell().Padding(3).Column(c =>
             {
-                c.Item().Height(18);
+                c.Item().Height(42);
                 c.Item().LineHorizontal(0.5f);
                 c.Item().AlignCenter().Text(rotuloDir).FontSize(8);
             });
@@ -210,18 +210,18 @@ public static class DocumentoBlocos
             ? "Coordenador(a) do CAAFE"
             : ctx.Instituicao.CargoCoordenador;
 
-        col.Item().ShowEntire().PaddingTop(6).Row(row =>
+        col.Item().ShowEntire().PaddingTop(14).Row(row =>
         {
             row.RelativeItem().Column(c =>
             {
-                c.Item().ImageAssinaturaSAAF(26);
+                c.Item().ImageAssinaturaSAAF(85);
                 c.Item().LineHorizontal(0.5f);
                 c.Item().AlignCenter().Text(cargoPresidente).SemiBold().FontSize(8);
             });
             row.ConstantItem(16);
             row.RelativeItem().Column(c =>
             {
-                c.Item().Height(26);
+                c.Item().Height(85);
                 c.Item().LineHorizontal(0.5f);
                 c.Item().AlignCenter().Text(cargoCoordenador).SemiBold().FontSize(8);
             });
@@ -327,10 +327,10 @@ public static class DocumentoBlocos
 
             for (var i = 0; i < rotulos.Length; i += 2)
             {
-                table.Cell().Padding(8).SlotAssinatura(rotulos[i], altura);
+                table.Cell().PaddingVertical(14).PaddingHorizontal(8).SlotAssinatura(rotulos[i], altura);
 
                 if (i + 1 < rotulos.Length)
-                    table.Cell().Padding(8).SlotAssinatura(rotulos[i + 1], altura);
+                    table.Cell().PaddingVertical(14).PaddingHorizontal(8).SlotAssinatura(rotulos[i + 1], altura);
             }
         });
     }
@@ -348,7 +348,7 @@ public static class DocumentoBlocos
     private static float AlturaSlotAssinatura(params string[] rotulos)
         => AlturaSlotSemAssinatura;
 
-    private const float AlturaSlotSemAssinatura = 56;
+    private const float AlturaSlotSemAssinatura = 100;
     public const float AlturaSlotComAssinatura = 90;
 
     public static void ImageAssinaturaSAAF(this IContainer container, float altura = AlturaSlotComAssinatura)
@@ -368,12 +368,12 @@ public static class DocumentoBlocos
         {
             row.RelativeItem().Column(c =>
             {
-                c.Item().Height(56);
+                c.Item().Height(100);
                 c.Item().LineHorizontal(0.5f);
                 c.Item().AlignCenter().Text(cargo).FontSize(10);
             });
             row.ConstantItem(30);
-            row.ConstantItem(140).Height(70).Border(0.5f).Column(c =>
+            row.ConstantItem(140).Height(85).Border(0.5f).Column(c =>
             {
                 c.Item().AlignCenter().Text("Carimbo").FontSize(9);
             });
@@ -388,7 +388,7 @@ public static class DocumentoBlocos
         {
             row.RelativeItem().Column(c =>
             {
-                c.Item().ImageAssinaturaSAAF(56);
+                c.Item().ImageAssinaturaSAAF(85);
                 c.Item().LineHorizontal(0.5f);
                 c.Item().AlignCenter().Text(cargo).FontSize(10);
             });

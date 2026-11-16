@@ -25,7 +25,6 @@ public class ExumacaoJudicialGerador : GeradorBase
         new CampoDefinicao("destinoDeterminado", "Destino determinado dos restos mortais", TipoCampo.Texto, Obrigatorio: true, Ajuda: "Ex: Órgão pericial, outro cemitério, etc."),
         new CampoDefinicao("empresaExecutoraId", "Empresa ou entidade executora", TipoCampo.Selecao, Obrigatorio: true, FonteOpcoes: "empresas"),
         new CampoDefinicao("dataExumacao", "Data da exumação", TipoCampo.Data),
-        new CampoDefinicao("horarioExumacao", "Horário da exumação", TipoCampo.Hora),
         new CampoDefinicao("responsavelId", "Responsável / Acompanhante", TipoCampo.Selecao, FonteOpcoes: "responsaveis")
     };
 
@@ -57,11 +56,7 @@ public class ExumacaoJudicialGerador : GeradorBase
             ("Empresa ou entidade executora", empresa?.Nome));
 
         var dataDecisao = ctx.Campos.GetData("dataDecisao");
-        var dataExumacao = ctx.Campos.GetData("dataExumacao") ?? ctx.DataEmissao;
-        var horaExumacao = ctx.Campos.GetHora("horarioExumacao");
-        var dataHoraExumacao = horaExumacao.HasValue
-            ? $"{dataExumacao:dd/MM/yyyy} às {horaExumacao.Value:hh\\:mm}"
-            : dataExumacao.ToString("dd/MM/yyyy");
+        var dataExumacao = (ctx.Campos.GetData("dataExumacao") ?? ctx.DataEmissao).ToString("dd/MM/yyyy");
 
         var falecidoDados = await DadosComuns.FalecidoAsync(db, falecido.Id);
 
@@ -111,7 +106,7 @@ public class ExumacaoJudicialGerador : GeradorBase
                 },
                 new (string, string?, int)[]
                 {
-                    ("Data e horário da exumação", dataHoraExumacao, 6),
+                    ("Data da exumação", dataExumacao, 6),
                     ("Empresa / Entidade executora", empresa?.Nome, 6)
                 });
 

@@ -65,6 +65,7 @@
 
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int? ResponsavelId { get; set; }
 
     private MudForm form = null!;
     private bool formValido;
@@ -80,6 +81,10 @@
     {
         dataAbertura = DateTime.Today;
         using var db = await DbFactory.CreateDbContextAsync();
+        if (ResponsavelId.HasValue)
+        {
+            responsavel = await db.Responsaveis.FindAsync(ResponsavelId.Value);
+        }
         assuntos = await db.AssuntosProtocolo
             .Where(a => a.Ativo)
             .OrderBy(a => a.Nome)

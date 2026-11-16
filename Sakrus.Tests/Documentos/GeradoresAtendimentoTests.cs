@@ -171,15 +171,13 @@ public class GeradoresAtendimentoTests
     }
 
     [Fact]
-    public async Task UsoCapela_SemRegistro_Bloqueia()
+    public async Task UsoCapela_SemRegistro_GeraPdf_ComFallback()
     {
         var (factory, atendimentoId, instituicao) = await CriarBaseAsync("uso-capela", comRegistroCapela: false);
         var gerador = new UsoCapelaGerador(factory);
 
-        var ex = await Assert.ThrowsAsync<DocumentoBloqueadoException>(
-            () => gerador.GerarAsync(CriarContexto(atendimentoId, instituicao)));
-
-        Assert.Contains("capela", ex.Message, StringComparison.OrdinalIgnoreCase);
+        var pdf = await gerador.GerarAsync(CriarContexto(atendimentoId, instituicao));
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
     }
 
     // ── Documento 5: Termo de Dispensa de Uso da Capela ──────────────────────
@@ -230,7 +228,7 @@ public class GeradoresAtendimentoTests
     }
 
     [Fact]
-    public async Task AuxilioFuneral_TipoErradoSemServicos_Bloqueia()
+    public async Task AuxilioFuneral_TipoErradoSemServicos_GeraPdfComServicosPadrao()
     {
         var (factory, atendimentoId, instituicao) = await CriarBaseAsync(
             "auxilio-funeral",
@@ -238,10 +236,8 @@ public class GeradoresAtendimentoTests
             tipoAtendimento: TipoAtendimentoFunerario.Particular);
         var gerador = new AuxilioFuneralGerador(factory);
 
-        var ex = await Assert.ThrowsAsync<DocumentoBloqueadoException>(
-            () => gerador.GerarAsync(CriarContexto(atendimentoId, instituicao)));
-
-        Assert.Contains("Auxílio Funeral", ex.Message);
+        var pdf = await gerador.GerarAsync(CriarContexto(atendimentoId, instituicao));
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
     }
 
     // ── Extração simples de texto de PDF (melhor esforço) ────────────────────
