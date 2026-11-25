@@ -45,7 +45,7 @@ public class FolhaRegularizacaoGerador : GeradorBase
         var linhas = await FinanceiroJazigoComum.MontarLancamentosAsync(db, jazigo, dataBase, ctx.DataEmissao);
 
         var area = jazigo.AreaM2;
-        var valorM2Concessao = await FinanceiroJazigoComum.ObterValorM2Async(db, dataBase.Year);
+        var valorM2Concessao = await FinanceiroJazigoComum.ObterValorConcessaoM2Async(db, jazigo);
         var taxaConcessao = area.HasValue
             ? RegrasDocumentos.CalcularValor(area.Value, valorM2Concessao)
             : linhas.Where(l => l.Tipo == TipoLancamento.Concessao).Sum(l => l.ValorDevido);
@@ -112,7 +112,7 @@ public class FolhaRegularizacaoGerador : GeradorBase
             else
             {
                 col.Tabela(
-                    new[] { "Ano", "Área do lote", "Valor do m²", "Valor da manutenção" },
+                    new[] { "Ano", "Área do lote", "Valor da manutenção", "Valor devido" },
                     manutencoes.Select(l => (IReadOnlyList<string>)new[]
                     {
                         l.Exercicio.ToString(),
@@ -136,7 +136,7 @@ public class FolhaRegularizacaoGerador : GeradorBase
                 });
             });
 
-            col.Paragrafo("Os valores por metro quadrado são aqueles cadastrados para cada exercício; o cadastro de um novo valor não altera os exercícios anteriores.");
+            col.Paragrafo("A taxa de manutenção de cada exercício em aberto usa o valor vigente do tipo de jazigo, sem juros ou multa. Exercícios já quitados preservam o valor registrado no pagamento.");
 
             col.LocalEData(ctx);
             col.BlocoAssinaturas("Assinatura do Responsável (Concessionário)", "Assinatura da CAAFE");

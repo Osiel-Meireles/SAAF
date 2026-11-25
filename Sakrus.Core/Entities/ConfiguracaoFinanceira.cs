@@ -17,6 +17,14 @@ public class ConfiguracaoFinanceira
     [Range(0, double.MaxValue, ErrorMessage = "Valor deve ser positivo")]
     public decimal TaxaConcessaoBase { get; set; }
 
+    /// <summary>Valor do m² da concessão para as quadras 01 e 02.</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Valor deve ser positivo")]
+    public decimal ValorConcessaoM2Quadras0102 { get; set; } = 276.66m;
+
+    /// <summary>Valor do m² da concessão para as demais quadras.</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Valor deve ser positivo")]
+    public decimal ValorConcessaoM2Demais { get; set; } = 366.55m;
+
     // ─── Tabela de Preços de Serviços Funerários ──────────────
     [Range(0, double.MaxValue, ErrorMessage = "Valor deve ser positivo")]
     public decimal PrecoUrnaBasica { get; set; } = 450.00m;

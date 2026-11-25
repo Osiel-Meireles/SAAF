@@ -189,6 +189,7 @@ using (var scope = app.Services.CreateScope())
             // Seed dos lotes baseados no PDF
             await DataSeeder.SeedLotesAsync(db);
             await DataSeeder.MoverGavetasParaParticularAsync(db);
+            await DataSeeder.SeedGavetaPublica0601Async(db);
 
             logger.LogInformation("Banco de dados pronto.");
             break;

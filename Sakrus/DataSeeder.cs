@@ -46,6 +46,34 @@ public static class DataSeeder
         }
     }
 
+    /// <summary>
+    /// Garante a gaveta pública 06.01 com 500 gavetas numeradas de 1 a 500.
+    /// Idempotente: não recria nem apaga gavetas já existentes nessa quadra.
+    /// </summary>
+    public static async Task SeedGavetaPublica0601Async(ApplicationDbContext context)
+    {
+        const string quadra = "06.01";
+
+        if (await context.GavetasPublicas.AnyAsync(g => g.Quadra == quadra))
+            return;
+
+        var gavetas = new List<GavetaPublica>(500);
+        for (int i = 1; i <= 500; i++)
+        {
+            gavetas.Add(new GavetaPublica
+            {
+                Quadra = quadra,
+                Setor = "01",
+                Lote = i.ToString(),
+                NumeroGaveta = i.ToString(),
+                Ocupada = false
+            });
+        }
+
+        context.GavetasPublicas.AddRange(gavetas);
+        await context.SaveChangesAsync();
+    }
+
     public static async Task SeedLotesAsync(ApplicationDbContext context)
     {
         // Limpar dados anteriores de Jazigos, Gavetas e Ossuarios gerados pelo seed incorreto

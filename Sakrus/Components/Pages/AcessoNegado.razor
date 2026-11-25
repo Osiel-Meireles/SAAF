@@ -1,0 +1,21 @@
+@page "/acesso-negado"
+@attribute [AllowAnonymous]
+
+<PageTitle>Acesso Restrito — SAAF</PageTitle>
+
+<div class="d-flex flex-column align-center justify-center" style="min-height: 60vh;">
+    <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Color="Color.Warning" Class="mb-4" Style="font-size: 4rem; opacity: 0.7;" />
+    <MudText Typo="Typo.h4" Class="mb-2" Style="font-weight: 700;">Acesso restrito</MudText>
+    <MudText Typo="Typo.body1" Align="Align.Center" Style="color: var(--mud-palette-text-secondary);" Class="mb-4">
+        Seu nível de acesso não permite abrir esta página.<br />
+        Se precisar deste recurso, solicite a liberação a um administrador.
+    </MudText>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" StartIcon="@Icons.Material.Filled.Home">
+            Voltar ao Início
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" Href="/guia" StartIcon="@Icons.Material.Filled.MenuBook">
+            Guia do Usuário
+        </MudButton>
+    </div>
+</div>

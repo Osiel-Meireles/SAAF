@@ -217,7 +217,7 @@
             {
                 "Em <b>Dados do Responsável</b>, pesquise pelo nome ou CPF. Se a pessoa ainda não existe, clique em <b>Novo Responsável</b> e preencha o cadastro.",
                 "Informe o <b>parentesco</b> do responsável com o falecido.",
-                "Em <b>Dados do Falecido</b>, preencha nome, CPF, data do falecimento, causa da morte, nº da Declaração de Óbito e local do falecimento.",
+                "Em <b>Dados do Falecido</b>, preencha nome, data do falecimento, causa da morte, nº da Declaração de Óbito e local do falecimento. O <b>CPF é opcional</b>: deixe em branco em natimortos e em sepultamentos antigos que não tinham o documento.",
                 "Em <b>Classificação do Atendimento</b>, escolha o <b>perfil</b>, a <b>origem/convênio</b> (ex.: Auxílio Funeral, Particular, IML) e o <b>procedimento</b> (ex.: Sepultamento, Peça Anatômica).",
                 "Se houver funerária envolvida, selecione-a em <b>Funerária Credenciada</b>.",
                 "Anexe os documentos em PDF (declaração de óbito, documentos pessoais), se tiver.",
@@ -226,6 +226,7 @@
             new[]
             {
                 "Falecido sem documentos? Ligue a chave <b>Modo Indigente</b>: os dados pessoais são ocultados e o sistema gera um código único.",
+                "CPF do falecido em branco não bloqueia o salvamento; se for preenchido, o sistema confere os dígitos.",
                 "Campos marcados como obrigatórios impedem o salvamento até serem preenchidos."
             }),
 
@@ -279,7 +280,8 @@
             new[]
             {
                 "Se o responsável tiver mais de uma gaveta particular, o sistema <b>não escolhe sozinho</b> — você precisa selecionar.",
-                "Para visualizar quais locais estão livres, consulte o <b>Mapa do Cemitério</b> (verde = livre, vermelho = ocupado)."
+                "Para visualizar quais locais estão livres, consulte o <b>Mapa do Cemitério</b> (verde = livre, vermelho = ocupado).",
+                "A quadra pública <b>06.01</b> está cadastrada com 500 gavetas numeradas de 1 a 500."
             }),
 
         new("documentos", "Emitir documentos", Icons.Material.Filled.Description, "/obitos",
@@ -304,7 +306,8 @@
             "Menu lateral → Cadastros → Responsáveis.",
             new[]
             {
-                "Clique para adicionar um novo responsável e preencha nome, CPF, RG, órgão emissor, endereço e telefone (campos obrigatórios).",
+                "Clique para adicionar um novo responsável e preencha nome, CPF, RG, órgão emissor, endereço e telefone (campos obrigatórios). A criação <b>não pede senha</b> de confirmação.",
+                "A senha de confirmação é solicitada apenas ao <b>editar</b> um responsável já cadastrado.",
                 "Na lista, use os ícones da coluna Ações: ver documentos, protocolos e documentos, emitir documentos, vincular a jazigo e gerenciar falecidos vinculados.",
                 "O ícone de casa ao lado do nome indica que a pessoa é proprietária de jazigo."
             },
@@ -332,26 +335,30 @@
                 "Localize o jazigo na lista (código, quadra/ala/lote, modelo, status e titular).",
                 "Se ele não tem titular, clique em <b>Vincular</b> e escolha o responsável.",
                 "Clique em <b>Detalhes</b> para ver titular, pessoas autorizadas e falecidos sepultados no local.",
+                "Em <b>Detalhes</b>, use <b>Editar dados do jazigo</b> para informar o <b>tipo de jazigo</b>, a <b>quantidade de gavetas</b>, quantas serão de <b>ossuário</b>, a <b>largura</b> e o <b>comprimento</b>. A área total em m² é calculada na hora e é a base do cálculo da concessão.",
                 "Nos detalhes, emita o <b>Termo de Concessão</b> e o <b>Contrato</b> de autorização de uso, adicione <b>autorizados</b> ou <b>transfira a titularidade</b>.",
                 "Se precisar dividir o lote, use <b>Desmembrar</b> (e <b>Desfazer Divisão</b> para reverter)."
             },
-            new[] { "A transferência de titularidade mantém o histórico dos titulares anteriores." }),
+            new[] { "A transferência de titularidade mantém o histórico dos titulares anteriores.", "As gavetas de ossuário não podem exceder a quantidade total de gavetas do jazigo." }),
 
         new("financeira", "Folha de Rosto Financeira e regularização", Icons.Material.Filled.AttachMoney, "/jazigos",
             "Mostrar o histórico de taxas de concessão e manutenção do jazigo particular e quanto falta pagar.",
-            "Jazigos → botão Documentos → Folha Financeira (e Folha de Regularização).",
+            "Jazigos → botão Documentos → Folha Financeira (e Folha de Regularização). Os pagamentos são registrados em Jazigos → Detalhes → Financeiro.",
             new[]
             {
-                "Confirme que o jazigo tem <b>largura e comprimento</b> cadastrados: a área em m² é a base de todos os cálculos.",
-                "Cadastre, na Configuração Financeira, o <b>valor do m²</b> de cada exercício.",
+                "Confirme que o jazigo tem <b>largura e comprimento</b> cadastrados (Detalhes → Editar dados do jazigo): a área total em m² é a base do cálculo da concessão.",
+                "Confirme o <b>tipo de jazigo</b>: ele define o valor anual da manutenção.",
+                "Em <b>Configuração Financeira</b> (Admin), mantenha o valor do m² da concessão das <b>quadras 01 e 02</b> e das <b>demais quadras</b>, e o valor anual de manutenção de cada tipo de jazigo.",
                 "Abra <b>Documentos</b> no jazigo e escolha <b>Folha Financeira</b>. Informe a <b>data-base</b> (sepultamento ou compra); o mês dela define o vencimento anual.",
                 "A folha lista a concessão e <b>uma linha por ano</b> de manutenção, desde a data-base, com valor, pagamento e saldo.",
+                "Para registrar um pagamento, abra <b>Detalhes</b> do jazigo → seção <b>Financeiro</b>, clique em <b>Pagar</b> na linha do exercício e informe valor, data e nº do comprovante.",
                 "Imprima para conferência e assinatura. Para saber o custo total de regularizar o lote, emita a <b>Folha de Regularização</b>."
             },
             new[]
             {
                 "Folha financeira só existe para jazigo <b>particular</b>; espaço público não tem cobrança.",
-                "O sistema <b>não calcula juros nem multa</b>. Valores de anos anteriores nunca mudam quando você cadastra um novo valor de m²."
+                "O sistema <b>não calcula juros nem multa</b>. Exercício em aberto usa o valor vigente do tipo de jazigo (se a manutenção era 28 e hoje é 31, o ano em aberto passa a 31); exercício já quitado preserva o valor registrado no pagamento.",
+                "Concessão = área total × valor do m² da quadra: <b>276,66</b> para quadras 01 e 02 e <b>366,55</b> para as demais. Vale também para jazigo infantil, não para gaveta pública."
             }),
 
         new("exumacao", "Exumação", Icons.Material.Filled.ArrowUpward, "/exumacoes",
@@ -429,12 +436,12 @@
             "Menu lateral → Sistema (o acesso às telas exige perfil de administrador).",
             new[]
             {
-                "<b>Configuração Financeira:</b> valor por m², taxas base e preços de serviços funerários (urna, translado por km, preparo etc.).",
+                "<b>Configuração Financeira:</b> valor do m² da concessão para quadras 01 e 02 e para as demais quadras, valor anual de manutenção por tipo de jazigo, taxas base e preços de serviços funerários (urna, translado por km, preparo etc.).",
                 "<b>Usuários:</b> criar, editar e desativar acessos.",
                 "<b>Auditoria:</b> consultar quem fez o quê e quando.",
                 "Para trocar sua senha, use o menu do usuário no canto superior direito → <b>Alterar Senha</b>."
             },
-            new[] { "Se algum item do menu Sistema não aparece para você, seu perfil não é de administrador e as telas desse grupo ficam bloqueadas." })
+            new[] { "Se algum item do menu Sistema não aparece para você, seu perfil não é de administrador. Ao abrir uma tela restrita por link direto, o sistema mostra a página <b>Acesso restrito</b> e mantém você conectado." })
     };
 
     private static readonly (string, string)[] _glossario =
@@ -442,6 +449,7 @@
         ("CAAFE", "Coordenação de Administração Funerária e Atendimento à Família Enlutada."),
         ("Concessionário / Titular", "Pessoa que detém o direito de uso de um jazigo particular."),
         ("Gaveta pública", "Espaço do cemitério municipal usado por tempo determinado e depois liberado por exumação."),
+        ("Gaveta de ossuário", "Gaveta do jazigo destinada a guardar restos mortais após a exumação."),
         ("Jazigo particular", "Lote com titular e cobrança de taxa de concessão e manutenção anual."),
         ("Exumação", "Retirada dos restos mortais para liberar a gaveta; permitida 5 anos após o sepultamento."),
         ("Data-base", "Data de sepultamento ou compra do jazigo; o mês dela define o vencimento anual."),
@@ -455,7 +463,9 @@
         ("O documento não é gerado e aparece um aviso.", "O aviso diz qual informação falta. Complete o cadastro (responsável, falecido ou jazigo) e gere novamente."),
         ("A gaveta particular não aparece para escolher.", "Ela só aparece se o jazigo estiver <b>vinculado</b> ao responsável. Vincule em Responsáveis ou Jazigos."),
         ("Reimprimi um documento. O número vai mudar?", "Não. A numeração fica fixa no registro e é reaproveitada."),
-        ("Cadastrei um novo valor de m². Os anos antigos mudam?", "Não. Cada exercício preserva o valor histórico."),
+        ("Mudei o valor do m² da concessão. O que já foi pago muda?", "Não. O pagamento registrado preserva o valor pago; apenas o saldo em aberto é recalculado."),
+        ("Mudei o valor da manutenção. Os anos em aberto mudam?", "Sim. Exercício em aberto passa a valer o valor vigente do tipo de jazigo, sem juros. Exercício já pago preserva o valor registrado no pagamento."),
+        ("Tentei abrir uma tela de administrador e apareceu 'Acesso restrito'. Fui desconectado?", "Não. A sessão continua ativa; apenas a tela é bloqueada. Peça a liberação a um administrador ou volte ao Início."),
         ("Não vejo o menu Sistema.", "As telas desse grupo são exclusivas do perfil administrador.")
     };
 }

@@ -110,7 +110,7 @@ public class FolhaFinanceiraGerador : GeradorBase
 
             col.Secao("TAXA ANUAL MANUTENÇÃO");
             col.Tabela(
-                new[] { "Ano", "Valor m²", "Valor manutenção", "Valor pago", "Nº documento", "Data pagamento" },
+                new[] { "Ano", "Valor unitário", "Valor manutenção", "Valor pago", "Nº documento", "Data pagamento" },
                 manutencoes.Select(l => (IReadOnlyList<string>)new[]
                 {
                     l.Exercicio.ToString(),

@@ -1,8 +1,18 @@
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
 
 @code {
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        var state = await AuthState.GetAuthenticationStateAsync();
+
+        // Usuário autenticado sem permissão para a página: acesso restrito, sem deslogar.
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/acesso-negado");
+            return;
+        }
+
         // Redireciona para o login preservando a URL original como returnUrl
         var uri = Navigation.Uri;
         var returnUrl = Uri.EscapeDataString(new Uri(uri).PathAndQuery);

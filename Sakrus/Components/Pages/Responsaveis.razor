@@ -450,16 +450,19 @@
             return;
         }
 
-        // 2FA
-        var param2FA = new DialogParameters
+        // 2FA — exigido apenas na edição; a criação é liberada sem confirmação de senha
+        if (isEditing)
         {
-            ["TituloOperacao"] = isEditing ? "Editar Responsável" : "Criar Responsável",
-            ["MensagemConfirmacao"] = $"Você está prestes a {(isEditing ? "editar" : "criar")} o responsável '{currentResp.Nome}'. Confirme sua identidade."
-        };
-        var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
-        var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
-        var res2FA = await dlg2FA.Result;
-        if (res2FA == null || res2FA.Canceled) return;
+            var param2FA = new DialogParameters
+            {
+                ["TituloOperacao"] = "Editar Responsável",
+                ["MensagemConfirmacao"] = $"Você está prestes a editar o responsável '{currentResp.Nome}'. Confirme sua identidade."
+            };
+            var opt2FA = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+            var dlg2FA = await DialogService.ShowAsync<ConfirmacaoSenhaDialog>("Confirmação de Segurança", param2FA, opt2FA);
+            var res2FA = await dlg2FA.Result;
+            if (res2FA == null || res2FA.Canceled) return;
+        }
 
         isSaving = true;
         StateHasChanged();

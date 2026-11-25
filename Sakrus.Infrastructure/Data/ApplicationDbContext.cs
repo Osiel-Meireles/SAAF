@@ -70,6 +70,8 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.ValorMetroQuadrado).HasPrecision(10, 2);
         modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.TaxaManutencaoBase).HasPrecision(10, 2);
         modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.TaxaConcessaoBase).HasPrecision(10, 2);
+        modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.ValorConcessaoM2Quadras0102).HasPrecision(10, 2);
+        modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.ValorConcessaoM2Demais).HasPrecision(10, 2);
         modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.PrecoUrnaBasica).HasPrecision(10, 2);
         modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.PrecoUrnaEspecial).HasPrecision(10, 2);
         modelBuilder.Entity<ConfiguracaoFinanceira>().Property(c => c.PrecoTransladoPorKm).HasPrecision(10, 4);
@@ -78,6 +80,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<ModeloJazigo>().Property(m => m.PercentualConcessao).HasPrecision(5, 2);
         modelBuilder.Entity<ModeloJazigo>().Property(m => m.PercentualManutencao).HasPrecision(5, 2);
         modelBuilder.Entity<ModeloJazigo>().Property(m => m.TaxaConstrucao).HasPrecision(10, 2);
+        modelBuilder.Entity<ModeloJazigo>().Property(m => m.ValorManutencaoAnual).HasPrecision(10, 2);
         
         // Precisão Estoque
         modelBuilder.Entity<ProdutoEstoque>().Property(p => p.Custo).HasPrecision(10, 2);

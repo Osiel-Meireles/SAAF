@@ -111,6 +111,52 @@
                         </MudList>
                     </MudItem>
                 }
+
+                @* Financeiro *@
+                <MudItem xs="12">
+                    <div class="d-flex align-center justify-space-between mt-2">
+                        <MudText Typo="Typo.subtitle1" Color="Color.Primary"><b>Financeiro</b></MudText>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Edit" OnClick="AbrirEdicaoJazigo">
+                            Editar dados do jazigo
+                        </MudButton>
+                    </div>
+                    <MudDivider Class="mb-2" />
+                    @if (linhasFinanceiras.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Nenhum lançamento financeiro calculado.</MudText>
+                    }
+                    else
+                    {
+                        <MudTable Items="linhasFinanceiras" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Exercício</MudTh>
+                                <MudTh>Tipo</MudTh>
+                                <MudTh>Devido</MudTh>
+                                <MudTh>Pago</MudTh>
+                                <MudTh>Saldo</MudTh>
+                                <MudTh>Comprovante</MudTh>
+                                <MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Exercício">@context.Exercicio</MudTd>
+                                <MudTd DataLabel="Tipo">@(context.Tipo == TipoLancamento.Concessao ? "Concessão" : "Manutenção")</MudTd>
+                                <MudTd DataLabel="Devido">@context.ValorDevido.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Pago">@context.ValorPago.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Saldo">@context.Saldo.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Comprovante">@(context.Documento ?? "—")</MudTd>
+                                <MudTd>
+                                    @if (context.EmAberto)
+                                    {
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Success"
+                                                   StartIcon="@Icons.Material.Filled.Payments"
+                                                   OnClick="() => AbrirPagamento(context)">Pagar</MudButton>
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudItem>
             </MudGrid>
         }
     </DialogContent>
@@ -162,11 +208,13 @@
     private Responsavel? responsavelAtual => titularAtivo?.Responsavel ?? responsavelLegado;
     private List<JazigoProprietario> vinculos = new(); // todos os vínculos ativos
     private List<Falecido> falecidos = new();
+    private List<Sakrus.Services.Documentos.LinhaFinanceira> linhasFinanceiras = new();
     private bool podeDesmembrar = false;
     private bool temSubLotes = false;
 
     protected override async Task OnInitializedAsync()
     {
+        DbContext?.Dispose();
         DbContext = DbFactory.CreateDbContext();
         jazigo = await DbContext.Jazigos
             .Include(j => j.ModeloJazigo)
@@ -215,10 +263,66 @@
 
             temSubLotes = await DbContext.Jazigos.AnyAsync(j => j.JazigoPaiId == JazigoId);
             podeDesmembrar = jazigo.JazigoPaiId == null && !jazigo.Ocupado;
+
+            linhasFinanceiras = (await Sakrus.Services.Documentos.FinanceiroJazigoComum
+                .MontarLancamentosAsync(DbContext, jazigo, ResolverDataBaseFinanceira(), DateTime.UtcNow))
+                .ToList();
         }
     }
 
+    private DateTime ResolverDataBaseFinanceira()
+    {
+        if (titularAtivo != null && titularAtivo.DataAquisicao != default)
+            return titularAtivo.DataAquisicao;
+
+        var sepultamento = falecidos
+            .Where(f => f.DataSepultamento.HasValue)
+            .Select(f => f.DataSepultamento!.Value)
+            .DefaultIfEmpty()
+            .Min();
+
+        return sepultamento != default ? sepultamento : DateTime.UtcNow.Date;
+    }
+
     private void Cancelar() => MudDialog.Cancel();
+
+    private async Task AbrirEdicaoJazigo()
+    {
+        if (jazigo == null) return;
+
+        var parameters = new DialogParameters { ["JazigoId"] = jazigo.Id };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditarJazigoDialog>("Dados do Jazigo", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task AbrirPagamento(Sakrus.Services.Documentos.LinhaFinanceira linha)
+    {
+        if (jazigo == null) return;
+
+        var parameters = new DialogParameters
+        {
+            ["JazigoId"] = jazigo.Id,
+            ["Exercicio"] = linha.Exercicio,
+            ["Tipo"] = linha.Tipo,
+            ["ValorSugerido"] = linha.Saldo > 0m ? linha.Saldo : linha.ValorDevido
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<RegistrarPagamentoDialog>("Registrar Pagamento", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await OnInitializedAsync();
+            StateHasChanged();
+        }
+    }
 
     private async Task GerarTermo()
     {

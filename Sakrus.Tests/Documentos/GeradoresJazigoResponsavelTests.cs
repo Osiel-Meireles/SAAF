@@ -37,7 +37,7 @@ public class GeradoresJazigoResponsavelTests
         var cemiterio = new Cemiterio { Nome = "Bela Vista" };
         var classificacao = new ClassificacaoEspaco { Nome = "Jazigo Tipo A", Natureza = NaturezaEspaco.Jazigo };
         var classificacaoPublica = new ClassificacaoEspaco { Nome = "Sepultura Simples", Natureza = NaturezaEspaco.Sepultura };
-        var modelo = new ModeloJazigo { Nome = "Tradicional" };
+        var modelo = new ModeloJazigo { Nome = "Tradicional", ValorManutencaoAnual = 100m };
         var titular = new Responsavel { Nome = "João Titular", CPF = "11122233344", RG = "MG-1", Endereco = "Rua A, 100", Telefone = "77 99999-0001" };
         var autorizada = new Responsavel { Nome = "Maria Autorizada", CPF = "55566677788" };
         var empresa = new Funeraria { Nome = "Funerária São Lucas", Ativo = true, EhExecutora = true };
@@ -72,7 +72,13 @@ public class GeradoresJazigoResponsavelTests
         db.Funerarias.Add(empresa);
         db.ClassificacoesEspaco.AddRange(classificacao, classificacaoPublica);
         db.ValoresMetroQuadrado.Add(new ValorMetroQuadrado { Exercicio = exercicioValor, Valor = valorM2 });
-        db.ConfiguracoesFinanceiras.Add(new ConfiguracaoFinanceira { ValorMetroQuadrado = valorM2 });
+        db.ConfiguracoesFinanceiras.Add(new ConfiguracaoFinanceira
+        {
+            ValorMetroQuadrado = valorM2,
+            TaxaManutencaoBase = 50m,
+            ValorConcessaoM2Quadras0102 = 276.66m,
+            ValorConcessaoM2Demais = 366.55m
+        });
         db.GavetasPublicas.Add(new GavetaPublica
         {
             Setor = "Planta Geral",
@@ -310,17 +316,26 @@ public class GeradoresJazigoResponsavelTests
         // 2024 (concessão + manutenção), 2025 e 2026 (manutenção).
         Assert.Equal(4, linhas.Count);
         Assert.Equal(1, linhas.Count(l => l.Tipo == TipoLancamento.Concessao));
-        Assert.Equal(600m, linhas.Single(l => l.Tipo == TipoLancamento.Manutencao && l.Exercicio == 2024).ValorDevido);
-        Assert.Equal(600m, linhas.Single(l => l.Tipo == TipoLancamento.Concessao).ValorDevido);
+        Assert.Equal(100m, linhas.Single(l => l.Tipo == TipoLancamento.Manutencao && l.Exercicio == 2024).ValorDevido);
+        // Quadra "3" (demais quadras): 6 m² × 366,55.
+        Assert.Equal(2199.30m, linhas.Single(l => l.Tipo == TipoLancamento.Concessao).ValorDevido);
     }
 
     [Fact]
-    public async Task Documento19_PreservaValorHistoricoDoExercicio()
+    public async Task Documento19_ExercicioPagoPreservaValorHistorico()
     {
         var b = await CriarBaseAsync(exercicioValor: 2024, valorM2: 100m);
         using (var db = b.Factory.CreateDbContext())
         {
-            db.ValoresMetroQuadrado.Add(new ValorMetroQuadrado { Exercicio = 2025, Valor = 120m });
+            db.LancamentosFinanceiros.Add(new LancamentoFinanceiro
+            {
+                JazigoId = b.JazigoId,
+                Exercicio = 2024,
+                Tipo = TipoLancamento.Manutencao,
+                Valor = 28m,
+                Pago = true,
+                DataPagamento = new DateTime(2024, 3, 10)
+            });
             await db.SaveChangesAsync();
         }
 
@@ -328,9 +343,14 @@ public class GeradoresJazigoResponsavelTests
         using var dbLeitura = b.Factory.CreateDbContext();
         var linhas = await FinanceiroJazigoComum.MontarLancamentosAsync(dbLeitura, jazigo, new DateTime(2024, 1, 15), DataEmissao);
 
-        Assert.Equal(100m, linhas.Single(l => l.Tipo == TipoLancamento.Manutencao && l.Exercicio == 2024).ValorM2);
-        Assert.Equal(120m, linhas.Single(l => l.Tipo == TipoLancamento.Manutencao && l.Exercicio == 2025).ValorM2);
-        Assert.Equal(720m, linhas.Single(l => l.Tipo == TipoLancamento.Manutencao && l.Exercicio == 2025).ValorDevido);
+        var pago2024 = linhas.Single(l => l.Tipo == TipoLancamento.Manutencao && l.Exercicio == 2024);
+        Assert.Equal(28m, pago2024.ValorDevido);
+        Assert.Equal(0m, pago2024.Saldo);
+
+        // Exercício em aberto usa o valor vigente do tipo de jazigo, sem juros.
+        var aberto2025 = linhas.Single(l => l.Tipo == TipoLancamento.Manutencao && l.Exercicio == 2025);
+        Assert.Equal(100m, aberto2025.ValorDevido);
+        Assert.Equal(100m, aberto2025.Saldo);
     }
 
     [Fact]
@@ -394,19 +414,19 @@ public class GeradoresJazigoResponsavelTests
         var area = jazigo.AreaM2!.Value;
         Assert.Equal(6m, area);
 
-        var taxaConcessao = RegrasDocumentos.CalcularValor(area, 100m);
-        Assert.Equal(600m, taxaConcessao);
+        var taxaConcessao = RegrasDocumentos.CalcularValor(area, 366.55m);
+        Assert.Equal(2199.30m, taxaConcessao);
 
         var maxParcelas = RegrasDocumentos.MaxParcelasPermitidas(taxaConcessao);
-        Assert.Equal(6, maxParcelas);
+        Assert.Equal(12, maxParcelas);
 
         var parcelas = RegrasDocumentos.SimularParcelamento(taxaConcessao, maxParcelas);
         Assert.Equal(taxaConcessao, parcelas.Sum(p => p.Valor));
         Assert.All(parcelas, p => Assert.True(p.Valor >= RegrasDocumentos.ParcelaMinima));
 
         var totalManutencoes = FinanceiroJazigoComum.FiltrarTipo(linhas, TipoLancamento.Manutencao).Sum(l => l.ValorDevido);
-        Assert.Equal(1800m, totalManutencoes);
-        Assert.Equal(2400m, taxaConcessao + totalManutencoes);
+        Assert.Equal(300m, totalManutencoes);
+        Assert.Equal(2499.30m, taxaConcessao + totalManutencoes);
     }
 
     [Fact]

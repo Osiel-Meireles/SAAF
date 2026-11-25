@@ -378,6 +378,14 @@ namespace Sakrus.Infrastructure.Migrations
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
 
+                    b.Property<decimal>("ValorConcessaoM2Demais")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal>("ValorConcessaoM2Quadras0102")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
                     b.Property<decimal>("ValorMetroQuadrado")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
@@ -998,6 +1006,12 @@ namespace Sakrus.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<int?>("QuantidadeGavetas")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("QuantidadeGavetasOssuario")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Revestimento")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
@@ -1139,6 +1153,10 @@ namespace Sakrus.Infrastructure.Migrations
                         .HasColumnType("numeric(5,2)");
 
                     b.Property<decimal>("TaxaConstrucao")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal>("ValorManutencaoAnual")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
 

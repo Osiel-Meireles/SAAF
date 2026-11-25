@@ -42,6 +42,49 @@ public static class FinanceiroJazigoComum
         return config?.ValorMetroQuadrado ?? 0m;
     }
 
+    /// <summary>
+    /// Valor do m² da concessão: quadras 01 e 02 usam um valor e as demais quadras outro.
+    /// </summary>
+    public static async Task<decimal> ObterValorConcessaoM2Async(ApplicationDbContext db, Jazigo jazigo)
+    {
+        var config = await db.ConfiguracoesFinanceiras
+            .OrderByDescending(c => c.DataUltimaAtualizacao)
+            .FirstOrDefaultAsync();
+
+        if (config == null)
+            return 0m;
+
+        return EhQuadra0102(jazigo.Quadra)
+            ? config.ValorConcessaoM2Quadras0102
+            : config.ValorConcessaoM2Demais;
+    }
+
+    /// <summary>
+    /// Valor anual da manutenção definido pelo tipo de jazigo. Sem valor no tipo,
+    /// usa a taxa de manutenção base da configuração financeira.
+    /// </summary>
+    public static async Task<decimal> ObterValorManutencaoAsync(ApplicationDbContext db, Jazigo jazigo)
+    {
+        var modelo = jazigo.ModeloJazigo
+            ?? await db.ModelosJazigos.FirstOrDefaultAsync(m => m.Id == jazigo.ModeloJazigoId);
+
+        if (modelo != null && modelo.ValorManutencaoAnual > 0m)
+            return modelo.ValorManutencaoAnual;
+
+        var config = await db.ConfiguracoesFinanceiras
+            .OrderByDescending(c => c.DataUltimaAtualizacao)
+            .FirstOrDefaultAsync();
+
+        return config?.TaxaManutencaoBase ?? 0m;
+    }
+
+    private static bool EhQuadra0102(string? quadra)
+    {
+        var valor = (quadra ?? string.Empty).Trim();
+        return valor.StartsWith("01", StringComparison.Ordinal)
+            || valor.StartsWith("02", StringComparison.Ordinal);
+    }
+
     public static DateTime ResolverDataBase(ContextoEmissao ctx, Jazigo jazigo, IReadOnlyList<LancamentoFinanceiro> lancamentos)
     {
         var informada = ctx.Campos.GetData("dataBase");
@@ -79,6 +122,8 @@ public static class FinanceiroJazigoComum
             .ToListAsync();
 
         var area = jazigo.AreaM2;
+        var valorConcessaoM2 = await ObterValorConcessaoM2Async(db, jazigo);
+        var valorManutencao = await ObterValorManutencaoAsync(db, jazigo);
         var exercicioInicial = dataBase.Year;
         var exercicioReferencia = referencia.Year;
         var exercicioMaximo = lancamentos.Count > 0
@@ -99,8 +144,8 @@ public static class FinanceiroJazigoComum
             foreach (var tipo in tipos)
             {
                 var doAno = lancamentos.Where(l => l.Exercicio == exercicio && l.Tipo == tipo).ToList();
-                var valorM2 = await ObterValorM2Async(db, exercicio);
-                var devido = CalcularDevido(doAno, area, valorM2);
+                var valorUnitario = tipo == TipoLancamento.Concessao ? valorConcessaoM2 : valorManutencao;
+                var devido = CalcularDevido(doAno, tipo, area, valorConcessaoM2, valorManutencao);
                 var pago = Math.Round(doAno.Where(l => l.Pago).Sum(l => l.Valor), 2, MidpointRounding.AwayFromZero);
                 var comprovante = doAno
                     .Select(l => l.Observacao)
@@ -114,7 +159,7 @@ public static class FinanceiroJazigoComum
                 linhas.Add(new LinhaFinanceira(
                     exercicio,
                     tipo,
-                    valorM2,
+                    valorUnitario,
                     area,
                     devido,
                     pago,
@@ -126,15 +171,30 @@ public static class FinanceiroJazigoComum
         return linhas;
     }
 
-    private static decimal CalcularDevido(IReadOnlyList<LancamentoFinanceiro> doAno, decimal? area, decimal valorM2)
+    private static decimal CalcularDevido(
+        IReadOnlyList<LancamentoFinanceiro> doAno,
+        TipoLancamento tipo,
+        decimal? area,
+        decimal valorConcessaoM2,
+        decimal valorManutencao)
     {
-        if (doAno.Count > 0)
+        if (tipo == TipoLancamento.Concessao)
+        {
+            if (doAno.Count > 0)
+                return Math.Round(doAno.Sum(l => l.Valor), 2, MidpointRounding.AwayFromZero);
+
+            if (area == null || valorConcessaoM2 <= 0m)
+                return 0m;
+
+            return RegrasDocumentos.CalcularValor(area.Value, valorConcessaoM2);
+        }
+
+        // Manutenção: exercício quitado preserva o valor histórico registrado.
+        // Exercício em aberto (ou sem lançamento) passa a valer o valor vigente do tipo de jazigo.
+        if (doAno.Any(l => l.Pago))
             return Math.Round(doAno.Sum(l => l.Valor), 2, MidpointRounding.AwayFromZero);
 
-        if (area == null || valorM2 <= 0m)
-            return 0m;
-
-        return RegrasDocumentos.CalcularValor(area.Value, valorM2);
+        return valorManutencao;
     }
 
     public static IReadOnlyList<LinhaFinanceira> FiltrarTipo(IEnumerable<LinhaFinanceira> linhas, TipoLancamento tipo)

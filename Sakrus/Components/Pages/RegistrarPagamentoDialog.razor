@@ -1,0 +1,121 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Payments" Class="mr-2" />
+            Registrar pagamento — @TipoLabel
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="formValido">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="int" @bind-Value="exercicio" Label="Exercício" Min="1900" Max="2200" Required="true" HideSpinButtons="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" @bind-Value="valor" Label="Valor pago (R$)" Min="0m" Format="N2" Required="true"
+                                     Adornment="Adornment.Start" AdornmentText="R$" HideSpinButtons="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Data do pagamento" @bind-Date="dataPagamento" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="documento" Label="Nº documento / comprovante" MaxLength="300" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Disabled="@salvando">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="Salvar" Disabled="@(!formValido || salvando)">
+            Confirmar pagamento
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int JazigoId { get; set; }
+    [Parameter] public int Exercicio { get; set; }
+    [Parameter] public TipoLancamento Tipo { get; set; }
+    [Parameter] public decimal ValorSugerido { get; set; }
+
+    private MudForm form = null!;
+    private bool formValido;
+    private bool salvando;
+
+    private int exercicio;
+    private decimal valor;
+    private DateTime? dataPagamento = DateTime.Today;
+    private string? documento;
+
+    private string TipoLabel => Tipo == TipoLancamento.Concessao ? "Concessão" : "Manutenção";
+
+    protected override void OnInitialized()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        exercicio = Exercicio;
+        valor = ValorSugerido;
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        await form.Validate();
+        if (!form.IsValid) return;
+
+        salvando = true;
+        try
+        {
+            var lancamento = await DbContext.LancamentosFinanceiros
+                .Where(l => l.JazigoId == JazigoId && l.Exercicio == exercicio && l.Tipo == Tipo && !l.Pago)
+                .OrderBy(l => l.Id)
+                .FirstOrDefaultAsync();
+
+            if (lancamento == null)
+            {
+                lancamento = new LancamentoFinanceiro
+                {
+                    JazigoId = JazigoId,
+                    Exercicio = exercicio,
+                    Tipo = Tipo
+                };
+                DbContext.LancamentosFinanceiros.Add(lancamento);
+            }
+
+            lancamento.Valor = valor;
+            lancamento.Pago = true;
+            lancamento.DataPagamento = dataPagamento.HasValue
+                ? DateTime.SpecifyKind(dataPagamento.Value, DateTimeKind.Utc)
+                : DateTime.UtcNow;
+            lancamento.Observacao = string.IsNullOrWhiteSpace(documento) ? null : documento.Trim();
+
+            await DbContext.SaveChangesAsync();
+
+            Snackbar.Add($"Pagamento de {TipoLabel} ({exercicio}) registrado com sucesso.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao registrar o pagamento: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            salvando = false;
+        }
+    }
+}

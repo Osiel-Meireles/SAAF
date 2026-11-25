@@ -85,7 +85,7 @@
                     <MudTextField @bind-Value="novoAtendimento.Falecido.Nome" Label="Nome Completo do Falecido" Required="true" RequiredError="Nome é obrigatório" />
                 </MudItem>
                 <MudItem xs="12" sm="3">
-                    <MudTextField @bind-Value="novoAtendimento.Falecido.Cpf" Label="CPF do Falecido (somente números)" Required="true" RequiredError="CPF é obrigatório" HelperText="11 dígitos, sem pontuação" />
+                    <MudTextField @bind-Value="novoAtendimento.Falecido.Cpf" Label="CPF do Falecido (somente números)" HelperText="Opcional. 11 dígitos, sem pontuação" />
                 </MudItem>
                 <MudItem xs="12" sm="3">
                     <MudDatePicker Label="Data de Nascimento" @bind-Date="dataNascimento" Editable="true" HelperText="Opcional — usado para regra de jazigo infantil" />

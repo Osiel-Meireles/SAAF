@@ -18,4 +18,11 @@ public class ModeloJazigo
     
     [Range(0, double.MaxValue)]
     public decimal TaxaConstrucao { get; set; }
+
+    /// <summary>
+    /// Valor anual da taxa de manutenção cobrado para este tipo de jazigo.
+    /// É o valor vigente aplicado a todos os exercícios em aberto na folha financeira.
+    /// </summary>
+    [Range(0, double.MaxValue)]
+    public decimal ValorManutencaoAnual { get; set; }
 }

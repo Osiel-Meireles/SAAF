@@ -95,7 +95,7 @@
                                     <MudTextField @bind-Value="novoFalecido.Nome" Label="Nome do Falecido" Required="true" RequiredError="Nome é obrigatório" />
                                 </MudItem>
                                 <MudItem xs="12" sm="6">
-                                    <MudTextField @bind-Value="novoFalecido.Cpf" Label="CPF (somente números)" Required="true" RequiredError="CPF é obrigatório" HelperText="11 dígitos, sem pontuação" />
+                                    <MudTextField @bind-Value="novoFalecido.Cpf" Label="CPF (somente números)" HelperText="Opcional. 11 dígitos, sem pontuação" />
                                 </MudItem>
                                 <MudItem xs="12" sm="6">
                                     <MudSelect T="CausaMorte" Label="Causa da Morte" @bind-Value="novoFalecido.CausaMorte" Required="true">

@@ -1,0 +1,169 @@
+@using Sakrus.Core.Entities
+@using Sakrus.Core.Helpers
+@using Sakrus.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
+            Dados do Jazigo @jazigo?.CodigoIdentificador
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (jazigo == null)
+        {
+            <MudAlert Severity="Severity.Error">Jazigo não encontrado.</MudAlert>
+        }
+        else
+        {
+            <MudForm @ref="form" @bind-IsValid="formValido">
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int" Label="Tipo de jazigo" @bind-Value="modeloId" Required="true" RequiredError="Informe o tipo de jazigo">
+                            @foreach (var modelo in modelos)
+                            {
+                                <MudSelectItem Value="@modelo.Id">@modelo.Nome</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="revestimento" Label="Revestimento" MaxLength="150" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="int?" @bind-Value="quantidadeGavetas" Label="Quantidade de gavetas" Min="0" HideSpinButtons="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="int?" @bind-Value="quantidadeGavetasOssuario" Label="Gavetas destinadas a ossuário" Min="0" HideSpinButtons="true"
+                                         HelperText="Não pode exceder a quantidade total de gavetas" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="decimal?" @bind-Value="largura" Label="Largura (m)" Min="0m" Format="N2" HideSpinButtons="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="decimal?" @bind-Value="comprimento" Label="Comprimento (m)" Min="0m" Format="N2" HideSpinButtons="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            Área total: <strong>@AreaFormatada</strong> (largura × comprimento)
+                        </MudAlert>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Disabled="@salvando">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Salvar" Disabled="@(!formValido || salvando || jazigo == null)">
+            Salvar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private ApplicationDbContext DbContext = default!;
+
+    public void Dispose()
+    {
+        DbContext?.Dispose();
+    }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int JazigoId { get; set; }
+
+    private MudForm form = null!;
+    private bool formValido;
+    private bool isLoading = true;
+    private bool salvando;
+
+    private Jazigo? jazigo;
+    private List<ModeloJazigo> modelos = new();
+
+    private int modeloId;
+    private string? revestimento;
+    private int? quantidadeGavetas;
+    private int? quantidadeGavetasOssuario;
+    private decimal? largura;
+    private decimal? comprimento;
+
+    private string AreaFormatada
+    {
+        get
+        {
+            var area = RegrasDocumentos.CalcularAreaM2(largura, comprimento);
+            return area.HasValue ? $"{area.Value:N2} m²" : "—";
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        DbContext = DbFactory.CreateDbContext();
+        modelos = await DbContext.ModelosJazigos.OrderBy(m => m.Nome).ToListAsync();
+        jazigo = await DbContext.Jazigos.FirstOrDefaultAsync(j => j.Id == JazigoId);
+
+        if (jazigo != null)
+        {
+            modeloId = jazigo.ModeloJazigoId;
+            revestimento = jazigo.Revestimento;
+            quantidadeGavetas = jazigo.QuantidadeGavetas;
+            quantidadeGavetasOssuario = jazigo.QuantidadeGavetasOssuario;
+            largura = jazigo.Largura;
+            comprimento = jazigo.Comprimento;
+        }
+
+        isLoading = false;
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        await form.Validate();
+        if (!form.IsValid || jazigo == null) return;
+
+        if (quantidadeGavetasOssuario.HasValue && quantidadeGavetas.HasValue
+            && quantidadeGavetasOssuario.Value > quantidadeGavetas.Value)
+        {
+            Snackbar.Add("As gavetas de ossuário não podem exceder a quantidade total de gavetas.", Severity.Warning);
+            return;
+        }
+
+        salvando = true;
+        try
+        {
+            jazigo.ModeloJazigoId = modeloId;
+            jazigo.Revestimento = string.IsNullOrWhiteSpace(revestimento) ? null : revestimento.Trim();
+            jazigo.QuantidadeGavetas = quantidadeGavetas;
+            jazigo.QuantidadeGavetasOssuario = quantidadeGavetasOssuario;
+            jazigo.Largura = largura;
+            jazigo.Comprimento = comprimento;
+
+            DbContext.Jazigos.Update(jazigo);
+            await DbContext.SaveChangesAsync();
+
+            Snackbar.Add("Dados do jazigo atualizados com sucesso.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar o jazigo: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            salvando = false;
+        }
+    }
+}

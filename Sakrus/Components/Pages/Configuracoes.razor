@@ -103,6 +103,58 @@ else
                                  HelperText="Valor fixo cobrado na concessão" />
             </MudItem>
 
+            <MudItem xs="12" sm="4">
+                <MudNumericField @bind-Value="_config.ValorConcessaoM2Quadras0102"
+                                 Label="Concessão por m² — Quadras 01 e 02 (R$)"
+                                 Variant="Variant.Outlined"
+                                 Format="N2"
+                                 Min="0m"
+                                 Adornment="Adornment.Start"
+                                 AdornmentText="R$"
+                                 Required="true"
+                                 HideSpinButtons="true"
+                                 HelperText="Multiplicado pela área total do lote" />
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudNumericField @bind-Value="_config.ValorConcessaoM2Demais"
+                                 Label="Concessão por m² — Demais quadras (R$)"
+                                 Variant="Variant.Outlined"
+                                 Format="N2"
+                                 Min="0m"
+                                 Adornment="Adornment.Start"
+                                 AdornmentText="R$"
+                                 Required="true"
+                                 HideSpinButtons="true"
+                                 HelperText="Multiplicado pela área total do lote" />
+            </MudItem>
+
+            @* ── Manutenção por tipo de jazigo ── *@
+            <MudItem xs="12">
+                <MudDivider Class="my-2" />
+                <div class="section-header mt-4">
+                    <MudIcon Icon="@Icons.Material.Filled.HomeWork" Class="mr-2" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h6">Manutenção por tipo de jazigo</MudText>
+                </div>
+                <MudText Typo="Typo.body2" Class="mb-4" Style="color:var(--mud-palette-text-secondary);">
+                    Valor anual cobrado em cada exercício em aberto na folha financeira. Sem juros ou multa.
+                </MudText>
+            </MudItem>
+
+            @foreach (var modelo in _modelos)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudNumericField @bind-Value="modelo.ValorManutencaoAnual"
+                                     Label="@($"{modelo.Nome} (R$/ano)")"
+                                     Variant="Variant.Outlined"
+                                     Format="N2"
+                                     Min="0m"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="R$"
+                                     HideSpinButtons="true" />
+                </MudItem>
+            }
+
             @* ── DIVIDER ── *@
             <MudItem xs="12">
                 <MudDivider Class="my-2" />
@@ -316,6 +368,8 @@ else
     private bool _salvando;
     private ConfiguracaoFinanceira? _config;
     private ConfiguracaoFinanceira? _configOriginal; // para o botão Descartar
+    private List<ModeloJazigo> _modelos = new();
+    private Dictionary<int, decimal> _modelosOriginal = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -347,6 +401,8 @@ else
             ValorMetroQuadrado    = _config.ValorMetroQuadrado,
             TaxaManutencaoBase    = _config.TaxaManutencaoBase,
             TaxaConcessaoBase     = _config.TaxaConcessaoBase,
+            ValorConcessaoM2Quadras0102 = _config.ValorConcessaoM2Quadras0102,
+            ValorConcessaoM2Demais      = _config.ValorConcessaoM2Demais,
             PrecoUrnaBasica       = _config.PrecoUrnaBasica,
             PrecoUrnaEspecial     = _config.PrecoUrnaEspecial,
             PrecoTransladoPorKm   = _config.PrecoTransladoPorKm,
@@ -355,6 +411,9 @@ else
             DataUltimaAtualizacao = _config.DataUltimaAtualizacao,
             AtualizadoPor         = _config.AtualizadoPor
         };
+
+        _modelos = await DbContext.ModelosJazigos.OrderBy(m => m.Nome).ToListAsync();
+        _modelosOriginal = _modelos.ToDictionary(m => m.Id, m => m.ValorManutencaoAnual);
 
         _carregando = false;
     }
@@ -407,6 +466,8 @@ else
                 ValorMetroQuadrado    = _config.ValorMetroQuadrado,
                 TaxaManutencaoBase    = _config.TaxaManutencaoBase,
                 TaxaConcessaoBase     = _config.TaxaConcessaoBase,
+                ValorConcessaoM2Quadras0102 = _config.ValorConcessaoM2Quadras0102,
+                ValorConcessaoM2Demais      = _config.ValorConcessaoM2Demais,
                 PrecoUrnaBasica       = _config.PrecoUrnaBasica,
                 PrecoUrnaEspecial     = _config.PrecoUrnaEspecial,
                 PrecoTransladoPorKm   = _config.PrecoTransladoPorKm,
@@ -415,6 +476,8 @@ else
                 DataUltimaAtualizacao = _config.DataUltimaAtualizacao,
                 AtualizadoPor         = _config.AtualizadoPor
             };
+
+            _modelosOriginal = _modelos.ToDictionary(m => m.Id, m => m.ValorManutencaoAnual);
 
             Snackbar.Add("Configuração financeira salva com sucesso!", Severity.Success);
         }
@@ -436,11 +499,19 @@ else
         _config.ValorMetroQuadrado  = _configOriginal.ValorMetroQuadrado;
         _config.TaxaManutencaoBase  = _configOriginal.TaxaManutencaoBase;
         _config.TaxaConcessaoBase   = _configOriginal.TaxaConcessaoBase;
+        _config.ValorConcessaoM2Quadras0102 = _configOriginal.ValorConcessaoM2Quadras0102;
+        _config.ValorConcessaoM2Demais      = _configOriginal.ValorConcessaoM2Demais;
         _config.PrecoUrnaBasica     = _configOriginal.PrecoUrnaBasica;
         _config.PrecoUrnaEspecial   = _configOriginal.PrecoUrnaEspecial;
         _config.PrecoTransladoPorKm = _configOriginal.PrecoTransladoPorKm;
         _config.PrecoPompa          = _configOriginal.PrecoPompa;
         _config.PrecoPreparoCorpo   = _configOriginal.PrecoPreparoCorpo;
+
+        foreach (var modelo in _modelos)
+        {
+            if (_modelosOriginal.TryGetValue(modelo.Id, out var valorOriginal))
+                modelo.ValorManutencaoAnual = valorOriginal;
+        }
 
         Snackbar.Add("Alterações descartadas.", Severity.Info);
     }

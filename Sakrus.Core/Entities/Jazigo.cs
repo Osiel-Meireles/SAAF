@@ -53,6 +53,12 @@ public class Jazigo
     public decimal? Largura { get; set; }
     public decimal? Comprimento { get; set; }
 
+    /// <summary>Quantidade total de gavetas previstas para este jazigo.</summary>
+    public int? QuantidadeGavetas { get; set; }
+
+    /// <summary>Quantidade de gavetas que serão destinadas a ossuário.</summary>
+    public int? QuantidadeGavetasOssuario { get; set; }
+
     [MaxLength(150)]
     public string? Revestimento { get; set; }
 
