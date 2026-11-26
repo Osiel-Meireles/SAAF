@@ -216,9 +216,9 @@
             );
 
         // Load Gavetas
-        var todasGavetas = await DbContext.GavetasPublicas
-            .OrderBy(g => g.NumeroGaveta)
-            .ToListAsync();
+        var todasGavetas = (await DbContext.GavetasPublicas.ToListAsync())
+            .OrdenarPor(g => g.NumeroGaveta)
+            .ToList();
             
         var gavetasValidas = todasGavetas.Select(g => {
             g.Quadra = string.IsNullOrWhiteSpace(g.Quadra) ? "S/Q" : g.Quadra;

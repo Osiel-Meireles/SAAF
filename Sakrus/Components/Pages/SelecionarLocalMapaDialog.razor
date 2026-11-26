@@ -441,7 +441,9 @@
         if (FalecidoIsInfantil.HasValue)
             query = query.Where(g => g.IsInfantil == FalecidoIsInfantil.Value);
 
-        var todasGavetas = await query.OrderBy(g => g.NumeroGaveta).ToListAsync();
+        var todasGavetas = (await query.ToListAsync())
+            .OrdenarPor(g => g.NumeroGaveta)
+            .ToList();
 
         var gavetasValidas = todasGavetas.Select(g =>
         {

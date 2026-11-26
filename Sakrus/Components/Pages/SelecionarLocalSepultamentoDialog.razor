@@ -297,10 +297,11 @@
         // ── GAVETAS ───────────────────────────────────────────────────────────
         if (TipoLocal == "Gaveta")
         {
-            var todasGavetas = await db.GavetasPublicas
+            var todasGavetas = (await db.GavetasPublicas
                 .Where(g => g.IsInfantil == FalecidoIsInfantil)          // Regra de negócio
-                .OrderBy(g => g.NumeroGaveta)
-                .ToListAsync();
+                .ToListAsync())
+                .OrdenarPor(g => g.NumeroGaveta)
+                .ToList();
 
             var gavetasValidas = todasGavetas.Select(g =>
             {
